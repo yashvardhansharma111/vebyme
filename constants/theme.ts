@@ -1,41 +1,49 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Theme colors - White and Purple
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#1A1A1A',
+    background: '#FFFFFF',
+    tint: '#8B5CF6', // Purple
+    icon: '#8B5CF6',
+    tabIconDefault: '#9CA3AF',
+    tabIconSelected: '#8B5CF6',
+    primary: '#8B5CF6',
+    primaryDark: '#7C3AED',
+    secondary: '#A78BFA',
+    border: '#E5E7EB',
+    error: '#EF4444',
+    success: '#10B981',
+    inputBackground: '#F9FAFB',
+    cardBackground: '#FFFFFF',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#FFFFFF',
+    background: '#1A1A1A',
+    tint: '#A78BFA',
+    icon: '#A78BFA',
+    tabIconDefault: '#6B7280',
+    tabIconSelected: '#A78BFA',
+    primary: '#A78BFA',
+    primaryDark: '#8B5CF6',
+    secondary: '#C4B5FD',
+    border: '#374151',
+    error: '#F87171',
+    success: '#34D399',
+    inputBackground: '#111827',
+    cardBackground: '#1F2937',
   },
 };
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
@@ -51,3 +59,12 @@ export const Fonts = Platform.select({
     mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
   },
 });
+
+// Border radius constants for rounded corners
+export const borderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  full: 9999,
+};
