@@ -1,19 +1,21 @@
 import SwipeableEventCard from '@/components/SwipeableEventCard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // ... Mock Data (EVENTS, FILTERS) same as before ... 
 const EVENTS = [
-  { id: 1, user: { name: 'Shreya Aggarwal', avatar: 'https://i.pravatar.cc/150?u=shreya', time: 'Thursday, 2:37pm' }, event: { title: 'Spontaneous ooty trip?', description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Hitchhiking'], image: 'https://picsum.photos/id/1011/200/300' }},
-  { id: 2, user: { name: 'Aman Mehra', avatar: 'https://i.pravatar.cc/150?u=aman', time: 'Thursday, 4:00pm' }, event: { title: 'Let’s go for cycling today!', description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Cycling'], image: 'https://picsum.photos/id/1025/200/300' }}
+  { id: 1, user: { id: '1', name: 'Shreya Aggarwal', avatar: 'https://i.pravatar.cc/150?u=shreya', time: 'Thursday, 2:37pm' }, event: { title: 'Spontaneous ooty trip?', description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Hitchhiking'], image: 'https://picsum.photos/id/1011/200/300' }},
+  { id: 2, user: { id: '2', name: 'Aman Mehra', avatar: 'https://i.pravatar.cc/150?u=aman', time: 'Thursday, 4:00pm' }, event: { title: "Let's go for cycling today!", description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Cycling'], image: 'https://picsum.photos/id/1025/200/300' }}
 ];
 const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports'];
 
 export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState('Clubs');
+  const router = useRouter();
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -46,7 +48,9 @@ export default function HomeScreen() {
                   <Text style={styles.locationSubtitle}>Bengaluru</Text>
                 </View>
               </View>
-              <Image source={{ uri: 'https://i.pravatar.cc/150?u=me' }} style={styles.headerAvatar} />
+              <TouchableOpacity onPress={() => router.push('/profile')}>
+                <Image source={{ uri: 'https://i.pravatar.cc/150?u=me' }} style={styles.headerAvatar} />
+              </TouchableOpacity>
             </View>
 
             {/* Filters */}
@@ -87,7 +91,12 @@ export default function HomeScreen() {
             {/* Feed */}
             <View style={styles.feed}>
               {EVENTS.map(item => (
-                <SwipeableEventCard key={item.id} user={item.user} event={item.event} />
+                <SwipeableEventCard 
+                  key={item.id} 
+                  user={item.user} 
+                  event={item.event}
+                  onUserPress={(userId: string) => router.push({ pathname: '/otherProfile/[id]', params: { id: userId } } as any)}
+                />
               ))}
             </View>
           </ScrollView>

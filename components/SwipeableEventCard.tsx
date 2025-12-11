@@ -4,7 +4,7 @@ import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 
 // --- The Base Event Card ---
-function EventCard({ user, event }: any) {
+function EventCard({ user, event, onUserPress }: any) {
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
@@ -40,19 +40,23 @@ function EventCard({ user, event }: any) {
       </View>
 
       {/* Floating User Pill */}
-      <View style={styles.userPill}>
+      <TouchableOpacity 
+        style={styles.userPill}
+        onPress={() => onUserPress && user.id && onUserPress(user.id)}
+        activeOpacity={0.7}
+      >
         <Image source={{ uri: user.avatar }} style={styles.avatar} />
         <View>
           <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.userTime}>{user.time}</Text>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 }
 
 // --- The Swipe Wrapper ---
-export default function SwipeableEventCard({ user, event }: any) {
+export default function SwipeableEventCard({ user, event, onUserPress }: any) {
   // Logic: Reveal the Left Action (Save icon) when swiping
   const renderLeftActions = (progress: any, dragX: any) => {
     const trans = dragX.interpolate({
@@ -73,7 +77,7 @@ export default function SwipeableEventCard({ user, event }: any) {
 
   return (
     <Swipeable renderLeftActions={renderLeftActions} containerStyle={styles.swipeContainer}>
-      <EventCard user={user} event={event} />
+      <EventCard user={user} event={event} onUserPress={onUserPress} />
     </Swipeable>
   );
 }
