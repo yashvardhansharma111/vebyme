@@ -1,9 +1,10 @@
 import SwipeableEventCard from '@/components/SwipeableEventCard';
+import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { Image, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ActivityIndicator, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
@@ -29,16 +30,180 @@ function ProfileAvatar() {
   );
 }
 
-// ... Mock Data (EVENTS, FILTERS) same as before ... 
-const EVENTS = [
-  { id: 1, user: { id: '1', name: 'Shreya Aggarwal', avatar: 'https://i.pravatar.cc/150?u=shreya', time: 'Thursday, 2:37pm' }, event: { title: 'Spontaneous ooty trip?', description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Hitchhiking'], image: 'https://picsum.photos/id/1011/200/300' }},
-  { id: 2, user: { id: '2', name: 'Aman Mehra', avatar: 'https://i.pravatar.cc/150?u=aman', time: 'Thursday, 4:00pm' }, event: { title: "Let's go for cycling today!", description: 'Leaving to Ooty tomorrow...', tags: ['Weekend', 'Evening', 'Cycling'], image: 'https://picsum.photos/id/1025/200/300' }}
-];
 const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports'];
+
+interface FeedPost {
+  post_id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  media: Array<{ url: string; type: string }>;
+  tags: string[];
+  timestamp: string | Date;
+  location: any;
+  is_active: boolean;
+  interaction_count: number;
+}
+
+interface FormattedEvent {
+  id: string;
+  user: {
+    id: string;
+    name: string;
+    avatar: string;
+    time: string;
+  };
+  event: {
+    title: string;
+    description: string;
+    tags: string[];
+    image: string;
+  };
+}
 
 export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState('Clubs');
+  const [events, setEvents] = useState<FormattedEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
+
+  // User profile cache to avoid fetching same user multiple times
+  const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
+
+  useEffect(() => {
+    if (user?.session_id && !currentUser) {
+      dispatch(fetchCurrentUser(user.session_id));
+    }
+  }, [user, currentUser, dispatch]);
+
+  const fetchUserProfile = useCallback(async (user_id: string) => {
+    // Check cache first
+    if (userCache[user_id]) {
+      return userCache[user_id];
+    }
+
+    try {
+      const response = await apiService.getUserProfile(user_id);
+      if (response.data) {
+        const userData = {
+          name: response.data.name || 'Unknown User',
+          profile_image: response.data.profile_image || 'https://via.placeholder.com/44',
+        };
+        setUserCache((prev) => ({ ...prev, [user_id]: userData }));
+        return userData;
+      }
+    } catch (error) {
+      console.error(`Error fetching user ${user_id}:`, error);
+    }
+
+    // Return default if fetch fails
+    return {
+      name: 'Unknown User',
+      profile_image: 'https://via.placeholder.com/44',
+    };
+  }, [userCache]);
+
+  const formatTimestamp = (timestamp: string | Date): string => {
+    try {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+
+      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return 'Recently';
+    }
+  };
+
+  const formatFeedData = useCallback(async (posts: FeedPost[]): Promise<FormattedEvent[]> => {
+    const formattedEvents = await Promise.all(
+      posts.map(async (post) => {
+        const userData = await fetchUserProfile(post.user_id);
+        const imageUrl = post.media && post.media.length > 0 ? post.media[0].url : 'https://picsum.photos/id/1011/200/300';
+
+        return {
+          id: post.post_id,
+          user: {
+            id: post.user_id,
+            name: userData.name,
+            avatar: userData.profile_image || 'https://via.placeholder.com/44',
+            time: formatTimestamp(post.timestamp),
+          },
+          event: {
+            title: post.title || 'Untitled Post',
+            description: post.description || 'No description',
+            tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
+            image: imageUrl,
+          },
+        };
+      })
+    );
+
+    return formattedEvents;
+  }, [fetchUserProfile]);
+
+  const loadFeed = useCallback(async (isRefresh = false) => {
+    if (!user?.user_id) {
+      setError('Please login to view feed');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      if (isRefresh) {
+        setIsRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
+      setError(null);
+
+      // Map filter to category if applicable
+      const filters: any = {};
+      const categoryFilters = ['Clubs', 'Music', 'Cafe'];
+      if (activeFilter && categoryFilters.includes(activeFilter)) {
+        filters.category_main = activeFilter.toLowerCase();
+      }
+      // Note: 'Today', 'Comedy', 'Sports' filters could be implemented with temporal_tags or other logic
+      // For now, we'll just show all posts when these are selected
+
+      const response = await apiService.getHomeFeed(user.user_id, filters, { limit: 20, offset: 0 });
+      
+      if (response.data && Array.isArray(response.data)) {
+        const formatted = await formatFeedData(response.data);
+        setEvents(formatted);
+      } else {
+        setEvents([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading feed:', err);
+      setError(err.message || 'Failed to load feed');
+      setEvents([]);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [user, activeFilter, formatFeedData]);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  const onRefresh = useCallback(() => {
+    loadFeed(true);
+  }, [loadFeed]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -56,6 +221,9 @@ export default function HomeScreen() {
           <ScrollView 
             contentContainerStyle={styles.scrollContainer} 
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
+            }
           >
             {/* Header */}
             <View style={styles.header}>
@@ -81,7 +249,14 @@ export default function HomeScreen() {
               {FILTERS.map((filter, index) => {
                 const isActive = activeFilter === filter;
                 return (
-                  <TouchableOpacity key={index} style={isActive ? styles.activeFilterChip : styles.filterChip} onPress={() => setActiveFilter(filter)}>
+                  <TouchableOpacity
+                    key={index}
+                    style={isActive ? styles.activeFilterChip : styles.filterChip}
+                    onPress={() => {
+                      setActiveFilter(filter);
+                      // Feed will reload automatically via useEffect when activeFilter changes
+                    }}
+                  >
                     <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
                   </TouchableOpacity>
                 );
@@ -105,7 +280,10 @@ export default function HomeScreen() {
                   <Image key={i} source={{ uri: `https://i.pravatar.cc/150?u=${i + 10}` }} style={[styles.miniAvatar, { marginLeft: i === 0 ? 0 : -12, zIndex: 10-i }]} />
                 ))}
               </View>
-              <TouchableOpacity style={styles.createBtn}>
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={() => router.push('/(tabs)/createPost')}
+              >
                 <Ionicons name="add" size={20} color="#FFF" style={{ marginRight: 8 }} />
                 <Text style={styles.createBtnText}>Create your own plan</Text>
               </TouchableOpacity>
@@ -113,14 +291,33 @@ export default function HomeScreen() {
 
             {/* Feed */}
             <View style={styles.feed}>
-              {EVENTS.map(item => (
-                <SwipeableEventCard 
-                  key={item.id} 
-                  user={item.user} 
-                  event={item.event}
-                  onUserPress={(userId: string) => router.push({ pathname: '/otherProfile/[id]', params: { id: userId } } as any)}
-                />
-              ))}
+              {isLoading && events.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color="#4A3B69" />
+                  <Text style={styles.loadingText}>Loading feed...</Text>
+                </View>
+              ) : error && events.length === 0 ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                  <TouchableOpacity style={styles.retryButton} onPress={() => loadFeed()}>
+                    <Text style={styles.retryButtonText}>Retry</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : events.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No posts found</Text>
+                  <Text style={styles.emptySubtext}>Be the first to create a post!</Text>
+                </View>
+              ) : (
+                events.map((item) => (
+                  <SwipeableEventCard
+                    key={item.id}
+                    user={item.user}
+                    event={item.event}
+                    onUserPress={(userId: string) => router.push({ pathname: '/otherProfile/[id]', params: { id: userId } } as any)}
+                  />
+                ))
+              )}
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -192,4 +389,13 @@ const styles = StyleSheet.create({
   createBtn: { backgroundColor: '#1C1C1E', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 30 },
   createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   feed: { paddingBottom: 20 },
+  loadingContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14, color: '#666' },
+  errorContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+  errorText: { fontSize: 14, color: '#FF3B30', textAlign: 'center', marginBottom: 16 },
+  retryButton: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 20 },
+  retryButtonText: { color: '#FFF', fontWeight: '600', fontSize: 14 },
+  emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { fontSize: 16, fontWeight: '600', color: '#666', marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: '#999', textAlign: 'center' },
 });

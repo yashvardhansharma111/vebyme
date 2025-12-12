@@ -282,6 +282,30 @@ class ApiService {
     }
     return data;
   }
+
+  // Feed APIs
+  async getHomeFeed(user_id: string, filters?: { category_main?: string; category_sub?: string[]; location?: any }, pagination?: { limit?: number; offset?: number }) {
+    return this.request<any[]>('/feed/home', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id,
+        filters: filters || {},
+        pagination: pagination || { limit: 10, offset: 0 },
+      }),
+    });
+  }
+
+  async refreshFeed(user_id: string) {
+    return this.request<any[]>(`/feed/refresh?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getPost(post_id: string) {
+    return this.request<any>(`/feed/post/${post_id}`, {
+      method: 'GET',
+    });
+  }
 }
 
 export const apiService = new ApiService();
