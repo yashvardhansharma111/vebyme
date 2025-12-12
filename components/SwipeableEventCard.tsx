@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import React from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { useAppSelector } from '@/store/hooks';
+import PostInteractionModal from './PostInteractionModal';
+import { apiService } from '@/services/api';
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress }: any) {
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
@@ -27,13 +30,22 @@ function EventCard({ user, event, onUserPress }: any) {
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons name="refresh" size={20} color="#000" />
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={onRepostPress}
+          >
+            <Ionicons name="repeat-outline" size={20} color="#000" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={() => onRequireAuth?.()}
+          >
             <Ionicons name="navigate-outline" size={20} color="#000" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.joinButton}>
+          <TouchableOpacity 
+            style={styles.joinButton}
+            onPress={onJoinPress}
+          >
             <Text style={styles.joinButtonText}>Join</Text>
           </TouchableOpacity>
         </View>
@@ -56,7 +68,11 @@ function EventCard({ user, event, onUserPress }: any) {
 }
 
 // --- The Swipe Wrapper ---
-export default function SwipeableEventCard({ user, event, onUserPress }: any) {
+export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth }: any) {
+  const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
+  const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
   // Logic: Reveal the Left Action (Save icon) when swiping
   const renderLeftActions = (progress: any, dragX: any) => {
     const trans = dragX.interpolate({
@@ -75,10 +91,77 @@ export default function SwipeableEventCard({ user, event, onUserPress }: any) {
     );
   };
 
+  const handleSwipeableWillOpen = () => {
+    // Show login modal if guest tries to save
+    if (!isAuthenticated && onRequireAuth) {
+      onRequireAuth();
+      return false; // Prevent swipe
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!isAuthenticated || !authUser?.user_id) {
+      onRequireAuth?.();
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // TODO: Implement save post API
+      Alert.alert('Success', 'Post saved!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to save post');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRepost = async () => {
+    if (!isAuthenticated || !authUser?.user_id) {
+      onRequireAuth?.();
+      return;
+    }
+
+    try {
+      await apiService.createRepost(event.id, authUser.user_id);
+      Alert.alert('Success', 'Post reposted!');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to repost');
+    }
+  };
+
   return (
-    <Swipeable renderLeftActions={renderLeftActions} containerStyle={styles.swipeContainer}>
-      <EventCard user={user} event={event} onUserPress={onUserPress} />
-    </Swipeable>
+    <>
+      <Swipeable 
+        renderLeftActions={renderLeftActions} 
+        containerStyle={styles.swipeContainer}
+        onSwipeableWillOpen={handleSwipeableWillOpen}
+      >
+        <EventCard 
+          user={user} 
+          event={event} 
+          onUserPress={onUserPress} 
+          onRequireAuth={onRequireAuth}
+          onJoinPress={() => {
+            if (isAuthenticated) {
+              setShowInteractionModal(true);
+            } else {
+              onRequireAuth?.();
+            }
+          }}
+          onRepostPress={handleRepost}
+        />
+      </Swipeable>
+      <PostInteractionModal
+        visible={showInteractionModal}
+        onClose={() => setShowInteractionModal(false)}
+        postId={postId || event?.id}
+        onSuccess={() => {
+          // Refresh feed or update UI
+        }}
+      />
+    </>
   );
 }
 

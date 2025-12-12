@@ -8,6 +8,8 @@ import { ActivityIndicator, Image, Platform, RefreshControl, SafeAreaView, Scrol
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
+import LoginModal from '@/components/LoginModal';
+import { Colors } from '@/constants/theme';
 
 function ProfileAvatar() {
   const { user } = useAppSelector((state) => state.auth);
@@ -67,9 +69,10 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
 
   // User profile cache to avoid fetching same user multiple times
@@ -97,15 +100,29 @@ export default function HomeScreen() {
         setUserCache((prev) => ({ ...prev, [user_id]: userData }));
         return userData;
       }
-    } catch (error) {
-      console.error(`Error fetching user ${user_id}:`, error);
+    } catch (error: any) {
+      // Silently handle missing users - don't log errors for 404s
+      // This is expected when users are deleted or don't exist
+      if (error.message?.includes('User not found') || error.message?.includes('404')) {
+        // User doesn't exist, use default values
+        const defaultData = {
+          name: 'Unknown User',
+          profile_image: 'https://via.placeholder.com/44',
+        };
+        setUserCache((prev) => ({ ...prev, [user_id]: defaultData }));
+        return defaultData;
+      }
+      // Only log unexpected errors (not user not found)
+      // Silently ignore expected errors
     }
 
     // Return default if fetch fails
-    return {
+    const defaultData = {
       name: 'Unknown User',
       profile_image: 'https://via.placeholder.com/44',
     };
+    setUserCache((prev) => ({ ...prev, [user_id]: defaultData }));
+    return defaultData;
   }, [userCache]);
 
   const formatTimestamp = (timestamp: string | Date): string => {
@@ -156,12 +173,6 @@ export default function HomeScreen() {
   }, [fetchUserProfile]);
 
   const loadFeed = useCallback(async (isRefresh = false) => {
-    if (!user?.user_id) {
-      setError('Please login to view feed');
-      setIsLoading(false);
-      return;
-    }
-
     try {
       if (isRefresh) {
         setIsRefreshing(true);
@@ -179,7 +190,8 @@ export default function HomeScreen() {
       // Note: 'Today', 'Comedy', 'Sports' filters could be implemented with temporal_tags or other logic
       // For now, we'll just show all posts when these are selected
 
-      const response = await apiService.getHomeFeed(user.user_id, filters, { limit: 20, offset: 0 });
+      // Allow guests to view feed (user_id is optional)
+      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 20, offset: 0 });
       
       if (response.data && Array.isArray(response.data)) {
         const formatted = await formatFeedData(response.data);
@@ -239,8 +251,22 @@ export default function HomeScreen() {
                   <Text style={styles.locationSubtitle}>Bengaluru</Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.push('/profile')}>
-                <ProfileAvatar />
+              <TouchableOpacity
+                onPress={() => {
+                  if (isAuthenticated) {
+                    router.push('/profile');
+                  } else {
+                    setShowLoginModal(true);
+                  }
+                }}
+              >
+                {isAuthenticated ? (
+                  <ProfileAvatar />
+                ) : (
+                  <View style={styles.guestAvatar}>
+                    <Ionicons name="person-outline" size={24} color={Colors.light.text} />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
 
@@ -282,7 +308,13 @@ export default function HomeScreen() {
               </View>
               <TouchableOpacity
                 style={styles.createBtn}
-                onPress={() => router.push('/(tabs)/createPost')}
+                onPress={() => {
+                  if (isAuthenticated) {
+                    router.push('/(tabs)/createPost');
+                  } else {
+                    setShowLoginModal(true);
+                  }
+                }}
               >
                 <Ionicons name="add" size={20} color="#FFF" style={{ marginRight: 8 }} />
                 <Text style={styles.createBtnText}>Create your own plan</Text>
@@ -314,7 +346,19 @@ export default function HomeScreen() {
                     key={item.id}
                     user={item.user}
                     event={item.event}
-                    onUserPress={(userId: string) => router.push({ pathname: '/otherProfile/[id]', params: { id: userId } } as any)}
+                    postId={item.id}
+                    onUserPress={(userId: string) => {
+                      if (isAuthenticated) {
+                        router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+                      } else {
+                        setShowLoginModal(true);
+                      }
+                    }}
+                    onRequireAuth={() => {
+                      if (!isAuthenticated) {
+                        setShowLoginModal(true);
+                      }
+                    }}
                   />
                 ))
               )}
@@ -331,6 +375,15 @@ export default function HomeScreen() {
         />
         
       </View>
+      <LoginModal
+        visible={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => {
+          setShowLoginModal(false);
+          // Reload feed after login
+          loadFeed();
+        }}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -370,6 +423,7 @@ const styles = StyleSheet.create({
   locationTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
   locationSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   headerAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
+  guestAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   filterScroll: { marginBottom: 24 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },

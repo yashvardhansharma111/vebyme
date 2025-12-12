@@ -1,23 +1,36 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================
-// CONFIGURATION: Set your computer's IP address here
+// CONFIGURATION: Backend URL
 // ============================================
-// For physical devices (Expo Go), you need your computer's local IP
-// Find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
-// Look for "IPv4 Address" - usually starts with 192.168.x.x
+// Priority order:
+// 1. Environment variable (EXPO_PUBLIC_API_URL) - for ngrok or production
+// 2. app.json extra.apiUrl - for development
+// 3. Fallback to IP-based URLs
 // ============================================
-const PHYSICAL_DEVICE_IP = '10.75.201.7'; // 👈 UPDATE THIS with your computer's IP
-// ============================================
+const PHYSICAL_DEVICE_IP = '10.75.201.7'; // Fallback IP (only used if env vars not set)
 
 // Get the correct base URL based on platform
 const getBaseURL = () => {
-  // Check if there's a custom API URL in environment variables
+  // Priority 1: Check environment variable (EXPO_PUBLIC_API_URL)
+  // This works with ngrok: EXPO_PUBLIC_API_URL=https://your-ngrok-url.ngrok.io/api
+  const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envApiUrl) {
+    console.log('📡 Using API URL from environment variable:', envApiUrl);
+    return envApiUrl.endsWith('/api') ? envApiUrl : `${envApiUrl}/api`;
+  }
+  
+  // Priority 2: Check app.json extra config
   const customUrl = Constants.expoConfig?.extra?.apiUrl;
   if (customUrl) {
-    return customUrl;
+    console.log('📡 Using API URL from app.json:', customUrl);
+    return customUrl.endsWith('/api') ? customUrl : `${customUrl}/api`;
   }
+  
+  // Priority 3: Fallback to IP-based URLs (for local development)
+  console.log('📡 Using fallback IP-based URL');
 
   // For web, use localhost
   if (Platform.OS === 'web') {
@@ -80,29 +93,64 @@ class ApiService {
     console.log('API Base URL:', this.baseUrl);
   }
 
+  private async getAccessToken(): Promise<string | null> {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.access_token || null;
+      }
+    } catch (error) {
+      console.error('Error getting access token:', error);
+    }
+    return null;
+  }
+
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    let timeoutId: NodeJS.Timeout | null = null;
+    const controller = new AbortController();
+    
     try {
       const url = `${this.baseUrl}${endpoint}`;
       console.log('🌐 Making request to:', url);
       console.log('📱 Platform:', Platform.OS, '| Is Device:', Constants.isDevice);
       
+      // Get access token for authenticated requests
+      const accessToken = await this.getAccessToken();
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        // ngrok bypass headers (for free tier)
+        'ngrok-skip-browser-warning': 'true',
+        ...options.headers,
+      };
+      
+      // Add authorization header if token exists and endpoint requires auth
+      // Skip auth for public endpoints
+      const publicEndpoints = ['/auth/send-otp', '/auth/verify-otp', '/auth/resend-otp'];
+      const requiresAuth = !publicEndpoints.some(ep => endpoint.includes(ep));
+      
+      if (accessToken && requiresAuth) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+      
       // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 30000); // 30 second timeout
       
       const response = await fetch(url, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
         signal: controller.signal,
       });
       
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
 
       // Check if response is ok before parsing JSON
       const contentType = response.headers.get('content-type');
@@ -112,24 +160,57 @@ class ApiService {
         data = await response.json();
       } else {
         const text = await response.text();
-        console.error('❌ Invalid response type:', text);
-        throw new Error(`Invalid response: ${text}`);
+        
+        // Check if ngrok warning page
+        if (text.includes('ngrok') || text.includes('ERR_NGROK') || text.includes('<!DOCTYPE html>')) {
+          console.error('❌ ngrok warning page detected. This usually means:');
+          console.error('1. The ngrok URL requires browser verification');
+          console.error('2. Add "ngrok-skip-browser-warning: true" header (already added)');
+          console.error('3. Or visit the ngrok URL in a browser first to verify');
+          throw new Error('ngrok verification required. Please visit the ngrok URL in a browser first, or check your backend is running.');
+        }
+        
+        console.error('❌ Invalid response type:', text.substring(0, 200));
+        throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
       }
       
       if (!response.ok) {
-        console.error('❌ Request failed:', response.status, data);
+        // Don't log 404 errors for user profiles (expected for missing users)
+        if (response.status === 404 && endpoint.includes('/user/profile/')) {
+          // Silently return error without logging - this is expected behavior
+          // Return a clean error that won't spam the console
+          const error = new Error('User not found');
+          (error as any).isExpected = true;
+          throw error;
+        }
+        // Only log non-404 errors or 404s for non-profile endpoints
+        if (response.status !== 404 || !endpoint.includes('/user/profile/')) {
+          console.error('❌ Request failed:', response.status, data);
+        }
         throw new Error(data.message || `Request failed with status ${response.status}`);
       }
 
       console.log('✅ Request successful:', endpoint);
       return data;
     } catch (error: any) {
-      console.error('❌ API Request Error:', error);
-      console.error('Error details:', {
-        message: error.message,
-        name: error.name,
-        url: `${this.baseUrl}${endpoint}`,
-      });
+      // Don't log expected 404 errors for user profiles (missing users are expected)
+      const isExpectedUserNotFound = 
+        ((error as any).isExpected || 
+         error.message?.includes('User not found') || 
+         error.message?.includes('404')) && 
+        endpoint.includes('/user/profile/');
+      
+      if (!isExpectedUserNotFound) {
+        console.error('❌ API Request Error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          url: `${this.baseUrl}${endpoint}`,
+        });
+      }
+      
+      // Re-throw the error so calling code can handle it
+      throw error;
       
       // Provide more helpful error messages
       if (error.message?.includes('Network request failed') || 
@@ -159,11 +240,26 @@ class ApiService {
         throw new Error(errorMsg);
       }
       
-      if (error.name === 'AbortError' || error.message?.includes('timeout')) {
-        throw new Error('Request timeout. The server is taking too long to respond.');
+      if (error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Aborted')) {
+        let timeoutMsg = 'Request timeout. The server is taking too long to respond.\n\n';
+        timeoutMsg += 'Possible causes:\n';
+        timeoutMsg += '1. Backend server is not running\n';
+        timeoutMsg += '2. Backend server is slow or overloaded\n';
+        timeoutMsg += '3. Network connection is slow\n';
+        timeoutMsg += `4. Check if backend is accessible at: ${this.baseUrl}\n`;
+        timeoutMsg += '\nTry:\n';
+        timeoutMsg += '- Restart the backend server\n';
+        timeoutMsg += '- Check backend logs for errors\n';
+        timeoutMsg += '- Verify the IP address is correct';
+        throw new Error(timeoutMsg);
       }
       
       throw new Error(error.message || 'Network error');
+    } finally {
+      // Always clear timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   }
 
@@ -287,11 +383,11 @@ class ApiService {
   }
 
   // Feed APIs
-  async getHomeFeed(user_id: string, filters?: { category_main?: string; category_sub?: string[]; location?: any }, pagination?: { limit?: number; offset?: number }) {
+  async getHomeFeed(user_id?: string, filters?: { category_main?: string; category_sub?: string[]; location?: any }, pagination?: { limit?: number; offset?: number }) {
     return this.request<any[]>('/feed/home', {
       method: 'POST',
       body: JSON.stringify({
-        user_id,
+        user_id: user_id || null,
         filters: filters || {},
         pagination: pagination || { limit: 10, offset: 0 },
       }),
@@ -307,6 +403,201 @@ class ApiService {
   async getPost(post_id: string) {
     return this.request<any>(`/feed/post/${post_id}`, {
       method: 'GET',
+    });
+  }
+
+  // Interaction APIs
+  async addComment(post_id: string, user_id: string, text: string) {
+    return this.request<{ comment_id: string }>('/post/comment', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, text }),
+    });
+  }
+
+  async getComments(post_id: string) {
+    return this.request<any[]>(`/post/comments/${post_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async addReaction(post_id: string, user_id: string, emoji_type: string) {
+    return this.request<any>('/post/react', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, emoji_type }),
+    });
+  }
+
+  async getReactions(post_id: string) {
+    return this.request<any[]>(`/post/reactions/${post_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async createJoinRequest(post_id: string, user_id: string, message?: string) {
+    return this.request<{ request_id: string }>('/post/join', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, message }),
+    });
+  }
+
+  async createJoinRequestWithReaction(post_id: string, user_id: string, emoji_type: string) {
+    return this.request<{ request_id: string }>('/post/join-with-reaction', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, emoji_type }),
+    });
+  }
+
+  async createJoinRequestWithComment(post_id: string, user_id: string, text: string) {
+    return this.request<{ request_id: string }>('/post/join-with-comment', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, text }),
+    });
+  }
+
+  async getJoinRequests(post_id: string) {
+    return this.request<any[]>(`/post/join/requests/${post_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async approveJoinRequest(request_id: string) {
+    return this.request<any>('/post/join/approve', {
+      method: 'POST',
+      body: JSON.stringify({ request_id }),
+    });
+  }
+
+  async rejectJoinRequest(request_id: string) {
+    return this.request<any>('/post/join/reject', {
+      method: 'POST',
+      body: JSON.stringify({ request_id }),
+    });
+  }
+
+  // Repost APIs
+  async createRepost(original_post_id: string, repost_author_id: string, added_content?: string) {
+    return this.request<{ repost_id: string }>('/repost/create', {
+      method: 'POST',
+      body: JSON.stringify({ original_post_id, repost_author_id, added_content }),
+    });
+  }
+
+  // Notification APIs
+  async getNotifications(user_id: string) {
+    return this.request<any[]>(`/notifications/list?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async markNotificationAsRead(notification_id: string) {
+    return this.request<any>('/notifications/mark-read', {
+      method: 'POST',
+      body: JSON.stringify({ notification_id }),
+    });
+  }
+
+  async getUnreadCount(user_id: string) {
+    return this.request<{ unread_count: number }>(`/notifications/counter?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  // Chat/Group APIs
+  async createGroup(post_id: string, created_by: string, member_ids: string[], group_name?: string) {
+    return this.request<{ group_id: string }>('/chat/group/create', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, created_by, member_ids, group_name }),
+    });
+  }
+
+  async createIndividualChat(post_id: string, user_id: string, other_user_id: string) {
+    return this.request<{ group_id: string }>('/chat/individual/create', {
+      method: 'POST',
+      body: JSON.stringify({ post_id, user_id, other_user_id }),
+    });
+  }
+
+  async addMembersToGroup(group_id: string, member_ids: string[]) {
+    return this.request<any>('/chat/group/add-members', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, member_ids }),
+    });
+  }
+
+  async getChatLists(user_id: string) {
+    return this.request<{
+      their_plans: any[];
+      my_plans: any[];
+      groups: any[];
+    }>(`/chat/lists?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getGroupDetails(group_id: string) {
+    return this.request<any>(`/chat/group/details/${group_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async sendMessage(group_id: string, user_id: string, type: 'text' | 'image' | 'poll', content: any) {
+    return this.request<{ message_id: string }>('/chat/send', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id, type, content }),
+    });
+  }
+
+  async getMessages(group_id: string) {
+    return this.request<any[]>(`/chat/messages/${group_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async addReaction(message_id: string, user_id: string, emoji_type: string) {
+    return this.request<any>('/chat/message/reaction', {
+      method: 'POST',
+      body: JSON.stringify({ message_id, user_id, emoji_type }),
+    });
+  }
+
+  async removeReaction(message_id: string, user_id: string, emoji_type: string) {
+    return this.request<any>('/chat/message/reaction', {
+      method: 'DELETE',
+      body: JSON.stringify({ message_id, user_id, emoji_type }),
+    });
+  }
+
+  async createPoll(group_id: string, user_id: string, question: string, options: string[], media?: any) {
+    return this.request<{ poll_id: string }>('/chat/poll/create', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id, question, options, media }),
+    });
+  }
+
+  async votePoll(poll_id: string, user_id: string, option_id: string) {
+    return this.request<any>('/chat/poll/vote', {
+      method: 'POST',
+      body: JSON.stringify({ poll_id, user_id, option_id }),
+    });
+  }
+
+  async getPollResults(poll_id: string) {
+    return this.request<any>(`/chat/poll/results/${poll_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async closeGroup(group_id: string, user_id: string) {
+    return this.request<any>('/chat/group/close', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id }),
+    });
+  }
+
+  async reopenGroup(group_id: string, user_id: string) {
+    return this.request<any>('/chat/group/reopen', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id }),
     });
   }
 }
