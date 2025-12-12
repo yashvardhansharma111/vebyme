@@ -2,9 +2,32 @@ import SwipeableEventCard from '@/components/SwipeableEventCard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Image, Platform, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchCurrentUser } from '@/store/slices/profileSlice';
+
+function ProfileAvatar() {
+  const { user } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    if (user?.session_id && !currentUser) {
+      dispatch(fetchCurrentUser(user.session_id));
+    }
+  }, [user, currentUser, dispatch]);
+
+  return (
+    <Image
+      source={{
+        uri: currentUser?.profile_image || 'https://via.placeholder.com/44',
+      }}
+      style={styles.headerAvatar}
+    />
+  );
+}
 
 // ... Mock Data (EVENTS, FILTERS) same as before ... 
 const EVENTS = [
@@ -49,7 +72,7 @@ export default function HomeScreen() {
                 </View>
               </View>
               <TouchableOpacity onPress={() => router.push('/profile')}>
-                <Image source={{ uri: 'https://i.pravatar.cc/150?u=me' }} style={styles.headerAvatar} />
+                <ProfileAvatar />
               </TouchableOpacity>
             </View>
 

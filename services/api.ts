@@ -194,6 +194,70 @@ class ApiService {
       body: JSON.stringify({ phone_number }),
     });
   }
+
+  // User Profile APIs
+  async getCurrentUser(session_id: string) {
+    return this.request<any>(`/user/me?session_id=${session_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserProfile(user_id: string) {
+    return this.request<any>(`/user/profile/${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async updateProfile(session_id: string, data: { name?: string; bio?: string; profile_image?: string; interests?: string[] }) {
+    return this.request<any>('/user/update', {
+      method: 'POST',
+      body: JSON.stringify({ session_id, ...data }),
+    });
+  }
+
+  async getUserStats(user_id: string) {
+    return this.request<{ plans_count: number; interactions_count: number }>(`/user/stats?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getUserPlans(user_id: string, limit = 20, offset = 0) {
+    return this.request<any[]>(`/user/plans?user_id=${user_id}&limit=${limit}&offset=${offset}`, {
+      method: 'GET',
+    });
+  }
+
+  async getSavedPosts(user_id: string) {
+    return this.request<any[]>(`/user/saved-posts?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async deleteUser(session_id: string) {
+    return this.request<any>('/user/delete', {
+      method: 'DELETE',
+      body: JSON.stringify({ session_id }),
+    });
+  }
+
+  // Upload API
+  async uploadImage(formData: FormData, accessToken?: string) {
+    const headers: HeadersInit = {};
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+    
+    const response = await fetch(`${this.baseUrl.replace('/api', '')}/api/upload/image`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Upload failed');
+    }
+    return data;
+  }
 }
 
 export const apiService = new ApiService();
