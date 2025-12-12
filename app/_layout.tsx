@@ -12,7 +12,7 @@ import { Colors } from '@/constants/theme';
 
 function RootLayoutNav() {
   const dispatch = useAppDispatch();
-  const { isLoading, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isLoading, isAuthenticated, isNewUser } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
     dispatch(loadUser());
@@ -29,11 +29,11 @@ function RootLayoutNav() {
   return (
     <>
       <Stack screenOptions={{ headerShown: false }}>
-        {!isAuthenticated ? (
-          <Stack.Screen name="login" />
-        ) : (
-          <Stack.Screen name="(tabs)" />
-        )}
+        <Stack.Screen name="login" />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="otherProfile" />
       </Stack>
       <StatusBar style="auto" />
     </>

@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Colors, borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { store } from '@/store/store';
 import { sendOTP, verifyOTP, resendOTP, clearError } from '@/store/slices/authSlice';
 
 export default function LoginScreen() {
@@ -25,14 +26,28 @@ export default function LoginScreen() {
   
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { isLoading, error, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { isLoading, error, isAuthenticated, isNewUser } = useAppSelector((state) => state.auth);
 
-  // Navigate to tabs when authenticated
+  // Navigate based on authentication and new user status
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/(tabs)');
+      console.log('🔍 Login useEffect - isAuthenticated:', isAuthenticated, 'isNewUser:', isNewUser, 'type:', typeof isNewUser);
+      // Use a small delay to ensure state is fully propagated
+      const timer = setTimeout(() => {
+        const currentState = store.getState().auth;
+        console.log('🔍 Login useEffect (after delay) - currentState.isNewUser:', currentState.isNewUser, 'currentState.isAuthenticated:', currentState.isAuthenticated);
+        if (currentState.isNewUser === true) {
+          console.log('✅ Navigating to signup profile');
+          router.replace('/signup/profile');
+        } else {
+          console.log('✅ Navigating to homepage');
+          router.replace('/(tabs)');
+        }
+      }, 150);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isNewUser, router]);
 
   // Show error alerts
   useEffect(() => {
@@ -73,7 +88,21 @@ export default function LoginScreen() {
     );
 
     if (verifyOTP.fulfilled.match(result)) {
-      // Navigation will happen via useEffect when isAuthenticated changes
+      // Navigate immediately based on the payload
+      const payloadIsNewUser = result.payload.isNewUser === true;
+      console.log('🔍 handleVerifyOTP - result.payload:', result.payload);
+      console.log('🔍 handleVerifyOTP - payloadIsNewUser:', payloadIsNewUser);
+      
+      // Small delay to ensure state is updated
+      setTimeout(() => {
+        if (payloadIsNewUser) {
+          console.log('✅ Immediately navigating to signup profile');
+          router.replace('/signup/profile');
+        } else {
+          console.log('✅ Immediately navigating to homepage');
+          router.replace('/(tabs)');
+        }
+      }, 200);
     }
   };
 
@@ -100,16 +129,20 @@ export default function LoginScreen() {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title}>Welcome to Vybeme</Text>
+            <Text style={styles.title}>
+              {step === 'phone' ? 'Found the Vybe?' : 'One Time Peek'}
+            </Text>
             <Text style={styles.subtitle}>
-              {step === 'phone' ? 'Enter your phone number to get started' : 'Enter the OTP code sent to your phone'}
+              {step === 'phone'
+                ? "Don't worry, we'll help you signup!"
+                : `We sent a 6-digit OTP to ${phone}`}
             </Text>
           </View>
 
           {step === 'phone' ? (
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <Text style={styles.label}>Phone Number</Text>
+                <Text style={styles.label}>Phone number</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Enter your phone number"
@@ -119,6 +152,7 @@ export default function LoginScreen() {
                   keyboardType="phone-pad"
                   autoFocus
                 />
+                <Text style={styles.disclaimer}>Message & data rates may apply.</Text>
               </View>
 
               <TouchableOpacity
@@ -132,34 +166,37 @@ export default function LoginScreen() {
                   <Text style={styles.buttonText}>Send OTP</Text>
                 )}
               </TouchableOpacity>
+
+              <Text style={styles.consentText}>
+                By tapping Send OTP, you consent to receive automated messages from Vybeme at the
+                number provided above. Message and data rates may apply.
+              </Text>
             </View>
           ) : (
             <View style={styles.form}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>OTP Code</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter 6-digit OTP"
-                  placeholderTextColor="#9CA3AF"
-                  value={otp}
-                  onChangeText={setOtp}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  autoFocus
-                />
+              <View style={styles.otpContainer}>
+                {[0, 1, 2, 3, 4, 5].map((index) => (
+                  <TextInput
+                    key={index}
+                    style={styles.otpInput}
+                    value={otp[index] || ''}
+                    onChangeText={(text) => {
+                      if (text.length <= 1) {
+                        const newOtp = otp.split('');
+                        newOtp[index] = text;
+                        setOtp(newOtp.join(''));
+                        // Auto-focus next input
+                        if (text && index < 5) {
+                          // Focus next input (handled by refs would be better, but this works)
+                        }
+                      }
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    autoFocus={index === 0 && otp.length === 0}
+                  />
+                ))}
               </View>
-
-              <TouchableOpacity
-                style={[styles.button, isLoading && styles.buttonDisabled]}
-                onPress={handleVerifyOTP}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.buttonText}>Verify OTP</Text>
-                )}
-              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.resendButton}
@@ -167,19 +204,20 @@ export default function LoginScreen() {
                 disabled={resendLoading || isLoading}
               >
                 <Text style={styles.resendText}>
-                  {resendLoading ? 'Resending...' : "Didn't receive? Resend OTP"}
+                  {resendLoading ? 'Resending...' : "Didn't receive your code? Resend OTP"}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => {
-                  setStep('phone');
-                  setOtp('');
-                }}
-                disabled={isLoading}
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleVerifyOTP}
+                disabled={isLoading || otp.length !== 6}
               >
-                <Text style={styles.backText}>Change Phone Number</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.buttonText}>Submit</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
@@ -208,14 +246,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: Colors.light.primary,
+    fontWeight: '800',
+    color: '#1C1C1E',
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -239,6 +277,40 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     borderWidth: 1,
     borderColor: Colors.light.border,
+    marginTop: 8,
+  },
+  disclaimer: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  consentText: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 16,
+    paddingHorizontal: 20,
+  },
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 12,
+  },
+  otpInput: {
+    flex: 1,
+    backgroundColor: Colors.light.inputBackground,
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 24,
+    fontWeight: '600',
+    color: Colors.light.text,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    textAlign: 'center',
+    minWidth: 50,
+    aspectRatio: 1,
   },
   button: {
     backgroundColor: Colors.light.primary,

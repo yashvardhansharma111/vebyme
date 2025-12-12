@@ -176,7 +176,7 @@ class ApiService {
   }
 
   async verifyOTP(phone_number: string, otp_code: string, otp_id: string) {
-    return this.request<{
+    const response = await this.request<{
       user_id: string;
       session_id: string;
       is_new_user: boolean;
@@ -186,6 +186,9 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ phone_number, otp_code, otp_id }),
     });
+    console.log('🔍 verifyOTP API Response:', JSON.stringify(response, null, 2));
+    console.log('🔍 is_new_user value:', response.data?.is_new_user, 'type:', typeof response.data?.is_new_user);
+    return response;
   }
 
   async resendOTP(phone_number: string) {
@@ -208,7 +211,7 @@ class ApiService {
     });
   }
 
-  async updateProfile(session_id: string, data: { name?: string; bio?: string; profile_image?: string; interests?: string[] }) {
+  async updateProfile(session_id: string, data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string }) {
     return this.request<any>('/user/update', {
       method: 'POST',
       body: JSON.stringify({ session_id, ...data }),

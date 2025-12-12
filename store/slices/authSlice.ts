@@ -7,6 +7,7 @@ interface User {
   session_id: string;
   access_token: string;
   refresh_token: string;
+  is_new_user?: boolean;
 }
 
 interface AuthState {
@@ -14,6 +15,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
+  isNewUser: boolean;
 }
 
 const initialState: AuthState = {
@@ -21,6 +23,7 @@ const initialState: AuthState = {
   isLoading: true,
   isAuthenticated: false,
   error: null,
+  isNewUser: false,
 };
 
 // Load user from storage
@@ -63,14 +66,17 @@ export const verifyOTP = createAsyncThunk(
     try {
       const response = await apiService.verifyOTP(phone_number, otp_code, otp_id);
       if (response.data) {
+        const isNewUser = response.data.is_new_user === true;
+        console.log('OTP Verification - is_new_user:', response.data.is_new_user, 'isNewUser:', isNewUser);
         const userData: User = {
           user_id: response.data.user_id,
           session_id: response.data.session_id,
           access_token: response.data.access_token,
           refresh_token: response.data.refresh_token,
+          is_new_user: isNewUser,
         };
         await AsyncStorage.setItem('user', JSON.stringify(userData));
-        return userData;
+        return { userData, isNewUser };
       }
       throw new Error('Failed to verify OTP');
     } catch (error: any) {
@@ -108,6 +114,14 @@ const authSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    clearNewUserFlag: (state) => {
+      state.isNewUser = false;
+      if (state.user) {
+        state.user.is_new_user = false;
+        // Update AsyncStorage
+        AsyncStorage.setItem('user', JSON.stringify(state.user)).catch(console.error);
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -119,6 +133,9 @@ const authSlice = createSlice({
         state.isLoading = false;
         state.user = action.payload;
         state.isAuthenticated = !!action.payload;
+        // Explicitly check for true, not just truthy
+        state.isNewUser = action.payload?.is_new_user === true;
+        console.log('🔍 loadUser - Restored user:', action.payload?.user_id, 'isNewUser:', state.isNewUser);
       })
       .addCase(loadUser.rejected, (state) => {
         state.isLoading = false;
@@ -140,10 +157,16 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(verifyOTP.fulfilled, (state, action) => {
+        console.log('🔍 verifyOTP.fulfilled - Full payload:', JSON.stringify(action.payload, null, 2));
+        console.log('🔍 verifyOTP.fulfilled - action.payload.isNewUser:', action.payload.isNewUser, 'type:', typeof action.payload.isNewUser);
         state.isLoading = false;
-        state.user = action.payload;
+        state.user = action.payload.userData;
         state.isAuthenticated = true;
+        // Explicitly check for true boolean
+        const isNewUserValue = action.payload.isNewUser === true || String(action.payload.isNewUser) === 'true';
+        state.isNewUser = Boolean(isNewUserValue);
         state.error = null;
+        console.log('✅ Auth State Updated - state.isNewUser:', state.isNewUser, 'state.isAuthenticated:', state.isAuthenticated);
       })
       .addCase(verifyOTP.rejected, (state, action) => {
         state.isLoading = false;
@@ -167,6 +190,6 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { clearError, clearNewUserFlag } = authSlice.actions;
 export default authSlice.reducer;
 

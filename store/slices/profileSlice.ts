@@ -89,7 +89,7 @@ export const fetchUserStats = createAsyncThunk(
 export const updateProfile = createAsyncThunk(
   'profile/updateProfile',
   async (
-    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[] } },
+    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string } },
     { rejectWithValue }
   ) => {
     try {
