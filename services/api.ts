@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 // ============================================
 // CONFIGURATION: Set your computer's IP address here
@@ -8,7 +8,7 @@ import Constants from 'expo-constants';
 // Find it by running: ipconfig (Windows) or ifconfig (Mac/Linux)
 // Look for "IPv4 Address" - usually starts with 192.168.x.x
 // ============================================
-const PHYSICAL_DEVICE_IP = '192.168.29.34'; // 👈 UPDATE THIS with your computer's IP
+const PHYSICAL_DEVICE_IP = '10.75.201.7'; // 👈 UPDATE THIS with your computer's IP
 // ============================================
 
 // Get the correct base URL based on platform
@@ -255,6 +255,30 @@ class ApiService {
     const data = await response.json();
     if (!response.ok) {
       throw new Error(data.message || 'Upload failed');
+    }
+    return data;
+  }
+
+  // Post APIs
+  async createPost(accessToken: string, postData: FormData | any) {
+    const headers: HeadersInit = {
+      'Authorization': `Bearer ${accessToken}`,
+    };
+
+    // If FormData, don't set Content-Type (browser will set it with boundary)
+    if (!(postData instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(`${this.baseUrl}/post/create`, {
+      method: 'POST',
+      headers,
+      body: postData instanceof FormData ? postData : JSON.stringify(postData),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create post');
     }
     return data;
   }

@@ -5,6 +5,12 @@ import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+  // Hide tab bar when on createPost screen
+  const currentRoute = state.routes[state.index];
+  if (currentRoute.name === 'createPost') {
+    return null;
+  }
+
   return (
     <View style={styles.tabBarContainer}>
       
