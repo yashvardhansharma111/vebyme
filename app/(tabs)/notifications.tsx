@@ -48,11 +48,13 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationGroup[]>([]);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [groupName, setGroupName] = useState('');
+  const [groupName, setGroupName] = useState<{ [postId: string]: string }>({});
   const [creatingGroup, setCreatingGroup] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
+  const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
   const router = useRouter();
   
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -93,17 +95,74 @@ export default function NotificationsScreen() {
     }
   }, [isAuthenticated, loadNotifications]);
 
-  const toggleExpand = (postId: string) => {
+  const fetchUserProfile = useCallback(async (user_id: string) => {
+    // Check cache first
+    if (userCache[user_id]) {
+      return userCache[user_id];
+    }
+
+    // Add to loading set
+    setLoadingUsers((prev) => new Set(prev).add(user_id));
+
+    try {
+      const response = await apiService.getUserProfile(user_id);
+      if (response.data) {
+        const userData = {
+          name: response.data.name || 'Unknown',
+          profile_image: response.data.profile_image || null,
+        };
+        setUserCache((prev) => ({ ...prev, [user_id]: userData }));
+        setLoadingUsers((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(user_id);
+          return newSet;
+        });
+        return userData;
+      }
+    } catch (error: any) {
+      // Handle error - use fallback
+      console.error(`Error fetching user ${user_id}:`, error);
+    }
+
+    // Fallback if fetch fails
+    const fallback = {
+      name: 'Unknown',
+      profile_image: null,
+    };
+    setUserCache((prev) => ({ ...prev, [user_id]: fallback }));
+    setLoadingUsers((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(user_id);
+      return newSet;
+    });
+    return fallback;
+  }, [userCache]);
+
+  const toggleExpand = useCallback(async (postId: string) => {
     if (expandedPostId === postId) {
       setExpandedPostId(null);
       setSelectedUsers(new Set());
-      setGroupName('');
+      setGroupName((prev) => {
+        const newState = { ...prev };
+        delete newState[postId];
+        return newState;
+      });
     } else {
       setExpandedPostId(postId);
-      setSelectedUsers(new Set());
-      setGroupName('');
+      
+      // Fetch user profiles for all interactions in this group
+      const group = notifications.find((n) => n.post_id === postId);
+      if (group) {
+        const uniqueUserIds = [...new Set(group.interactions.map((i) => i.source_user_id))];
+        // Fetch all users (caching handles duplicates)
+        uniqueUserIds.forEach((userId) => {
+          if (!userCache[userId] && !loadingUsers.has(userId)) {
+            fetchUserProfile(userId);
+          }
+        });
+      }
     }
-  };
+  }, [expandedPostId, notifications, userCache, loadingUsers, fetchUserProfile]);
 
   const toggleUserSelection = (userId: string) => {
     const newSelected = new Set(selectedUsers);
@@ -119,7 +178,7 @@ export default function NotificationsScreen() {
     if (!isAuthenticated || !user?.user_id) return;
 
     try {
-      const response = await apiService.approveJoinRequest(interactionId);
+      await apiService.approveJoinRequest(interactionId);
       Alert.alert(
         'Request Approved! ✅',
         'The user has been notified and can now chat with you.',
@@ -130,7 +189,7 @@ export default function NotificationsScreen() {
               if (postId && requesterId) {
                 try {
                   const chatResponse = await apiService.createIndividualChat(postId, user.user_id, requesterId);
-                  if (chatResponse.data?.group_id) {
+                  if (chatResponse.data && chatResponse.data.group_id) {
                     router.push({
                       pathname: '/chat/[groupId]',
                       params: { groupId: chatResponse.data.group_id },
@@ -191,7 +250,8 @@ export default function NotificationsScreen() {
       return;
     }
 
-    if (!groupName.trim()) {
+    const name = groupName[postId]?.trim();
+    if (!name) {
       Alert.alert('Error', 'Please enter a group name');
       return;
     }
@@ -199,19 +259,19 @@ export default function NotificationsScreen() {
     setCreatingGroup(postId);
     try {
       const memberIds = Array.from(selectedUsers);
-      const response = await apiService.createGroup(postId, user.user_id, memberIds, groupName.trim());
+      const response = await apiService.createGroup(postId, user.user_id, memberIds, name);
       
-      if (response.data) {
+      if (response.data && response.data.group_id) {
         Alert.alert(
           'Group Created! 🎉',
-          `"${groupName.trim()}" group has been created. You can now chat with ${selectedUsers.size} member${selectedUsers.size > 1 ? 's' : ''} about this plan.`,
+          `"${name}" group has been created. You can now chat with ${selectedUsers.size} member${selectedUsers.size > 1 ? 's' : ''} about this plan.`,
           [
             {
               text: 'Go to Chat',
               onPress: () => {
                 router.push({
                   pathname: '/chat/group/[groupId]',
-                  params: { groupId: response.data.group_id },
+                  params: { groupId: response.data!.group_id },
                 } as any);
               },
             },
@@ -220,7 +280,11 @@ export default function NotificationsScreen() {
         );
         setExpandedPostId(null);
         setSelectedUsers(new Set());
-        setGroupName('');
+        setGroupName((prev) => {
+          const newState = { ...prev };
+          delete newState[postId];
+          return newState;
+        });
         loadNotifications();
       }
     } catch (error: any) {
@@ -244,23 +308,12 @@ export default function NotificationsScreen() {
     return date.toLocaleDateString();
   };
 
-  const getInteractionIcon = (type: string) => {
-    switch (type) {
-      case 'comment':
-        return 'chatbubble-outline';
-      case 'reaction':
-        return 'heart-outline';
-      case 'join':
-        return 'person-add-outline';
-      case 'repost':
-        return 'repeat-outline';
-      default:
-        return 'notifications-outline';
-    }
-  };
-
   const getInteractionText = (interaction: Interaction) => {
-    const userName = interaction.user?.name || 'Someone';
+    // Use cached user name if available, otherwise use interaction.user, then fallback
+    const cachedUser = userCache[interaction.source_user_id];
+    const userName = cachedUser?.name || 
+                     interaction.user?.name || 
+                     'Unknown';
     switch (interaction.type) {
       case 'comment':
         return `${userName} commented`;
@@ -275,9 +328,18 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleUserPress = (userId: string) => {
+    if (userId) {
+      router.push({
+        pathname: '/profile/[userId]',
+        params: { userId },
+      } as any);
+    }
+  };
+
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
@@ -301,19 +363,19 @@ export default function NotificationsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ActivityIndicator size="large" color="#1C1C1E" />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Notifications</Text>
       </View>
@@ -337,196 +399,161 @@ export default function NotificationsScreen() {
               .slice(0, 3)
               .map((i) => i.user?.profile_image || 'https://via.placeholder.com/44');
             const remainingCount = Math.max(0, group.interactions.length - 3);
+            const postText = group.post?.description || group.post?.title || 'Post interaction';
 
             return (
               <View key={group.post_id} style={styles.notificationCard}>
-                {/* Header with avatars and post info */}
+                {/* Collapsed Header */}
                 <TouchableOpacity
                   style={styles.cardHeader}
                   onPress={() => toggleExpand(group.post_id)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.avatarStack}>
-                    {avatars.map((avatar, index) => (
-                      <Image
-                        key={index}
-                        source={{ uri: avatar }}
-                        style={[
-                          styles.avatar,
-                          { marginLeft: index > 0 ? -12 : 0, zIndex: 10 - index },
-                        ]}
-                      />
-                    ))}
-                    {remainingCount > 0 && (
-                      <View
-                        style={[
-                          styles.avatar,
-                          styles.avatarOverlay,
-                          { marginLeft: -12, zIndex: 0 },
-                        ]}
-                      >
-                        <Text style={styles.avatarOverlayText}>+{remainingCount}</Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.cardContent}>
-                    <Text style={styles.postText} numberOfLines={2}>
-                      {group.post?.description || group.post?.title || 'Post interaction'}
+                  <View style={styles.headerLeft}>
+                    <View style={styles.avatarStack}>
+                      {avatars.map((avatar, index) => (
+                        <Image
+                          key={index}
+                          source={{ uri: avatar }}
+                          style={[
+                            styles.avatar,
+                            { marginLeft: index > 0 ? -12 : 0, zIndex: 10 - index },
+                          ]}
+                        />
+                      ))}
+                      {remainingCount > 0 && (
+                        <View
+                          style={[
+                            styles.avatar,
+                            styles.avatarOverlay,
+                            { marginLeft: -12, zIndex: 0 },
+                          ]}
+                        >
+                          <Text style={styles.avatarOverlayText}>+{remainingCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.postText} numberOfLines={3}>
+                      {postText}
                     </Text>
-                    <Text style={styles.timeText}>{formatTime(group.created_at)}</Text>
                   </View>
-
-                  <Ionicons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
-                    color={Colors.light.text}
-                  />
+                  <View style={styles.headerRight}>
+                    <Text style={styles.timeText}>{formatTime(group.created_at)}</Text>
+                    <TouchableOpacity 
+                      style={styles.chevronButton}
+                      onPress={() => toggleExpand(group.post_id)}
+                    >
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color="#1C1C1E"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
 
-                {/* Expanded interactions */}
+                {/* Expanded Content */}
                 {isExpanded && (
                   <View style={styles.expandedContent}>
                     {group.interactions.map((interaction) => {
                       const isSelected = selectedUsers.has(interaction.source_user_id);
-                      // Check if interaction is pending (has request_id and status is pending)
                       const isPending = interaction.payload?.request_id && 
                                        interaction.payload?.status === 'pending';
-                      
-                      // Check if interaction is approved
-                      const isApproved = interaction.payload?.status === 'approved' || 
-                                        interaction.status === 'approved';
+                      const isApproved = interaction.payload?.status === 'approved';
                       
                       return (
-                        <View key={interaction.notification_id} style={styles.interactionContainer}>
-                          <View style={styles.interactionRow}>
-                            <TouchableOpacity
-                              style={styles.userInfoSection}
-                              onPress={() => {
-                                if (interaction.source_user_id) {
-                                  // If approved, allow starting individual chat
-                                  if (isApproved && group.post_id) {
-                                    handleStartIndividualChat(group.post_id, interaction.source_user_id);
-                                  } else {
-                                    // Navigate to profile
-                                    router.push({
-                                      pathname: '/profile/[userId]',
-                                      params: { userId: interaction.source_user_id },
-                                    } as any);
-                                  }
-                                }
-                              }}
-                            >
+                        <View key={interaction.notification_id} style={styles.interactionItem}>
+                          <TouchableOpacity
+                            style={styles.checkbox}
+                            onPress={() => toggleUserSelection(interaction.source_user_id)}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={16} color="#1C1C1E" />
+                            )}
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity
+                            style={styles.userInfoRow}
+                            onPress={() => handleUserPress(interaction.source_user_id)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.avatarContainer}>
                               <Image
                                 source={{
-                                  uri:
-                                    interaction.user?.profile_image ||
-                                    'https://via.placeholder.com/44',
+                                  uri: userCache[interaction.source_user_id]?.profile_image || 
+                                       interaction.user?.profile_image || 
+                                       'https://via.placeholder.com/40',
                                 }}
-                                style={styles.interactionAvatar}
+                                style={styles.userAvatar}
                               />
-                              <View style={styles.interactionInfo}>
-                                <Text style={styles.interactionText}>
-                                  {getInteractionText(interaction)}
-                                </Text>
-                                {interaction.type === 'comment' && interaction.payload?.text && (
-                                  <Text style={styles.commentText} numberOfLines={1}>
-                                    {interaction.payload.text}
+                              {loadingUsers.has(interaction.source_user_id) && (
+                                <View style={styles.loadingOverlay}>
+                                  <ActivityIndicator size="small" color="#1C1C1E" />
+                                </View>
+                              )}
+                            </View>
+                            <View style={styles.userInfo}>
+                              {loadingUsers.has(interaction.source_user_id) ? (
+                                <View style={styles.loadingTextContainer}>
+                                  <ActivityIndicator size="small" color="#8E8E93" style={{ marginRight: 8 }} />
+                                  <Text style={styles.loadingText}>Loading...</Text>
+                                </View>
+                              ) : (
+                                <>
+                                  <Text style={styles.interactionText}>
+                                    {getInteractionText(interaction)}
                                   </Text>
-                                )}
-                                {interaction.type === 'reaction' && interaction.payload?.emoji_type && (
-                                  <Text style={styles.emojiText}>{interaction.payload.emoji_type}</Text>
-                                )}
-                              </View>
-                            </TouchableOpacity>
-                            
-                            <View style={styles.interactionActions}>
-                              <TouchableOpacity
-                                style={styles.checkbox}
-                                onPress={() => toggleUserSelection(interaction.source_user_id)}
-                              >
-                                {isSelected && (
-                                  <Ionicons name="checkmark" size={16} color={Colors.light.primary} />
-                                )}
-                              </TouchableOpacity>
-                              <Ionicons
-                                name={getInteractionIcon(interaction.type)}
-                                size={20}
-                                color={Colors.light.text}
-                                style={styles.interactionIcon}
-                              />
+                                  {interaction.type === 'comment' && interaction.payload?.text && (
+                                    <Text style={styles.commentText} numberOfLines={1}>
+                                      {interaction.payload.text}
+                                    </Text>
+                                  )}
+                                  {interaction.type === 'reaction' && interaction.payload?.emoji_type && (
+                                    <Text style={styles.emojiText}>{interaction.payload.emoji_type}</Text>
+                                  )}
+                                </>
+                              )}
                             </View>
-                          </View>
-                          
-                          {/* Approve/Reject buttons for pending requests */}
-                          {isPending && interaction.payload?.request_id && (
-                            <View style={styles.actionButtons}>
-                              <TouchableOpacity
-                                style={[styles.actionButton, styles.approveButton]}
-                                onPress={() => handleApprove(
-                                  interaction.payload.request_id,
-                                  group.post_id,
-                                  interaction.source_user_id
-                                )}
-                              >
-                                <Text style={styles.actionButtonText}>Approve</Text>
-                              </TouchableOpacity>
-                              <TouchableOpacity
-                                style={[styles.actionButton, styles.rejectButton]}
-                                onPress={() => handleReject(interaction.payload.request_id)}
-                              >
-                                <Text style={styles.actionButtonText}>Reject</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
-                          
-                          {/* Show "Start Chat" button for approved requests */}
-                          {isApproved && !isPending && group.post_id && (
-                            <View style={styles.actionButtons}>
-                              <TouchableOpacity
-                                style={[styles.actionButton, styles.chatButton]}
-                                onPress={() => handleStartIndividualChat(group.post_id, interaction.source_user_id)}
-                              >
-                                <Ionicons name="chatbubble-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                                <Text style={styles.actionButtonText}>Start Chat</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
-                          
-                          {/* Show "Start Chat" button for approved requests */}
-                          {isApproved && !isPending && group.post_id && (
-                            <View style={styles.actionButtons}>
-                              <TouchableOpacity
-                                style={[styles.actionButton, styles.chatButton]}
-                                onPress={() => handleStartIndividualChat(group.post_id, interaction.source_user_id)}
-                              >
-                                <Ionicons name="chatbubble-outline" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                                <Text style={styles.actionButtonText}>Start Chat</Text>
-                              </TouchableOpacity>
-                            </View>
-                          )}
+                          </TouchableOpacity>
+
+                          <Ionicons
+                            name={
+                              interaction.type === 'comment' ? 'chatbubble-outline' :
+                              interaction.type === 'reaction' ? 'heart-outline' :
+                              interaction.type === 'join' ? 'person-add-outline' :
+                              'repeat-outline'
+                            }
+                            size={20}
+                            color="#1C1C1E"
+                            style={styles.interactionIcon}
+                          />
                         </View>
                       );
                     })}
 
-                    {/* Group creation section */}
+                    {/* Group Creation Section - Only show when users are selected */}
                     {selectedUsers.size > 0 && (
                       <View style={styles.groupCreationSection}>
                         <TextInput
                           style={styles.groupNameInput}
                           placeholder="Group Name"
                           placeholderTextColor="#9CA3AF"
-                          value={groupName}
-                          onChangeText={setGroupName}
+                          value={groupName[group.post_id] || ''}
+                          onChangeText={(text) => {
+                            setGroupName((prev) => ({
+                              ...prev,
+                              [group.post_id]: text,
+                            }));
+                          }}
                         />
                         <TouchableOpacity
                           style={[
                             styles.createGroupButton,
-                            (!groupName.trim() || creatingGroup === group.post_id) &&
+                            (!groupName[group.post_id]?.trim() || creatingGroup === group.post_id) &&
                               styles.createGroupButtonDisabled,
                           ]}
                           onPress={() => handleCreateGroup(group.post_id)}
-                          disabled={!groupName.trim() || creatingGroup === group.post_id}
+                          disabled={!groupName[group.post_id]?.trim() || creatingGroup === group.post_id}
                         >
                           {creatingGroup === group.post_id ? (
                             <ActivityIndicator color="#FFFFFF" size="small" />
@@ -543,6 +570,12 @@ export default function NotificationsScreen() {
           })
         )}
       </ScrollView>
+
+      <LoginModal
+        visible={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => loadNotifications()}
+      />
     </SafeAreaView>
   );
 }
@@ -550,16 +583,17 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#F2F2F7',
   },
   header: {
     padding: 20,
     paddingTop: 10,
+    paddingBottom: 16,
   },
   headerText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: Colors.light.text,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1C1C1E',
   },
   scrollView: {
     flex: 1,
@@ -582,20 +616,20 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: '#1C1C1E',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#8E8E93',
     textAlign: 'center',
   },
   loginButton: {
     marginTop: 20,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: '#1C1C1E',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: borderRadius.lg,
+    borderRadius: 24,
   },
   loginButtonText: {
     color: '#FFFFFF',
@@ -603,161 +637,183 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   notificationCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: borderRadius.lg,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    marginBottom: 12,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
     padding: 16,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    marginRight: 12,
   },
   avatarStack: {
     flexDirection: 'row',
     marginRight: 12,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
-    borderColor: Colors.light.background,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#E5E5EA',
   },
   avatarOverlay: {
-    backgroundColor: Colors.light.inputBackground,
+    backgroundColor: '#1C1C1E',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarOverlayText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  cardContent: {
-    flex: 1,
-    marginRight: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   postText: {
+    flex: 1,
     fontSize: 14,
-    color: Colors.light.text,
-    marginBottom: 4,
+    color: '#1C1C1E',
     lineHeight: 20,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    minHeight: 40,
   },
   timeText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#8E8E93',
+    marginBottom: 8,
+  },
+  chevronButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   expandedContent: {
     padding: 16,
     paddingTop: 0,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: '#E5E5EA',
   },
-  interactionRow: {
+  interactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: '#F2F2F7',
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: Colors.light.border,
+    borderColor: '#1C1C1E',
     marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
   },
-  interactionAvatar: {
+  userInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  userAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
   },
-  interactionInfo: {
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+  },
+  userInfo: {
     flex: 1,
   },
   interactionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: '#1C1C1E',
     marginBottom: 2,
   },
   commentText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  emojiText: {
+    fontSize: 16,
+    marginTop: 2,
   },
   interactionIcon: {
     marginLeft: 8,
-  },
-  interactionContainer: {
-    marginBottom: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-    marginLeft: 76, // Align with content
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  approveButton: {
-    backgroundColor: Colors.light.success || Colors.light.primary,
-  },
-  rejectButton: {
-    backgroundColor: Colors.light.error,
-  },
-  chatButton: {
-    backgroundColor: Colors.light.primary,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emojiText: {
-    fontSize: 20,
-    marginTop: 4,
   },
   groupCreationSection: {
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: '#E5E5EA',
   },
   groupNameInput: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.md,
-    padding: 12,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 14,
     fontSize: 16,
-    color: Colors.light.text,
+    color: '#1C1C1E',
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   createGroupButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   createGroupButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#8E8E93',
     opacity: 0.6,
   },
   createGroupButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
