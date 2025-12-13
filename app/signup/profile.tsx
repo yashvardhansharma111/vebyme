@@ -16,8 +16,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  SafeAreaView,
+  TouchableWithoutFeedback,
+  Keyboard
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 export default function SignupProfileScreen() {
@@ -31,9 +34,11 @@ export default function SignupProfileScreen() {
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Modal State
   const [showGenderPicker, setShowGenderPicker] = useState(false);
 
-  const genders = ['male', 'female', 'other'];
+  const genders = ['Male', 'Female', 'Other'];
 
   const handleImagePicker = async () => {
     try {
@@ -95,9 +100,14 @@ export default function SignupProfileScreen() {
         name: name.trim(),
         bio: bio.trim(),
       };
+      
+      if (dateOfBirth) {
+         // You might want to format this or validate it before sending
+         // profileData.dob = dateOfBirth; 
+      }
 
       if (gender) {
-        profileData.gender = gender;
+        profileData.gender = gender.toLowerCase();
       }
 
       if (profileImage) {
@@ -111,7 +121,6 @@ export default function SignupProfileScreen() {
         })
       ).unwrap();
 
-      // Navigate to interests screen
       router.push('/signup/interests');
     } catch (error: any) {
       console.error('Error updating profile:', error);
@@ -122,267 +131,317 @@ export default function SignupProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container}>
+       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Finally!</Text>
-            <Text style={styles.subtitle}>Let's hear about you</Text>
-          </View>
+        <View style={styles.contentContainer}>
+          
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+                <Text style={styles.title}>Finally!</Text>
+                <Text style={styles.subtitle}>Let's hear about you</Text>
+            </View>
 
-          <View style={styles.form}>
             {/* Profile Image */}
-            <View style={styles.imageContainer}>
-              <TouchableOpacity onPress={handleImagePicker} style={styles.imageButton}>
+            <View style={styles.imageWrapper}>
+                <TouchableOpacity onPress={handleImagePicker} style={styles.imageContainer}>
                 {profileImage ? (
-                  <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                    <Image source={{ uri: profileImage }} style={styles.profileImage} />
                 ) : (
-                  <View style={styles.placeholderImage}>
-                    <Ionicons name="person" size={40} color="#9CA3AF" />
-                  </View>
+                    <View style={styles.placeholderImage}>
+                        <Ionicons name="person" size={60} color="#FFF" />
+                    </View>
                 )}
-                <View style={styles.cameraIcon}>
-                  <Ionicons name="camera" size={20} color="#FFF" />
+                <View style={styles.cameraBadge}>
+                    <Ionicons name="camera" size={16} color="#000" />
                 </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
             </View>
 
-            {/* Name */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Your Name</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your name"
-                placeholderTextColor="#9CA3AF"
-                value={name}
-                onChangeText={setName}
-                autoCapitalize="words"
-              />
-            </View>
+            {/* Form Fields */}
+            <View style={styles.form}>
+                
+                {/* Name */}
+                <View style={styles.inputGroup}>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Your Name"
+                        placeholderTextColor="#9CA3AF"
+                        value={name}
+                        onChangeText={setName}
+                        autoCapitalize="words"
+                    />
+                </View>
 
-            {/* Date of Birth */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Date of Birth</Text>
-              <TouchableOpacity style={styles.input}>
-                <TextInput
-                  style={styles.inputText}
-                  placeholder="DD/MM/YYYY"
-                  placeholderTextColor="#9CA3AF"
-                  value={dateOfBirth}
-                  onChangeText={setDateOfBirth}
-                  keyboardType="numeric"
-                  maxLength={10}
-                />
-                <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            </View>
+                {/* Date of Birth */}
+                <View style={styles.inputGroup}>
+                    <View style={styles.input}>
+                        <TextInput
+                            style={styles.inputText}
+                            placeholder="Date of Birth (DD/MM/YYYY)"
+                            placeholderTextColor="#9CA3AF"
+                            value={dateOfBirth}
+                            onChangeText={setDateOfBirth}
+                            keyboardType="numbers-and-punctuation"
+                        />
+                        <Ionicons name="calendar-outline" size={22} color="#6B7280" />
+                    </View>
+                </View>
 
-            {/* Gender */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Gender</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowGenderPicker(!showGenderPicker)}
-              >
-                <Text style={[styles.inputText, !gender && { color: '#9CA3AF' }]}>
-                  {gender ? gender.charAt(0).toUpperCase() + gender.slice(1) : 'Select gender'}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-              {showGenderPicker && (
-                <View style={styles.pickerContainer}>
-                  {genders.map((g) => (
+                {/* Gender */}
+                <View style={styles.inputGroup}>
                     <TouchableOpacity
-                      key={g}
-                      style={[styles.pickerOption, gender === g && styles.pickerOptionSelected]}
-                      onPress={() => {
-                        setGender(g);
-                        setShowGenderPicker(false);
-                      }}
+                        style={styles.input}
+                        onPress={() => setShowGenderPicker(!showGenderPicker)}
                     >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          gender === g && styles.pickerOptionTextSelected,
-                        ]}
-                      >
-                        {g.charAt(0).toUpperCase() + g.slice(1)}
-                      </Text>
+                        <Text style={[styles.inputText, !gender && styles.placeholderText]}>
+                            {gender || "Gender"}
+                        </Text>
+                        <Ionicons name="chevron-down" size={22} color="#6B7280" />
                     </TouchableOpacity>
-                  ))}
                 </View>
-              )}
-            </View>
 
-            {/* Bio/Status */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Anything you want to put on status</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Tell us about yourself..."
-                placeholderTextColor="#9CA3AF"
-                value={bio}
-                onChangeText={setBio}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
+                {/* Bio */}
+                <View style={styles.inputGroup}>
+                    <TextInput
+                        style={[styles.input, styles.textArea]}
+                        placeholder="Anything you want to put on status"
+                        placeholderTextColor="#9CA3AF"
+                        value={bio}
+                        onChangeText={setBio}
+                        multiline
+                        textAlignVertical="top"
+                    />
+                </View>
 
-            <TouchableOpacity
-              style={[styles.button, isSubmitting && styles.buttonDisabled]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.buttonText}>Done, let's Vibe!</Text>
-              )}
+            </View>
+          </ScrollView>
+
+          {/* Bottom Button */}
+          <View style={styles.footer}>
+             <TouchableOpacity
+                style={[styles.button, isSubmitting && styles.buttonDisabled]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+                >
+                {isSubmitting ? (
+                    <ActivityIndicator color="#FFF" />
+                ) : (
+                    <Text style={styles.buttonText}>One more step</Text>
+                )}
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+
+        </View>
+
+        {/* --- MODALS --- */}
+
+        {/* Gender Selection Modal */}
+        <Modal visible={showGenderPicker} transparent animationType="fade">
+             <TouchableOpacity 
+                style={styles.modalOverlay} 
+                activeOpacity={1} 
+                onPress={() => setShowGenderPicker(false)}
+             >
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Select Gender</Text>
+                    {genders.map((g, index) => (
+                        <TouchableOpacity 
+                            key={g} 
+                            style={[styles.modalOption, index === genders.length - 1 && styles.modalOptionLast]}
+                            onPress={() => {
+                                setGender(g);
+                                setShowGenderPicker(false);
+                            }}
+                        >
+                            <Text style={[styles.modalOptionText, gender === g && styles.selectedText]}>{g}</Text>
+                            {gender === g && <Ionicons name="checkmark" size={20} color="#1C1C1E" />}
+                        </TouchableOpacity>
+                    ))}
+                </View>
+             </TouchableOpacity>
+        </Modal>
+
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F2F2F2',
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
+  // Header
   header: {
-    marginBottom: 32,
     alignItems: 'center',
+    marginBottom: 40,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1C1C1E',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    color: '#6B7280',
   },
-  form: {
-    width: '100%',
+  // Image
+  imageWrapper: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
   imageContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  imageButton: {
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  placeholderImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#9CA3AF', // Gray placeholder
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   profileImage: {
     width: 120,
     height: 120,
     borderRadius: 60,
   },
-  placeholderImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#E5E5EA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraIcon: {
+  cameraBadge: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#FFFFFF',
     width: 36,
     height: 36,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  inputContainer: {
-    marginBottom: 20,
+  // Form
+  form: {
+    gap: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 8,
+  inputGroup: {
+    marginBottom: 0,
   },
   input: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
-    fontSize: 16,
-    color: '#1C1C1E',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    fontSize: 16,
+    color: '#1C1C1E',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   inputText: {
-    flex: 1,
     fontSize: 16,
     color: '#1C1C1E',
+    flex: 1,
+    padding: 0, // Removes default Android padding
+  },
+  placeholderText: {
+    color: '#9CA3AF',
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 120,
     alignItems: 'flex-start',
+    paddingTop: 18,
   },
-  pickerContainer: {
-    marginTop: 8,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    overflow: 'hidden',
-  },
-  pickerOption: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  pickerOptionSelected: {
-    backgroundColor: '#F2F2F7',
-  },
-  pickerOptionText: {
-    fontSize: 16,
-    color: '#1C1C1E',
-  },
-  pickerOptionTextSelected: {
-    fontWeight: '600',
-    color: '#1C1C1E',
+  // Footer
+  footer: {
+    padding: 24,
+    paddingBottom: 10,
   },
   button: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 30,
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    width: '100%',
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   buttonText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  // Modals
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    width: '100%',
+    padding: 20,
+    maxWidth: 340,
+  },
+  modalTitle: {
+    fontSize: 18,
     fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalOption: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F2',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalOptionLast: {
+    borderBottomWidth: 0,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  selectedText: {
+    color: '#1C1C1E',
+    fontWeight: '600',
   },
 });
-

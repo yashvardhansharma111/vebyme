@@ -1,6 +1,5 @@
 import { updateProfile } from '@/store/slices/profileSlice';
 import { clearNewUserFlag } from '@/store/slices/authSlice';
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -15,55 +14,37 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-const ALL_INTERESTS = [
-  'Breakfast',
-  'Lunch',
-  'Dinner',
-  'Coffee',
-  'Music',
-  'Movies',
-  'Art',
-  'Board Games',
-  'House Party',
-  'Road Trip',
-  'Concert',
-  'Cooking',
-  'Live Music',
-  'Party',
-  'Health',
-  'HumanityParty',
-  'Nature',
-  'Standup',
-  'Sports',
-  'Workshops',
-  'PreMeeting',
-  'Podcasts',
+// Data mapping exactly to the screenshot with Emojis
+const INTERESTS_DATA = [
+  { label: 'Breakfast', emoji: '🥞' },
+  { label: 'Brunch', emoji: '🍹' },
+  { label: 'Lunch', emoji: '🍔' },
+  { label: 'Dinner', emoji: '🍝' },
+  { label: 'Coffee', emoji: '☕' },
+  { label: 'Picnic', emoji: '🧺' },
+  { label: 'Barbecue', emoji: '🍖' },
+  { label: 'Movie', emoji: '🍿' },
+  { label: 'Art', emoji: '🎨' },
+  { label: 'Board Games', emoji: '♟️' },
+  { label: 'House Party', emoji: '🏡' },
+  { label: 'Bike Ride', emoji: '🚲' },
+  { label: 'Road Trip', emoji: '🛣️' },
+  { label: 'Karaoke', emoji: '🎤' },
+  { label: 'Outdoor', emoji: '🌇' },
+  { label: 'Concert', emoji: '🎷' },
+  { label: 'Cooking', emoji: '🥣' },
+  { label: 'Live Music', emoji: '🎶' },
+  { label: 'Party', emoji: '🎉' },
+  { label: 'Health', emoji: '💪' },
+  { label: 'Themed Party', emoji: '👯' },
+  { label: 'Book', emoji: '📔' },
+  { label: 'Nature', emoji: '🌅' },
+  { label: 'Standup', emoji: '🎙️' },
+  { label: 'Sports', emoji: '🏀' },
+  { label: 'Workshops', emoji: '🧘' },
+  { label: 'Pet Meeting', emoji: '🐕' },
+  { label: 'Potluck', emoji: '🍱' },
 ];
-
-const INTEREST_ICONS: { [key: string]: string } = {
-  Breakfast: 'croissant',
-  Lunch: 'restaurant',
-  Dinner: 'restaurant',
-  Coffee: 'cafe',
-  Music: 'musical-notes',
-  Movies: 'film',
-  Art: 'color-palette',
-  'Board Games': 'dice',
-  'House Party': 'home',
-  'Road Trip': 'car',
-  Concert: 'mic',
-  Cooking: 'restaurant',
-  'Live Music': 'guitar',
-  Party: 'balloon',
-  Health: 'heart',
-  HumanityParty: 'people',
-  Nature: 'leaf',
-  Standup: 'mic',
-  Sports: 'basketball',
-  Workshops: 'construct',
-  PreMeeting: 'handshake',
-  Podcasts: 'radio',
-};
 
 export default function SignupInterestsScreen() {
   const router = useRouter();
@@ -115,54 +96,53 @@ export default function SignupInterestsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Lastly,</Text>
-          <Text style={styles.subtitle}>What do you vibe to?</Text>
-        </View>
-
-        <View style={styles.interestsGrid}>
-          {ALL_INTERESTS.map((interest) => {
-            const isSelected = selectedInterests.includes(interest);
-            const iconName = INTEREST_ICONS[interest] || 'ellipse';
-
-            return (
-              <TouchableOpacity
-                key={interest}
-                style={[styles.interestChip, isSelected && styles.interestChipSelected]}
-                onPress={() => toggleInterest(interest)}
-              >
-                <Ionicons
-                  name={iconName as any}
-                  size={20}
-                  color={isSelected ? '#FFF' : '#666'}
-                  style={styles.interestIcon}
-                />
-                <Text
-                  style={[styles.interestText, isSelected && styles.interestTextSelected]}
-                >
-                  {interest}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <TouchableOpacity
-          style={[styles.button, isSubmitting && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
+      <View style={styles.contentContainer}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {isSubmitting ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={styles.buttonText}>Let's Go</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
+          <View style={styles.header}>
+            <Text style={styles.title}>Lastly,</Text>
+            <Text style={styles.subtitle}>What do you vybe on?</Text>
+          </View>
+
+          <View style={styles.interestsGrid}>
+            {INTERESTS_DATA.map((item) => {
+              const isSelected = selectedInterests.includes(item.label);
+
+              return (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[styles.interestChip, isSelected && styles.interestChipSelected]}
+                  onPress={() => toggleInterest(item.label)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.emoji}>{item.emoji}</Text>
+                  <Text
+                    style={[styles.interestText, isSelected && styles.interestTextSelected]}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.button, isSubmitting && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.buttonText}>Let's Go</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -170,18 +150,23 @@ export default function SignupInterestsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F2F2F2', // Light gray background
+  },
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingTop: 40,
+    paddingBottom: 20,
   },
   header: {
     marginBottom: 32,
     alignItems: 'center',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     color: '#1C1C1E',
     marginBottom: 8,
@@ -194,47 +179,60 @@ const styles = StyleSheet.create({
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center', // Centers the cloud of chips
     gap: 12,
-    marginBottom: 32,
-    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   interestChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 25, // Pill shape
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    minWidth: '30%',
-    maxWidth: '48%',
+    // Subtle shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   interestChipSelected: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
+    backgroundColor: '#1C1C1E', // Black background when selected
+    transform: [{ scale: 1.02 }], // Slight pop effect
   },
-  interestIcon: {
+  emoji: {
+    fontSize: 18,
     marginRight: 8,
   },
   interestText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#1C1C1E',
   },
   interestTextSelected: {
-    color: '#FFF',
+    color: '#FFFFFF',
+  },
+  footer: {
+    padding: 20,
+    paddingBottom: 10,
+    backgroundColor: '#F2F2F2',
   },
   button: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 30,
+    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   buttonText: {
     color: '#FFF',
@@ -242,4 +240,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
