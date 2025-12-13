@@ -8,11 +8,12 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 
@@ -21,7 +22,7 @@ export default function CreatePollScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { user } = useAppSelector((state) => state.auth);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '']);
+  const [options, setOptions] = useState<string[]>(['', '', '']); // Default 3 options like screenshot
   const [creating, setCreating] = useState(false);
 
   const handleAddOption = () => {
@@ -62,11 +63,9 @@ export default function CreatePollScreen() {
     try {
       setCreating(true);
       await apiService.createPoll(groupId, user.user_id, question.trim(), validOptions);
-      Alert.alert('Poll Created! 📊', 'Your poll has been posted to the group chat.');
       router.back();
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to create poll. Please try again.');
-      console.error('Error creating poll:', error);
+      Alert.alert('Error', 'Failed to create poll.');
     } finally {
       setCreating(false);
     }
@@ -74,81 +73,92 @@ export default function CreatePollScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      
+      {/* Modal Indicator Bar */}
+      <View style={styles.modalIndicatorContainer}>
+        <View style={styles.modalIndicator} />
+      </View>
+
+      {/* Header (Hidden back button usually for modals, but keeping logical structure) */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Poll</Text>
-        <View style={{ width: 24 }} />
+        {/* Placeholder for left side to balance title */}
+        <View style={{ width: 24 }} /> 
+        {/* Title could be here, but screenshot implies clean look. Leaving empty or adding if needed. */}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Add Media Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Add Media</Text>
-          <View style={styles.divider} />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          
+          {/* Add Media / Question Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Add Media</Text>
+            
+            <TextInput
+              style={styles.questionInput}
+              placeholder="Ask Question"
+              placeholderTextColor="#9CA3AF"
+              value={question}
+              onChangeText={setQuestion}
+              multiline={false}
+              maxLength={150}
+            />
+          </View>
+
+          {/* Poll Options Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Poll Options</Text>
+            
+            {options.map((option, index) => (
+              <View key={index} style={styles.optionRow}>
+                <TextInput
+                  style={styles.optionInput}
+                  placeholder={`Option ${index + 1}`}
+                  placeholderTextColor="#9CA3AF"
+                  value={option}
+                  onChangeText={(value) => handleOptionChange(index, value)}
+                  maxLength={60}
+                />
+                
+                {/* Delete Icon (Trash Can) */}
+                {options.length > 2 && (
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveOption(index)}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {/* + Add Option Button */}
+            {options.length < 10 && (
+              <TouchableOpacity style={styles.addOptionButton} onPress={handleAddOption}>
+                <Ionicons name="add" size={20} color="#333" />
+                <Text style={styles.addOptionText}>Add Option</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Create Button Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.createButton, creating && styles.createButtonDisabled]}
+            onPress={handleCreatePoll}
+            disabled={creating}
+          >
+            {creating ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.createButtonText}>Create Poll</Text>
+            )}
+          </TouchableOpacity>
         </View>
-
-        {/* Question Input */}
-        <View style={styles.section}>
-          <TextInput
-            style={styles.questionInput}
-            placeholder="Ask Question"
-            placeholderTextColor="#9CA3AF"
-            value={question}
-            onChangeText={setQuestion}
-            multiline
-            maxLength={200}
-          />
-        </View>
-
-        {/* Poll Options */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Poll Options</Text>
-          {options.map((option, index) => (
-            <View key={index} style={styles.optionRow}>
-              <TextInput
-                style={styles.optionInput}
-                placeholder={`Option ${index + 1}`}
-                placeholderTextColor="#9CA3AF"
-                value={option}
-                onChangeText={(value) => handleOptionChange(index, value)}
-                maxLength={100}
-              />
-              {options.length > 2 && (
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveOption(index)}
-                >
-                  <Ionicons name="close" size={20} color="#9CA3AF" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-
-          {options.length < 10 && (
-            <TouchableOpacity style={styles.addOptionButton} onPress={handleAddOption}>
-              <Ionicons name="add" size={20} color={Colors.light.primary} />
-              <Text style={styles.addOptionText}>Add Option</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* Create Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.createButton, creating && styles.createButtonDisabled]}
-          onPress={handleCreatePoll}
-          disabled={creating}
-        >
-          {creating ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.createButtonText}>Create Poll</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -156,52 +166,44 @@ export default function CreatePollScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
+  },
+  modalIndicatorContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  modalIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E5E7EB',
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 10,
   },
   section: {
     marginBottom: 24,
   },
   sectionLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.light.border,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
   },
   questionInput: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.md,
-    padding: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16, // Pill-ish shape but taller
+    paddingHorizontal: 16,
+    paddingVertical: 16,
     fontSize: 16,
-    color: Colors.light.text,
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 16,
+    color: '#1F2937',
   },
   optionRow: {
     flexDirection: 'row',
@@ -210,45 +212,47 @@ const styles = StyleSheet.create({
   },
   optionInput: {
     flex: 1,
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.md,
-    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24, // Full Pill Shape
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     fontSize: 15,
-    color: Colors.light.text,
-    marginRight: 8,
+    color: '#1F2937',
   },
   removeButton: {
-    padding: 8,
+    padding: 10,
+    marginLeft: 4,
   },
   addOptionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.light.primary,
-    borderStyle: 'dashed',
-    marginTop: 8,
+    marginTop: 4,
+    paddingVertical: 8,
   },
   addOptionText: {
     fontSize: 15,
-    color: Colors.light.primary,
+    color: '#333',
     fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   footer: {
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    paddingBottom: 30, // Extra padding for safe area visually
+    borderTopWidth: 0,
   },
   createButton: {
-    backgroundColor: '#000000',
-    borderRadius: borderRadius.lg,
-    padding: 16,
+    backgroundColor: '#1F2937', // Dark/Black button
+    borderRadius: 30, // Pill Shape
+    paddingVertical: 16,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   createButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   createButtonText: {
     color: '#FFFFFF',
@@ -256,4 +260,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

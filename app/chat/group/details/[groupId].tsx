@@ -8,10 +8,12 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
@@ -38,6 +40,7 @@ export default function GroupDetailsScreen() {
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { user } = useAppSelector((state) => state.auth);
+  const insets = useSafeAreaInsets();
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
@@ -116,7 +119,7 @@ export default function GroupDetailsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
+          <Ionicons name="chevron-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -129,7 +132,7 @@ export default function GroupDetailsScreen() {
             <Image
               key={member.user_id}
               source={{ uri: member.profile_image || 'https://via.placeholder.com/30' }}
-              style={[styles.headerAvatar, { marginLeft: idx > 0 ? -8 : 0 }]}
+              style={[styles.headerAvatar, { marginLeft: idx > 0 ? -8 : 0, zIndex: 3 - idx }]}
             />
           ))}
         </View>
@@ -139,7 +142,9 @@ export default function GroupDetailsScreen() {
         {/* Active Plan Card */}
         {groupDetails.plan && (
           <View style={styles.planCard}>
-            <Text style={styles.planCardLabel}>Active Plan</Text>
+            <View style={styles.planBadge}>
+              <Text style={styles.planBadgeText}>Active Plan</Text>
+            </View>
             <View style={styles.planContent}>
               <Text style={styles.planTitle}>{groupDetails.plan.title}</Text>
               <Text style={styles.planDescription} numberOfLines={3}>
@@ -158,7 +163,9 @@ export default function GroupDetailsScreen() {
 
         {/* All Members */}
         <View style={styles.membersCard}>
-          <Text style={styles.membersTitle}>All Members</Text>
+          <View style={styles.membersBadge}>
+            <Text style={styles.membersBadgeText}>All Members</Text>
+          </View>
           <View style={styles.membersGrid}>
             {groupDetails.members.map((member) => (
               <View key={member.user_id} style={styles.memberItem}>
@@ -177,7 +184,7 @@ export default function GroupDetailsScreen() {
 
       {/* Close Group Button */}
       {isCreator && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity
             style={styles.closeButton}
             onPress={() => {
@@ -195,9 +202,14 @@ export default function GroupDetailsScreen() {
         </View>
       )}
 
-      {/* Close Dialog */}
-      {showCloseDialog && (
-        <View style={styles.dialogOverlay}>
+      {/* Close Dialog Modal with Blur */}
+      <Modal
+        visible={showCloseDialog}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowCloseDialog(false)}
+      >
+        <BlurView intensity={20} tint="dark" style={styles.modalOverlay}>
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>Close group chat?</Text>
             <Text style={styles.dialogText}>
@@ -206,21 +218,21 @@ export default function GroupDetailsScreen() {
             </Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonClose]}
+                style={styles.dialogButtonClose}
                 onPress={handleCloseGroup}
               >
                 <Text style={styles.dialogButtonTextClose}>Close Group</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogButtonCancel]}
+                style={styles.dialogButtonCancel}
                 onPress={() => setShowCloseDialog(false)}
               >
                 <Text style={styles.dialogButtonTextCancel}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      )}
+        </BlurView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -228,7 +240,7 @@ export default function GroupDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
@@ -250,16 +262,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: '#F3F4F6',
   },
   headerInfo: {
     flex: 1,
     marginHorizontal: 12,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontWeight: '700',
+    color: '#000',
   },
   headerSubtitle: {
     fontSize: 14,
@@ -274,37 +287,44 @@ const styles = StyleSheet.create({
     height: 30,
     borderRadius: 15,
     borderWidth: 2,
-    borderColor: Colors.light.background,
+    borderColor: '#FFFFFF',
   },
   content: {
     flex: 1,
     padding: 16,
   },
   planCard: {
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
     padding: 16,
     marginBottom: 16,
   },
-  planCardLabel: {
+  planBadge: {
+    backgroundColor: '#374151',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  planBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6B7280',
-    marginBottom: 8,
+    color: '#FFFFFF',
     textTransform: 'uppercase',
   },
   planContent: {
     position: 'relative',
   },
   planTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 6,
   },
   planDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#4B5563',
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -314,15 +334,23 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   membersCard: {
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
     padding: 16,
   },
-  membersTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+  membersBadge: {
+    backgroundColor: '#374151',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     marginBottom: 16,
+  },
+  membersBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
   membersGrid: {
     flexDirection: 'row',
@@ -341,46 +369,41 @@ const styles = StyleSheet.create({
   },
   memberName: {
     fontSize: 12,
-    color: Colors.light.text,
+    color: '#000',
     textAlign: 'center',
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: '#F3F4F6',
   },
   closeButton: {
-    backgroundColor: Colors.light.error,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 12,
     padding: 16,
     alignItems: 'center',
   },
   closeButtonText: {
-    color: '#FFFFFF',
+    color: '#DC2626',
     fontSize: 16,
     fontWeight: '600',
   },
-  dialogOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  modalOverlay: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   dialog: {
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 24,
     width: '85%',
     maxWidth: 400,
   },
   dialogTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 12,
   },
   dialogText: {
@@ -393,20 +416,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  dialogButton: {
+  dialogButtonClose: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    borderRadius: 12,
     padding: 12,
-    borderRadius: borderRadius.md,
     alignItems: 'center',
   },
-  dialogButtonClose: {
-    backgroundColor: Colors.light.error,
-  },
   dialogButtonCancel: {
+    flex: 1,
     backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
   },
   dialogButtonTextClose: {
-    color: '#FFFFFF',
+    color: '#DC2626',
     fontSize: 14,
     fontWeight: '600',
   },
