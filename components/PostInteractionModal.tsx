@@ -8,13 +8,14 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, borderRadius } from '@/constants/theme';
+import { Colors, borderRadius } from '@/constants/theme'; // Assuming these exist based on context
 import { apiService } from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
+import { BlurView } from 'expo-blur';
 
 interface PostInteractionModalProps {
   visible: boolean;
@@ -37,67 +38,6 @@ export default function PostInteractionModal({
   const [loading, setLoading] = useState(false);
   const { user } = useAppSelector((state) => state.auth);
 
-  const handleReact = async () => {
-    if (!user?.user_id) {
-      Alert.alert('Error', 'Please login to express interest');
-      return;
-    }
-
-    if (!postId) {
-      Alert.alert('Error', 'Post ID is missing');
-      console.error('❌ PostInteractionModal: postId is missing', { postId });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Create join request with reaction (pending status)
-      console.log('📤 Sending reaction:', { postId, user_id: user.user_id, emoji: selectedEmoji });
-      await apiService.createJoinRequestWithReaction(postId, user.user_id, selectedEmoji);
-      Alert.alert('Success', 'Your interest has been sent! The author will review it.');
-      onSuccess?.();
-      handleClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send interest');
-      console.error('❌ Error sending reaction:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleComment = async () => {
-    if (!user?.user_id) {
-      Alert.alert('Error', 'Please login to express interest');
-      return;
-    }
-
-    if (!postId) {
-      Alert.alert('Error', 'Post ID is missing');
-      console.error('❌ PostInteractionModal: postId is missing', { postId });
-      return;
-    }
-
-    if (!comment.trim()) {
-      Alert.alert('Error', 'Please enter a comment');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Create join request with comment (pending status)
-      console.log('📤 Sending comment:', { postId, user_id: user.user_id, text: comment.trim() });
-      await apiService.createJoinRequestWithComment(postId, user.user_id, comment.trim());
-      Alert.alert('Success', 'Your interest has been sent! The author will review it.');
-      onSuccess?.();
-      handleClose();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to send interest');
-      console.error('❌ Error sending comment:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleClose = () => {
     setMode('react');
     setComment('');
@@ -105,36 +45,82 @@ export default function PostInteractionModal({
     onClose();
   };
 
+  const handleReact = async () => {
+    if (!user?.user_id) return;
+    setLoading(true);
+    try {
+      await apiService.createJoinRequestWithReaction(postId, user.user_id, selectedEmoji);
+      Alert.alert('Success', 'Interest sent!');
+      onSuccess?.();
+      handleClose();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send interest');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleComment = async () => {
+    if (!user?.user_id || !comment.trim()) return;
+    setLoading(true);
+    try {
+      await apiService.createJoinRequestWithComment(postId, user.user_id, comment.trim());
+      Alert.alert('Success', 'Interest sent!');
+      onSuccess?.();
+      handleClose();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to send interest');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="fade"
       transparent
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.modalContent}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleClose}>
-              <Ionicons name="close" size={24} color={Colors.light.text} />
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>
-              Express Interest to Join
-            </Text>
-            <View style={{ width: 24 }} />
-          </View>
+      {/* Blur Background for consistency with other modals */}
+      <BlurView intensity={20} tint="dark" style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.keyboardView}
+        >
+          <View style={styles.modalContent}>
+            
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Express Interest</Text>
+              <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
             <Text style={styles.description}>
-              Choose how you'd like to express interest. The author will review and approve your request.
+              Let the host know you're interested in joining this plan.
             </Text>
 
-            {mode === 'react' && (
-              <View style={styles.reactContent}>
-                <Text style={styles.sectionTitle}>React with Emoji</Text>
+            {/* Toggle Tabs (Visual separation) */}
+            <View style={styles.tabContainer}>
+              <TouchableOpacity 
+                style={[styles.tab, mode === 'react' && styles.activeTab]} 
+                onPress={() => setMode('react')}
+              >
+                <Text style={[styles.tabText, mode === 'react' && styles.activeTabText]}>Emoji</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.tab, mode === 'comment' && styles.activeTab]} 
+                onPress={() => setMode('comment')}
+              >
+                <Text style={[styles.tabText, mode === 'comment' && styles.activeTabText]}>Message</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Content Area */}
+            <View style={styles.contentArea}>
+              {mode === 'react' ? (
                 <View style={styles.emojiGrid}>
                   {EMOJI_OPTIONS.map((emoji) => (
                     <TouchableOpacity
@@ -145,66 +131,43 @@ export default function PostInteractionModal({
                       ]}
                       onPress={() => setSelectedEmoji(emoji)}
                     >
-                      <Text style={styles.emoji}>{emoji}</Text>
+                      <Text style={styles.emojiText}>{emoji}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
-                <TouchableOpacity
-                  style={[styles.actionButton, loading && styles.buttonDisabled]}
-                  onPress={handleReact}
-                  disabled={loading}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {loading ? 'Sending...' : 'Send Interest'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.switchModeButton}
-                  onPress={() => setMode('comment')}
-                >
-                  <Ionicons name="chatbubble-outline" size={20} color={Colors.light.primary} />
-                  <Text style={styles.switchModeText}>Or write a comment instead</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {mode === 'comment' && (
-              <View style={styles.commentContent}>
-                <Text style={styles.sectionTitle}>Write a Comment</Text>
+              ) : (
                 <TextInput
                   style={styles.commentInput}
-                  placeholder="Write your comment to express interest..."
+                  placeholder="Write a message to the host..."
                   placeholderTextColor="#9CA3AF"
                   value={comment}
                   onChangeText={setComment}
                   multiline
-                  numberOfLines={4}
                   textAlignVertical="top"
+                  autoFocus
                 />
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    (!comment.trim() || loading) && styles.buttonDisabled,
-                  ]}
-                  onPress={handleComment}
-                  disabled={!comment.trim() || loading}
-                >
-                  <Text style={styles.actionButtonText}>
-                    {loading ? 'Sending...' : 'Send Interest'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.switchModeButton}
-                  onPress={() => setMode('react')}
-                >
-                  <Ionicons name="heart-outline" size={20} color={Colors.light.primary} />
-                  <Text style={styles.switchModeText}>Or react with emoji instead</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
+              )}
+            </View>
+
+            {/* Action Button */}
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                (loading || (mode === 'comment' && !comment.trim())) && styles.buttonDisabled
+              ]}
+              onPress={mode === 'react' ? handleReact : handleComment}
+              disabled={loading || (mode === 'comment' && !comment.trim())}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.actionButtonText}>Send Request</Text>
+              )}
+            </TouchableOpacity>
+
+          </View>
+        </KeyboardAvoidingView>
+      </BlurView>
     </Modal>
   );
 }
@@ -212,93 +175,129 @@ export default function PostInteractionModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  keyboardView: {
+    width: '100%',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: Colors.light.background,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    maxHeight: '90%',
-    paddingBottom: 40,
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
   },
+  
+  // Header
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
   },
-  content: {
-    padding: 24,
+  closeButton: {
+    padding: 4,
   },
   description: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+
+  // Tabs
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 16,
+    padding: 4,
     marginBottom: 24,
-    textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 16,
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 12,
+  },
+  activeTab: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 16,
-    textAlign: 'center',
+    color: '#666',
   },
-  reactContent: {
-    width: '100%',
+  activeTabText: {
+    color: '#1C1C1E',
   },
-  commentContent: {
-    width: '100%',
+
+  // Content Area
+  contentArea: {
+    minHeight: 120, // Keep height consistent to minimize jumping
+    justifyContent: 'center',
+    marginBottom: 24,
   },
+
+  // Emoji Styles
   emojiGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: 24,
+    justifyContent: 'space-between',
     gap: 12,
   },
   emojiButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.light.inputBackground,
+    width: '30%', // 3 per row
+    aspectRatio: 1,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: 'transparent',
   },
   emojiButtonSelected: {
-    borderColor: Colors.light.primary,
-    backgroundColor: Colors.light.cardBackground,
+    borderColor: '#1C1C1E',
+    backgroundColor: '#FFF',
   },
-  emoji: {
+  emojiText: {
     fontSize: 32,
   },
+
+  // Comment Styles
   commentInput: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.md,
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 16,
     padding: 16,
     fontSize: 16,
-    color: Colors.light.text,
-    minHeight: 100,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    color: '#1C1C1E',
+    height: 120,
   },
+
+  // Action Button
   actionButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.lg,
-    padding: 16,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 30, // Pill shape
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -306,20 +305,6 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  switchModeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    marginTop: 16,
-    gap: 8,
-  },
-  switchModeText: {
-    color: Colors.light.primary,
-    fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
   },
 });
-

@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, fetchCurrentUser } from '@/store/slices/profileSlice';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { apiService } from '@/services/api';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -77,6 +78,7 @@ export default function EditProfileScreen() {
         
         // Create FormData for upload
         const formData = new FormData();
+        // @ts-ignore
         formData.append('image', {
           uri: asset.uri,
           type: 'image/jpeg',
@@ -151,75 +153,88 @@ export default function EditProfileScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={Colors.light.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Photo */}
-        <View style={styles.photoSection}>
+        
+        {/* Profile Photo Section - Card Style */}
+        <View style={styles.photoCard}>
           <Image
             source={{ uri: profileImage || 'https://via.placeholder.com/100' }}
             style={styles.profileImage}
           />
           <View style={styles.photoButtons}>
             <TouchableOpacity
-              style={styles.photoButton}
+              style={styles.editPhotoButton}
               onPress={() => setShowPhotoModal(true)}
               disabled={uploading}
             >
               {uploading ? (
-                <ActivityIndicator color={Colors.light.primary} />
+                <ActivityIndicator size="small" color="#1C1C1E" />
               ) : (
-                <Text style={styles.photoButtonText}>Edit Photo</Text>
+                <Text style={styles.editPhotoText}>Edit Photo</Text>
               )}
             </TouchableOpacity>
-            {profileImage && (
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={handleRemovePhoto}
-              >
-                <Text style={styles.removeButtonText}>Remove</Text>
-              </TouchableOpacity>
-            )}
+            
+            <TouchableOpacity
+              style={styles.removePhotoButton}
+              onPress={handleRemovePhoto}
+            >
+              <Text style={styles.removePhotoText}>Remove</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Username */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Username</Text>
-          <TextInput
-            style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Enter username"
-            placeholderTextColor="#9CA3AF"
-            maxLength={30}
-          />
-          <Text style={styles.charCount}>{name.length}/30</Text>
+        {/* Input Fields Section - Card Style */}
+        <View style={styles.formCard}>
+          {/* Username Input */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputHeader}>
+              <Text style={styles.label}>Username</Text>
+              <Text style={styles.charCount}>{name.length}/30</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Enter username"
+              placeholderTextColor="#9CA3AF"
+              maxLength={30}
+            />
+          </View>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Bio Input */}
+          <View style={styles.inputContainer}>
+            <View style={styles.inputHeader}>
+              <Text style={styles.label}>Bio</Text>
+              <Text style={styles.charCount}>{bio.length}/90</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Tell us about yourself"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={4}
+              maxLength={90}
+              textAlignVertical="top"
+            />
+          </View>
         </View>
 
-        {/* Bio */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Bio</Text>
-          <TextInput
-            style={[styles.input, styles.bioInput]}
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Tell us about yourself"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-            maxLength={90}
-            textAlignVertical="top"
-          />
-          <Text style={styles.charCount}>{bio.length}/90</Text>
-        </View>
+      </ScrollView>
 
-        {/* Save Button */}
+      {/* Save Button */}
+      <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -231,7 +246,7 @@ export default function EditProfileScreen() {
             <Text style={styles.saveButtonText}>Save</Text>
           )}
         </TouchableOpacity>
-      </ScrollView>
+      </View>
 
       {/* Photo Selection Modal */}
       <Modal
@@ -243,25 +258,24 @@ export default function EditProfileScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Photo Source</Text>
               <TouchableOpacity onPress={() => setShowPhotoModal(false)}>
-                <IconSymbol name="xmark" size={24} color={Colors.light.text} />
+                <Ionicons name="close" size={24} color="#1C1C1E" />
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Profile Photo</Text>
-              <View style={{ width: 24 }} />
             </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => pickImage('camera')}
               >
-                <IconSymbol name="camera.fill" size={32} color={Colors.light.primary} />
+                <IconSymbol name="camera.fill" size={32} color="#1C1C1E" />
                 <Text style={styles.modalButtonText}>Camera</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => pickImage('gallery')}
               >
-                <IconSymbol name="photo.fill" size={32} color={Colors.light.primary} />
+                <IconSymbol name="photo.fill" size={32} color="#1C1C1E" />
                 <Text style={styles.modalButtonText}>Gallery</Text>
               </TouchableOpacity>
             </View>
@@ -275,111 +289,157 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
   },
-  photoSection: {
+  
+  // Photo Section Styles
+  photoCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 12, // Reduced padding to fit buttons better
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F2F2F2',
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 16,
+    width: 70, // Slightly reduced from 80
+    height: 70,
+    borderRadius: 35,
+    marginRight: 12, // Reduced margin
+    backgroundColor: '#F2F2F2',
   },
   photoButtons: {
+    flex: 1,
     flexDirection: 'row',
-    gap: 12,
+    gap: 8, // Reduced gap
   },
-  photoButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+  editPhotoButton: {
+    flex: 1,
+    backgroundColor: '#F2F2F2',
+    paddingVertical: 10, // Adjusted padding
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  photoButtonText: {
+  editPhotoText: {
+    fontSize: 13, // Slightly smaller text if needed
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  removePhotoButton: {
+    flex: 1,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 10,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removePhotoText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
-  removeButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+
+  // Form Section Styles
+  formCard: {
+    backgroundColor: '#F5F5F5', // Darker gray for better visibility against white
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
   },
-  removeButtonText: {
-    color: Colors.light.error,
-    fontSize: 14,
-    fontWeight: '600',
+  inputContainer: {
+    marginBottom: 4,
   },
-  inputSection: {
-    marginBottom: 24,
+  inputHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.lg,
-    padding: 16,
-    fontSize: 16,
-    color: Colors.light.text,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  bioInput: {
-    height: 100,
-    paddingTop: 16,
+    fontWeight: '600', // Made bold
+    color: '#555555', // Darker gray label
   },
   charCount: {
     fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'right',
-    marginTop: 4,
+    color: '#888',
+  },
+  input: {
+    fontSize: 16,
+    color: '#000000', // Solid black text
+    paddingVertical: 8,
+    fontWeight: '600', // Semi-bold text
+  },
+  bioInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E0E0E0', // Darker divider
+    marginVertical: 16,
+  },
+
+  // Footer Styles
+  footer: {
+    padding: 20,
+    paddingBottom: 40,
+    backgroundColor: '#FFFFFF',
   },
   saveButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.lg,
-    padding: 16,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 30,
+    paddingVertical: 18,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 32,
+    justifyContent: 'center',
   },
   saveButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.light.background,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
   },
@@ -391,22 +451,22 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   modalButtons: {
     flexDirection: 'row',
-    gap: 24,
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    gap: 20,
   },
   modalButton: {
     alignItems: 'center',
     gap: 8,
+    padding: 16,
   },
   modalButtonText: {
     fontSize: 14,
-    color: Colors.light.text,
-    fontWeight: '500',
+    color: '#1C1C1E',
+    fontWeight: '600',
   },
 });
-

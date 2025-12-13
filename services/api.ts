@@ -332,6 +332,26 @@ class ApiService {
     });
   }
 
+  async savePost(accessToken: string, user_id: string, post_id: string) {
+    return this.request<{ save_id: string; saved_at: string }>('/post/save', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ user_id, post_id }),
+    });
+  }
+
+  async unsavePost(accessToken: string, user_id: string, post_id: string) {
+    return this.request<any>('/post/unsave', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ user_id, post_id }),
+    });
+  }
+
   async deleteUser(session_id: string) {
     return this.request<any>('/user/delete', {
       method: 'DELETE',

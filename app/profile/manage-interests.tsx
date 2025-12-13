@@ -5,43 +5,43 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors, borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, fetchCurrentUser } from '@/store/slices/profileSlice';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 
-const ALL_INTERESTS = [
-  'House Party',
-  'Road Trip',
-  'Concert',
-  'Sports',
-  'Breakfast',
-  'Brunch',
-  'Lunch',
-  'Dinner',
-  'Coffee',
-  'Drinks',
-  'Art',
-  'Music',
-  'Movies',
-  'Gaming',
-  'Travel',
-  'Photography',
-  'Reading',
-  'Writing',
-  'Dancing',
-  'Singing',
-  'Cooking',
-  'Party',
-  'Health',
-  'Fitness',
-  'Fashion',
-  'Shopping',
-  'Workshops',
-  'Networking',
-  'Podcasts',
+// Data mapping exactly to the screenshot
+const INTERESTS_DATA = [
+  { label: 'Breakfast', emoji: '🥞' },
+  { label: 'Brunch', emoji: '🍹' },
+  { label: 'Lunch', emoji: '🍔' },
+  { label: 'Dinner', emoji: '🍝' },
+  { label: 'Coffee', emoji: '☕' },
+  { label: 'Picnic', emoji: '🧺' },
+  { label: 'Barbecue', emoji: '🍖' },
+  { label: 'Movie', emoji: '🍿' },
+  { label: 'Art', emoji: '🎨' },
+  { label: 'Board Games', emoji: '♟️' },
+  { label: 'House Party', emoji: '🏡' },
+  { label: 'Bike Ride', emoji: '🚲' },
+  { label: 'Road Trip', emoji: '🛣️' },
+  { label: 'Karaoke', emoji: '🎤' },
+  { label: 'Outdoor', emoji: '🌇' },
+  { label: 'Concert', emoji: '🎷' },
+  { label: 'Cooking', emoji: '🥣' },
+  { label: 'Live Music', emoji: '🎶' },
+  { label: 'Party', emoji: '🎉' },
+  { label: 'Health', emoji: '💪' },
+  { label: 'Themed Party', emoji: '👯' },
+  { label: 'Book', emoji: '📔' },
+  { label: 'Nature', emoji: '🌅' },
+  { label: 'Standup', emoji: '🎙️' },
+  { label: 'Sports', emoji: '🏀' },
+  { label: 'Workshops', emoji: '🧘' },
+  { label: 'Pet Meeting', emoji: '🐕' },
+  { label: 'Potluck', emoji: '🍱' },
 ];
 
 export default function ManageInterestsScreen() {
@@ -49,6 +49,7 @@ export default function ManageInterestsScreen() {
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+  
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -91,33 +92,39 @@ export default function ManageInterestsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={Colors.light.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Manage Your Interests</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.interestsGrid}>
-          {ALL_INTERESTS.map((interest) => {
-            const isSelected = selectedInterests.includes(interest);
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 100 }}
+      >
+        <View style={styles.interestsCloud}>
+          {INTERESTS_DATA.map((item) => {
+            const isSelected = selectedInterests.includes(item.label);
             return (
               <TouchableOpacity
-                key={interest}
+                key={item.label}
                 style={[
                   styles.interestTag,
                   isSelected && styles.interestTagSelected,
                 ]}
-                onPress={() => toggleInterest(interest)}
+                onPress={() => toggleInterest(item.label)}
+                activeOpacity={0.7}
               >
+                <Text style={styles.emoji}>{item.emoji}</Text>
                 <Text
                   style={[
                     styles.interestText,
                     isSelected && styles.interestTextSelected,
                   ]}
                 >
-                  {interest}
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             );
@@ -125,15 +132,18 @@ export default function ManageInterestsScreen() {
         </View>
       </ScrollView>
 
+      {/* Footer Save Button */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
           disabled={saving}
         >
-          <Text style={styles.saveButtonText}>
-            {saving ? 'Saving...' : 'Save'}
-          </Text>
+          {saving ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+             <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -143,68 +153,98 @@ export default function ManageInterestsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF', // White background
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
   },
-  interestsGrid: {
+  
+  // Interests Cloud Layout
+  interestsCloud: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center', // Center the cloud of tags
     gap: 12,
-    marginBottom: 24,
+    paddingTop: 10,
   },
+  
+  // Tag Styles
   interestTag: {
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF', // White background for unselected
+    borderRadius: 30, // Pill shape
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 12,
+    // Subtle shadow for unselected items (to stand out against white bg)
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    // Border for better definition
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: '#F2F2F2',
   },
   interestTagSelected: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: '#1C1C1E', // Black background for selected
+    borderColor: '#1C1C1E',
+    transform: [{ scale: 1.02 }], // Slight pop
+  },
+  
+  emoji: {
+    fontSize: 18,
+    marginRight: 8,
   },
   interestText: {
     fontSize: 14,
-    color: Colors.light.text,
-    fontWeight: '500',
+    color: '#1C1C1E', // Dark text
+    fontWeight: '600',
   },
   interestTextSelected: {
-    color: '#FFFFFF',
+    color: '#FFFFFF', // White text
   },
+  
+  // Footer
   footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 40,
+    backgroundColor: '#FFFFFF',
   },
   saveButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.lg,
-    padding: 16,
+    backgroundColor: '#1C1C1E', // Black button
+    borderRadius: 30,
+    padding: 18,
     alignItems: 'center',
   },
   saveButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
-

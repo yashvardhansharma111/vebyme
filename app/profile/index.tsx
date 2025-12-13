@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,21 +7,29 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
+  Modal,
+  ImageBackground,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors, borderRadius } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser, fetchUserStats } from '@/store/slices/profileSlice';
 import { logout } from '@/store/slices/authSlice';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/api';
+import { BlurView } from 'expo-blur';
 
 export default function MyProfileScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
+  
   const { user } = useAppSelector((state) => state.auth);
-  const { currentUser, stats, isLoading } = useAppSelector((state) => state.profile);
+  const { currentUser, isLoading } = useAppSelector((state) => state.profile);
+
+  // State for Custom Modals
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     if (user?.session_id) {
@@ -33,380 +41,414 @@ export default function MyProfileScreen() {
   }, [dispatch, user]);
 
   const handleLogout = async () => {
-    Alert.alert(
-      "You're about to Logout!",
-      'You can log back in anytime using your email or phone number.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'default',
-          onPress: async () => {
-            await dispatch(logout());
-            router.replace('/login');
-          },
-        },
-      ]
-    );
+    setShowLogoutModal(false);
+    await dispatch(logout());
+    router.replace('/login');
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      "You're about to delete your account!",
-      'Deleting your account is permanent.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete Account',
-          style: 'destructive',
-          onPress: async () => {
-            if (!user?.session_id) return;
-            try {
-              await apiService.deleteUser(user.session_id);
-              await dispatch(logout());
-              router.replace('/login');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete account');
-            }
-          },
-        },
-      ]
-    );
+  const handleDeleteAccount = async () => {
+    if (!user?.session_id) return;
+    try {
+      await apiService.deleteUser(user.session_id);
+      setShowDeleteModal(false);
+      await dispatch(logout());
+      router.replace('/login');
+    } catch (error: any) {
+      console.error(error); 
+    }
   };
 
   if (isLoading && !currentUser) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
+        <ActivityIndicator size="large" color="#1C1C1E" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My profile</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      {/* Profile Card */}
-      <View style={styles.profileCard}>
-        <View style={styles.bannerContainer}>
-          <Image
-            source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/400x200' }}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
-        </View>
-        <View style={styles.profileImageContainer}>
-          <Image
-            source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/100' }}
-            style={styles.profileImage}
-          />
-        </View>
-        <View style={styles.profileInfo}>
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{currentUser?.name || 'User'}</Text>
-            {currentUser?.name && (
-              <IconSymbol name="checkmark.seal.fill" size={20} color={Colors.light.primary} />
-            )}
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        
+        {/* --- HEADER IMAGE SECTION --- */}
+        <ImageBackground
+          source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/400x300' }}
+          style={[styles.headerBackground, { paddingTop: insets.top }]}
+          resizeMode="cover"
+        >
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity 
+                style={styles.editButton} 
+                onPress={() => router.push('/profile/edit')}
+            >
+              <Text style={styles.editButtonText}>Edit</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.bio}>{currentUser?.bio || 'No bio yet'}</Text>
-        </View>
-      </View>
+        </ImageBackground>
 
-      {/* Stats */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats?.plans_count || 0}</Text>
-          <Text style={styles.statLabel}>Plans</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats?.interactions_count || 0}</Text>
-          <Text style={styles.statLabel}>Interactions</Text>
-        </View>
-      </View>
+        {/* --- PROFILE CARD --- */}
+        <View style={styles.profileCardWrapper}>
+          <View style={styles.profileCard}>
+            <View style={styles.avatarContainer}>
+              <Image
+                source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/100' }}
+                style={styles.avatar}
+              />
+            </View>
 
-      {/* User Details */}
-      <View style={styles.section}>
-        <View style={styles.detailItem}>
-          <IconSymbol name="person.fill" size={20} color={Colors.light.primary} />
-          <Text style={styles.detailText}>{currentUser?.name || 'Not set'}</Text>
-        </View>
-        {currentUser?.phone_number && (
-          <View style={styles.detailItem}>
-            <IconSymbol name="phone.fill" size={20} color={Colors.light.primary} />
-            <Text style={styles.detailText}>{currentUser.phone_number}</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Interests */}
-      {currentUser?.interests && currentUser.interests.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>#interests</Text>
-          <View style={styles.interestsContainer}>
-            {currentUser.interests.map((interest, index) => (
-              <View key={index} style={styles.interestTag}>
-                <Text style={styles.interestText}>#{interest}</Text>
+            <View style={styles.profileInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.name}>{currentUser?.name || 'User'}</Text>
+                <Ionicons name="checkmark-circle" size={18} color="#1C1C1E" />
               </View>
-            ))}
+              <Text style={styles.bio}>{currentUser?.bio || 'No bio yet'}</Text>
+            </View>
+
+            <TouchableOpacity style={styles.viewProfileButton}>
+              <Ionicons name="person-outline" size={16} color="#FFF" style={{ marginRight: 8 }} />
+              <Text style={styles.viewProfileText}>View Profile</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      )}
 
-      {/* Menu Items */}
-      <View style={styles.menuSection}>
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/your-plans')}
-        >
-          <IconSymbol name="list.bullet" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Your Plans</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+        {/* --- MENU SECTIONS --- */}
+        <View style={styles.menuContainer}>
+          
+          {/* Group 1: Plans */}
+          <View style={styles.menuGroup}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/your-plans')}>
+              <Ionicons name="calendar-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Your Plans</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/saved-plans')}>
+              <Ionicons name="bookmark-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Saved Plans</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/saved-plans')}
-        >
-          <IconSymbol name="bookmark.fill" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Saved Plans</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+          {/* Group 2: Preferences */}
+          <View style={styles.menuGroup}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/location-preference')}>
+              <Ionicons name="location-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Location Preferences</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/manage-socials')}>
+              <Ionicons name="logo-instagram" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Manage Socials</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/manage-interests')}>
+              <Ionicons name="options-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Manage Interests</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/edit')}
-        >
-          <IconSymbol name="pencil" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Edit Profile</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+          {/* Group 3: Contact */}
+          <View style={styles.menuGroup}>
+            <TouchableOpacity style={styles.menuItem}>
+              <Ionicons name="headset-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Contact Us</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/location-preference')}
-        >
-          <IconSymbol name="location.fill" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Location Preferences</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+           {/* Group 4: Actions */}
+           <View style={styles.menuGroup}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => setShowDeleteModal(true)}>
+              <Ionicons name="trash-outline" size={22} color="#FF3B30" style={styles.menuIcon} />
+              <Text style={[styles.menuText, { color: '#FF3B30' }]}>Delete account</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.menuItem} onPress={() => setShowLogoutModal(true)}>
+              <Ionicons name="log-out-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/manage-socials')}
-        >
-          <IconSymbol name="link" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Manage Socials</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => router.push('/profile/manage-interests')}
-        >
-          <IconSymbol name="tag.fill" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Manage Interests</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+      {/* --- DELETE ACCOUNT MODAL WITH BLUR --- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showDeleteModal}
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        {/* Blur View acts as the overlay background */}
+        <BlurView intensity={25} tint="dark" style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>You're about to delete your account !</Text>
+            <Text style={styles.modalDescription}>
+              Deleting your account will permanently remove all your data.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.deleteActionButton} 
+                onPress={handleDeleteAccount}
+              >
+                <Text style={styles.deleteActionText}>Delete Account</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </BlurView>
+      </Modal>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <IconSymbol name="envelope.fill" size={20} color={Colors.light.primary} />
-          <Text style={styles.menuText}>Contact Us</Text>
-          <IconSymbol name="chevron.right" size={16} color="#9CA3AF" />
-        </TouchableOpacity>
+      {/* --- LOGOUT MODAL WITH BLUR --- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showLogoutModal}
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        {/* Blur View acts as the overlay background */}
+        <BlurView intensity={25} tint="dark" style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>You're about to Logout !</Text>
+            <Text style={styles.modalDescription}>
+              You can log back in anytime using your email or phone number.
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.logoutActionButton} 
+                onPress={handleLogout}
+              >
+                <Text style={styles.logoutActionText}>Logout</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </BlurView>
+      </Modal>
 
-        <TouchableOpacity
-          style={[styles.menuItem, styles.deleteItem]}
-          onPress={handleDeleteAccount}
-        >
-          <Text style={styles.deleteText}>Delete account</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.menuItem, styles.logoutItem]}
-          onPress={handleLogout}
-        >
-          <Text style={styles.logoutText}>Log out</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#F2F2F2',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#F2F2F2',
   },
-  header: {
+  
+  // Header
+  headerBackground: {
+    width: '100%',
+    height: 240,
+    justifyContent: 'flex-start',
+  },
+  headerTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
-  headerTitle: {
-    fontSize: 18,
+  editButton: {
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  editButtonText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: '#1C1C1E',
+  },
+
+  // Profile Card
+  profileCardWrapper: {
+    paddingHorizontal: 16,
+    marginTop: -60,
+    marginBottom: 20,
   },
   profileCard: {
-    backgroundColor: Colors.light.cardBackground,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.light.border,
-  },
-  bannerContainer: {
-    height: 150,
-    backgroundColor: Colors.light.inputBackground,
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  profileImageContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
     alignItems: 'center',
-    marginTop: -50,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  profileImage: {
-    width: 100,
-    height: 100,
+  avatarContainer: {
+    marginTop: -50,
+    marginBottom: 12,
     borderRadius: 50,
-    borderWidth: 4,
-    borderColor: Colors.light.background,
+    padding: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  avatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   profileInfo: {
     alignItems: 'center',
-    padding: 16,
-    paddingTop: 8,
+    marginBottom: 20,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     marginBottom: 4,
   },
   name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.light.text,
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1C1C1E',
   },
   bio: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666',
     textAlign: 'center',
   },
-  statsContainer: {
+  viewProfileButton: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.lg,
-    padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    justifyContent: 'center',
+    backgroundColor: '#1C1C1E',
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 30,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.light.primary,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  sectionTitle: {
+  viewProfileText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 12,
   },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  detailText: {
-    fontSize: 14,
-    color: Colors.light.text,
-  },
-  interestsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  interestTag: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  interestText: {
-    fontSize: 14,
-    color: Colors.light.primary,
-    fontWeight: '500',
-  },
-  menuSection: {
+
+  // Menu
+  menuContainer: {
     paddingHorizontal: 16,
-    marginBottom: 32,
+    gap: 16,
+  },
+  menuGroup: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+  },
+  menuIcon: {
+    marginRight: 16,
   },
   menuText: {
-    flex: 1,
     fontSize: 16,
-    color: Colors.light.text,
-  },
-  deleteItem: {
-    borderBottomWidth: 0,
-    marginTop: 8,
-  },
-  deleteText: {
+    color: '#1C1C1E',
+    fontWeight: '500',
     flex: 1,
-    fontSize: 16,
-    color: Colors.light.error,
-    textAlign: 'center',
   },
-  logoutItem: {
-    borderBottomWidth: 0,
+  divider: {
+    height: 1,
+    backgroundColor: '#F2F2F2',
+    width: '100%',
   },
-  logoutText: {
+
+  // --- MODAL STYLES ---
+  modalOverlay: {
     flex: 1,
-    fontSize: 16,
-    color: Colors.light.text,
-    textAlign: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
+    // No backgroundColor here because BlurView handles the tint
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 8,
+    textAlign: 'left',
+  },
+  modalDescription: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 24,
+    lineHeight: 20,
+    textAlign: 'left',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  // Delete Specific
+  deleteActionButton: {
+    flex: 1,
+    backgroundColor: '#FFEEEE', // Light red
+    borderRadius: 30,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteActionText: {
+    color: '#FF3B30', // Red Text
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  // Logout Specific
+  logoutActionButton: {
+    flex: 1,
+    backgroundColor: '#FFEEEE', // Light red
+    borderRadius: 30,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutActionText: {
+    color: '#FF3B30', // Red Text
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  // Common Cancel
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#333333', // Dark Grey
+    borderRadius: 30,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
 });
-

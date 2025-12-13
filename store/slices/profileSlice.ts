@@ -10,6 +10,11 @@ interface UserProfile {
   interests: string[];
   gender?: string;
   phone_number?: string;
+  social_media?: {
+    instagram?: string;
+    twitter?: string;
+    facebook?: string;
+  };
 }
 
 interface ProfileState {

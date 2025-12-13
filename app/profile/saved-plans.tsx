@@ -8,12 +8,13 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import PostInteractionModal from '@/components/PostInteractionModal';
+import LoginModal from '@/components/LoginModal';
 
 interface SavedPlan {
   post_id: string;
@@ -22,15 +23,156 @@ interface SavedPlan {
   description: string;
   media?: Array<{ url: string; type: string }>;
   tags?: string[];
-  timestamp: string;
+  timestamp: string | Date;
   location?: any;
+  saved_at?: string | Date;
 }
 
+const TAG_ICONS: { [key: string]: string } = {
+  Weekend: 'calendar',
+  Evening: 'cloud',
+  Hitchhiking: 'thumbs-up',
+  Today: 'today',
+  Tomorrow: 'calendar-outline',
+  Morning: 'sunny-outline',
+  Night: 'moon',
+  Cycling: 'bicycle',
+  Sports: 'football',
+  Music: 'musical-notes',
+  Cafe: 'cafe',
+  Clubs: 'wine',
+};
+
+// User profile cache (mock/helper)
+const userCache: { [key: string]: { name: string; profile_image: string | null } } = {};
+
+const fetchUserProfile = async (user_id: string) => {
+  if (userCache[user_id]) return userCache[user_id];
+  try {
+    const response = await apiService.getUserProfile(user_id);
+    if (response.data) {
+      const userData = {
+        name: response.data.name || 'Unknown User',
+        profile_image: response.data.profile_image || null,
+      };
+      userCache[user_id] = userData;
+      return userData;
+    }
+  } catch (error) {
+    console.error(`Error fetching user ${user_id}:`, error);
+  }
+  return { name: 'Unknown User', profile_image: null };
+};
+
+// --- Saved Plan Card Component ---
+function SavedPlanCard({ 
+  plan, 
+  onUserPress,
+  onJoinPress 
+}: { 
+  plan: SavedPlan & { user?: any }; 
+  onUserPress?: (userId: string) => void;
+  onJoinPress?: (postId: string) => void;
+}) {
+  
+  const formatUserTime = (timestamp: string | Date): string => {
+    try {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayName = days[date.getDay()];
+      const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${dayName}, ${time}`;
+    } catch {
+      return 'Recently';
+    }
+  };
+
+  const allTags = plan.tags || [];
+
+  return (
+    <View style={styles.cardWrapper}>
+      
+      {/* Floating User Pill */}
+      <TouchableOpacity
+        style={styles.userPill}
+        onPress={() => plan.user_id && onUserPress?.(plan.user_id)}
+        activeOpacity={0.9}
+      >
+        <Image
+          source={{ uri: plan.user?.profile_image || 'https://via.placeholder.com/40' }}
+          style={styles.avatar}
+        />
+        <View>
+          <Text style={styles.userName}>{plan.user?.name || 'Unknown User'}</Text>
+          <Text style={styles.userTime}>{formatUserTime(plan.timestamp)}</Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Main Card */}
+      <View style={styles.card}>
+        <View style={styles.cardContent}>
+          <Text style={styles.title}>{plan.title || 'Untitled Plan'}</Text>
+          <Text style={styles.description} numberOfLines={4}>
+            {plan.description || 'No description'}
+            <Text style={styles.vybemeText}> vybeme!</Text>
+          </Text>
+
+          <View style={styles.middleRow}>
+            {/* Tags Area */}
+            <View style={styles.tagsContainer}>
+              {allTags.slice(0, 3).map((tag: string, index: number) => (
+                <View key={index} style={styles.tag}>
+                  <Ionicons
+                    name={(TAG_ICONS[tag] || 'ellipse') as any}
+                    size={12}
+                    color="#555"
+                    style={styles.tagIcon}
+                  />
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Image Area */}
+            {plan.media && plan.media.length > 0 && (
+              <Image 
+                source={{ uri: plan.media[0].url }} 
+                style={styles.eventImage} 
+                resizeMode="cover"
+              />
+            )}
+          </View>
+        </View>
+
+        {/* Footer Actions */}
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="refresh" size={20} color="#1C1C1E" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.joinButton}
+            onPress={() => onJoinPress?.(plan.post_id)}
+          >
+            <Text style={styles.joinButtonText}>Join</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// --- Main Screen ---
 export default function SavedPlansScreen() {
   const router = useRouter();
-  const { user } = useAppSelector((state) => state.auth);
-  const [plans, setPlans] = useState<SavedPlan[]>([]);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const [plans, setPlans] = useState<(SavedPlan & { user?: any })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     loadSavedPlans();
@@ -38,12 +180,17 @@ export default function SavedPlansScreen() {
 
   const loadSavedPlans = async () => {
     if (!user?.user_id) return;
-    
     try {
       setLoading(true);
       const response = await apiService.getSavedPosts(user.user_id);
       if (response.data) {
-        setPlans(response.data);
+        const plansWithUsers = await Promise.all(
+          response.data.map(async (plan: SavedPlan) => {
+            const userData = await fetchUserProfile(plan.user_id);
+            return { ...plan, user: userData };
+          })
+        );
+        setPlans(plansWithUsers);
       }
     } catch (error) {
       console.error('Error loading saved plans:', error);
@@ -52,38 +199,42 @@ export default function SavedPlansScreen() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
+  const handleJoinPress = (postId: string) => {
+    if (!isAuthenticated) {
+      setShowLoginModal(true);
+      return;
+    }
+    setSelectedPostId(postId);
+    setShowInteractionModal(true);
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const handleInteractionSuccess = () => {
+    // Optionally refresh the plans or show a success message
+    // The modal will close automatically
   };
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
-      </View>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#1C1C1E" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={Colors.light.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Saved Plans</Text>
-        <View style={{ width: 24 }} />
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {plans.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No saved plans</Text>
@@ -91,196 +242,220 @@ export default function SavedPlansScreen() {
           </View>
         ) : (
           plans.map((plan) => (
-            <View key={plan.post_id} style={styles.planCard}>
-              <View style={styles.planHeader}>
-                <View style={styles.userInfo}>
-                  <Image
-                    source={{ uri: `https://via.placeholder.com/40?text=${plan.user_id?.charAt(0) || 'U'}` }}
-                    style={styles.avatar}
-                  />
-                  <View>
-                    <Text style={styles.userName}>User {plan.user_id?.slice(-4) || ''}</Text>
-                    <Text style={styles.timestamp}>
-                      {formatDate(plan.timestamp)}, {formatTime(plan.timestamp)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              <Text style={styles.planTitle}>{plan.title}</Text>
-              <Text style={styles.planDescription} numberOfLines={3}>
-                {plan.description}
-              </Text>
-
-              {plan.tags && plan.tags.length > 0 && (
-                <View style={styles.tagsContainer}>
-                  {plan.tags.slice(0, 3).map((tag, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {plan.media && plan.media.length > 0 && (
-                <Image
-                  source={{ uri: plan.media[0].url }}
-                  style={styles.planImage}
-                  resizeMode="cover"
-                />
-              )}
-
-              <TouchableOpacity style={styles.joinButton}>
-                <Text style={styles.joinButtonText}>Join</Text>
-              </TouchableOpacity>
-
-              <View style={styles.interactionRow}>
-                <TouchableOpacity style={styles.interactionButton}>
-                  <Ionicons name="heart-outline" size={20} color={Colors.light.text} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.interactionButton}>
-                  <Ionicons name="chatbubble-outline" size={20} color={Colors.light.text} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.interactionButton}>
-                  <Ionicons name="share-outline" size={20} color={Colors.light.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
+            <SavedPlanCard
+              key={plan.post_id}
+              plan={plan}
+              onUserPress={(userId: string) => {
+                router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+              }}
+              onJoinPress={handleJoinPress}
+            />
           ))
         )}
       </ScrollView>
-    </View>
+
+      {/* Post Interaction Modal */}
+      <PostInteractionModal
+        visible={showInteractionModal}
+        onClose={() => {
+          setShowInteractionModal(false);
+          setSelectedPostId(null);
+        }}
+        postId={selectedPostId || ''}
+        onSuccess={handleInteractionSuccess}
+      />
+
+      {/* Login Modal */}
+      <LoginModal
+        visible={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={() => {
+          setShowLoginModal(false);
+          // After login, user can try joining again
+        }}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF', // White background based on SS
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.light.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   content: {
-    flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20, // Space for first pill
+    paddingBottom: 40,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    marginTop: 100,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: '#1C1C1E',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666',
   },
-  planCard: {
-    backgroundColor: Colors.light.cardBackground,
-    borderRadius: borderRadius.lg,
-    padding: 16,
-    marginBottom: 16,
+
+  // --- Card Styles ---
+  cardWrapper: {
+    marginBottom: 40, // Space between cards to account for pill overflow
+    marginTop: 20,    // Space for own pill
+    position: 'relative',
+  },
+  userPill: {
+    position: 'absolute',
+    top: -24, // Pull up to overlap border
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 24,
+    // Shadow to pop out
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 10, // Ensure on top
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  userTime: {
+    fontSize: 11,
+    color: '#666',
+  },
+  
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    paddingTop: 30, // Extra padding for pill area
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: '#F5F5F5',
   },
-  planHeader: {
-    marginBottom: 12,
+  cardContent: {
+    marginBottom: 16,
   },
-  userInfo: {
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 8,
+    marginTop: 8,
+  },
+  description: {
+    fontSize: 15,
+    color: '#444',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  vybemeText: {
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  
+  middleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  tagsContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginRight: 12,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  tagIcon: {
+    marginRight: 4,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  eventImage: {
+    width: 90,
+    height: 70,
+    borderRadius: 16,
+  },
+  
+  footer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  planTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  planDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  tag: {
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  tagText: {
-    fontSize: 12,
-    color: Colors.light.primary,
-  },
-  planImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: borderRadius.md,
-    marginBottom: 12,
+  iconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   joinButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.md,
-    padding: 12,
+    flex: 1,
+    height: 48,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   joinButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  interactionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-  },
-  interactionButton: {
-    padding: 8,
+    fontWeight: '700',
+    fontSize: 16,
   },
 });
-

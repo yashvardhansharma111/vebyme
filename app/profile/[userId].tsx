@@ -12,9 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, borderRadius } from '@/constants/theme';
+import { BlurView } from 'expo-blur';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchUserProfile, fetchUserStats, fetchUserPlans } from '@/store/slices/profileSlice';
+import { fetchUserProfile, fetchUserStats } from '@/store/slices/profileSlice';
 import { apiService } from '@/services/api';
 
 const INTEREST_ICONS: { [key: string]: string } = {
@@ -24,6 +24,34 @@ const INTEREST_ICONS: { [key: string]: string } = {
   Sports: 'football',
   Karaoke: 'mic',
   Cycling: 'bicycle',
+  Breakfast: 'restaurant',
+  Lunch: 'restaurant',
+  Dinner: 'restaurant',
+  Coffee: 'cafe',
+  Music: 'musical-notes',
+  Movies: 'film',
+  'Board Games': 'dice',
+  'House Party': 'home',
+  'Road Trip': 'car',
+  Concert: 'mic',
+  Cooking: 'restaurant',
+  'Live Music': 'guitar',
+  Party: 'balloon',
+  Health: 'heart',
+  Nature: 'leaf',
+  Standup: 'mic',
+  Workshops: 'construct',
+  Podcasts: 'radio',
+};
+
+const TAG_ICONS: { [key: string]: string } = {
+  Weekend: 'calendar',
+  Evening: 'sunny',
+  Hitchhiking: 'thumbs-up',
+  Today: 'today',
+  Tomorrow: 'calendar-outline',
+  Morning: 'sunny-outline',
+  Night: 'moon',
 };
 
 export default function OtherUserProfileScreen() {
@@ -63,7 +91,6 @@ export default function OtherUserProfileScreen() {
       Alert.alert('Error', 'Please login to start a chat');
       return;
     }
-    // TODO: Navigate to chat screen when implemented
     Alert.alert('Coming Soon', 'Chat feature will be available soon');
   };
 
@@ -77,7 +104,6 @@ export default function OtherUserProfileScreen() {
           text: 'Report',
           style: 'destructive',
           onPress: () => {
-            // TODO: Implement report user API
             Alert.alert('Success', 'User reported successfully');
           },
         },
@@ -87,50 +113,77 @@ export default function OtherUserProfileScreen() {
 
   if (isLoading && !viewedUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ActivityIndicator size="large" color="#1C1C1E" />
         </View>
       </SafeAreaView>
     );
   }
 
-  const socialMedia = viewedUser?.social_media || {};
+  const socialMedia = (viewedUser as any)?.social_media || {};
   const interests = viewedUser?.interests || [];
+  const hasProfileImage = viewedUser?.profile_image;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
+        {/* Header with back button */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <View style={styles.backButtonInner}>
+              <Ionicons name="arrow-back" size={20} color="#FFF" />
+              <Ionicons name="close" size={16} color="#FFF" style={styles.closeIcon} />
+            </View>
           </TouchableOpacity>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            Other User Profile
-          </Text>
-          <View style={{ width: 24 }} />
         </View>
 
-        {/* Profile Banner */}
-        <View style={styles.bannerContainer}>
-          <Image
-            source={{
-              uri: viewedUser?.profile_image || 'https://via.placeholder.com/400x200',
-            }}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
-          <View style={styles.bannerOverlay}>
-            <View style={styles.nameContainer}>
-              <Text style={styles.userName}>{viewedUser?.name || 'User'}</Text>
-              {viewedUser?.name && (
-                <Ionicons name="checkmark-circle" size={20} color={Colors.light.primary} />
+        {/* Profile Picture Section */}
+        {hasProfileImage ? (
+          <View style={styles.profileImageContainer}>
+            <Image
+              source={{ uri: viewedUser.profile_image! }}
+              style={styles.profileImageBackground}
+              resizeMode="cover"
+            />
+            <View style={styles.profileContent}>
+              <View style={styles.profileImageWrapper}>
+                <Image
+                  source={{ uri: viewedUser.profile_image! }}
+                  style={styles.profileImageCircle}
+                  resizeMode="cover"
+                />
+              </View>
+              <BlurView intensity={40} tint="dark" style={styles.profileInfoBlur}>
+                <View style={styles.profileInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.userName}>{viewedUser?.name || 'User'}</Text>
+                    <Ionicons name="checkmark-circle" size={20} color="#FFF" style={styles.verifiedIcon} />
+                  </View>
+                  {viewedUser?.bio && (
+                    <Text style={styles.bio} numberOfLines={2}>
+                      {viewedUser.bio}
+                    </Text>
+                  )}
+                </View>
+              </BlurView>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.profileImageContainerNoImage}>
+            <View style={styles.profileInfoNoImage}>
+              <View style={styles.nameRow}>
+                <Text style={styles.userNameNoImage}>{viewedUser?.name || 'User'}</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#1C1C1E" style={styles.verifiedIcon} />
+              </View>
+              {viewedUser?.bio && (
+                <Text style={styles.bioNoImage} numberOfLines={2}>
+                  {viewedUser.bio}
+                </Text>
               )}
             </View>
-            <Text style={styles.bio}>{viewedUser?.bio || 'No bio yet'}</Text>
           </View>
-        </View>
+        )}
 
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
@@ -144,35 +197,39 @@ export default function OtherUserProfileScreen() {
           </View>
         </View>
 
-        {/* Social Media */}
+        {/* Social Media Card */}
         {(socialMedia.instagram || socialMedia.twitter) && (
           <View style={styles.sectionCard}>
             {socialMedia.instagram && (
               <View style={styles.socialRow}>
-                <Ionicons name="logo-instagram" size={20} color="#E4405F" />
+                <View style={styles.socialIconContainer}>
+                  <Ionicons name="logo-instagram" size={20} color="#1C1C1E" />
+                </View>
                 <Text style={styles.socialText}>{socialMedia.instagram}</Text>
               </View>
             )}
             {socialMedia.twitter && (
               <View style={styles.socialRow}>
-                <Ionicons name="logo-twitter" size={20} color="#1DA1F2" />
+                <View style={styles.socialIconContainer}>
+                  <Ionicons name="logo-twitter" size={20} color="#1C1C1E" />
+                </View>
                 <Text style={styles.socialText}>{socialMedia.twitter}</Text>
               </View>
             )}
           </View>
         )}
 
-        {/* Interests */}
+        {/* Interests Card - CENTERED */}
         {interests.length > 0 && (
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>#Interests</Text>
-            <View style={styles.interestsGrid}>
+            <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>#interests</Text>
+            <View style={[styles.interestsGrid, { justifyContent: 'center' }]}>
               {interests.map((interest, index) => (
-                <View key={index} style={styles.interestTag}>
+                <View key={index} style={styles.interestChip}>
                   <Ionicons
-                    name={INTEREST_ICONS[interest] as any || 'ellipse'}
+                    name={(INTEREST_ICONS[interest] || 'ellipse') as any}
                     size={14}
-                    color={Colors.light.text}
+                    color="#1C1C1E"
                     style={styles.interestIcon}
                   />
                   <Text style={styles.interestText}>{interest}</Text>
@@ -182,46 +239,67 @@ export default function OtherUserProfileScreen() {
           </View>
         )}
 
-        {/* Recent Plans */}
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Recent Plans</Text>
-          {loadingPlans ? (
-            <ActivityIndicator size="small" color={Colors.light.primary} style={styles.loading} />
-          ) : recentPlans.length === 0 ? (
-            <Text style={styles.emptyText}>No plans yet</Text>
-          ) : (
-            recentPlans.map((plan) => (
-              <View key={plan.plan_id} style={styles.planCard}>
-                <View style={styles.planContent}>
-                  <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-                  <Text style={styles.planDescription} numberOfLines={2}>
-                    {plan.description || 'No description'}
-                  </Text>
-                  {plan.category_sub && plan.category_sub.length > 0 && (
-                    <View style={styles.planTags}>
-                      {plan.category_sub.slice(0, 3).map((tag: string, idx: number) => (
-                        <View key={idx} style={styles.planTag}>
-                          <Text style={styles.planTagText}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
+        {/* Recent Plans - SEPARATE HEADER & CARDS */}
+        <Text style={styles.sectionHeaderTitle}>Recent Plans</Text>
+
+        {loadingPlans ? (
+          <ActivityIndicator size="small" color="#1C1C1E" style={styles.loading} />
+        ) : recentPlans.length === 0 ? (
+          <Text style={styles.emptyText}>No plans yet</Text>
+        ) : (
+          recentPlans.map((plan) => {
+            const allTags = [
+              ...(plan.temporal_tags || []),
+              ...(plan.category_sub || []),
+            ].slice(0, 3);
+
+            return (
+              <View key={plan.plan_id} style={styles.standalonePlanCard}>
+                <View style={styles.planRow}>
+                  {/* Left Content */}
+                  <View style={styles.planContent}>
+                    <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
+                    <Text style={styles.planDescription} numberOfLines={3}>
+                      {plan.description || 'No description'}
+                    </Text>
+                    
+                    {allTags.length > 0 && (
+                      <View style={styles.planTags}>
+                        {allTags.map((tag: string, idx: number) => (
+                          <View key={idx} style={styles.planTag}>
+                            <Ionicons
+                              name={(TAG_ICONS[tag] || 'ellipse') as any}
+                              size={12}
+                              color="#1C1C1E"
+                              style={styles.tagIcon}
+                            />
+                            <Text style={styles.planTagText}>{tag}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                    
+                    {/* "vybeme!" text check - if available in data */}
+                    <Text style={styles.vybemeText}>vybeme!</Text>
+                  </View>
+
+                  {/* Right Image (if exists) */}
+                  {plan.media && plan.media.length > 0 && (
+                    <Image
+                      source={{ uri: plan.media[0].url }}
+                      style={styles.planImage}
+                      resizeMode="cover"
+                    />
                   )}
                 </View>
-                {plan.media && plan.media.length > 0 && (
-                  <Image
-                    source={{ uri: plan.media[0].url }}
-                    style={styles.planImage}
-                    resizeMode="cover"
-                  />
-                )}
               </View>
-            ))
-          )}
-        </View>
+            );
+          })
+        )}
 
         {/* Report User */}
         <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
-          <Ionicons name="flag-outline" size={18} color={Colors.light.error} />
+          <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
           <Text style={styles.reportText}>Report User</Text>
         </TouchableOpacity>
 
@@ -229,6 +307,9 @@ export default function OtherUserProfileScreen() {
         <TouchableOpacity style={styles.chatButton} onPress={handleChat}>
           <Text style={styles.chatButtonText}>Chat</Text>
         </TouchableOpacity>
+        
+        {/* Bottom padding for scroll */}
+        <View style={{ height: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -237,7 +318,7 @@ export default function OtherUserProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#F2F2F7',
   },
   scrollView: {
     flex: 1,
@@ -246,113 +327,208 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#F2F2F7',
   },
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    position: 'absolute',
+    zIndex: 10,
+    top: 40,
+    left: 0,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 10,
+    justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    flex: 1,
-    textAlign: 'center',
+  closeIcon: {
+    marginLeft: -4,
   },
-  bannerContainer: {
-    height: 200,
+  profileImageContainer: {
+    width: '100%',
+    height: 400, // Slightly taller based on UI
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  bannerImage: {
+  profileImageBackground: {
+    position: 'absolute',
     width: '100%',
     height: '100%',
   },
-  bannerOverlay: {
+  profileContent: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    paddingBottom: 20,
   },
-  nameContainer: {
+  profileImageWrapper: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    borderWidth: 4,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  profileImageCircle: {
+    width: '100%',
+    height: '100%',
+  },
+  profileInfoBlur: {
+    width: '100%',
+    borderRadius: 0,
+    overflow: 'hidden',
+  },
+  profileInfo: {
+    width: '100%',
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)', // Fallback/Overlay
+  },
+  profileImageContainerNoImage: {
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingTop: 80, // Space for header
+    paddingBottom: 20,
+    marginBottom: 20,
+  },
+  profileInfoNoImage: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFF',
+    marginRight: 8,
+  },
+  userNameNoImage: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginRight: 8,
+  },
+  verifiedIcon: {
+    marginLeft: 4,
   },
   bio: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  bioNoImage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   statsContainer: {
     flexDirection: 'row',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     marginBottom: 16,
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
     padding: 20,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statNumber: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: Colors.light.text,
+    fontWeight: '800',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '600',
   },
   sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
     padding: 20,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.light.text,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
     marginBottom: 16,
+  },
+  sectionHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginTop: 10,
+    marginBottom: 16,
+    textAlign: 'center', // Centered title outside cards
   },
   socialRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  socialIconContainer: {
+    width: 24,
+    alignItems: 'center',
   },
   socialText: {
     fontSize: 14,
-    color: Colors.light.text,
+    color: '#1C1C1E',
+    marginLeft: 12,
+    fontWeight: '500',
   },
   interestsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  interestTag: {
+  interestChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.inputBackground,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: borderRadius.md,
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     gap: 6,
   },
   interestIcon: {
@@ -361,86 +537,124 @@ const styles = StyleSheet.create({
   interestText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: '#1C1C1E',
   },
   loading: {
     padding: 20,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666',
     textAlign: 'center',
     padding: 20,
   },
-  planCard: {
-    flexDirection: 'row',
+  // New Styles for Separate Cards
+  standalonePlanCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    padding: 20,
+    marginHorizontal: 20,
     marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  planRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   planContent: {
     flex: 1,
     marginRight: 12,
   },
   planTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
   planDescription: {
     fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 8,
+    color: '#666',
+    marginBottom: 12,
     lineHeight: 20,
   },
   planTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
+    marginBottom: 8,
   },
   planTag: {
-    backgroundColor: Colors.light.inputBackground,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  tagIcon: {
+    marginRight: 2,
   },
   planTagText: {
-    fontSize: 11,
-    color: Colors.light.text,
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#1C1C1E',
+    fontWeight: '600',
+  },
+  vybemeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginTop: 4,
   },
   planImage: {
     width: 80,
-    height: 60,
-    borderRadius: borderRadius.md,
+    height: 80,
+    borderRadius: 16,
+    marginTop: 4,
   },
   reportButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    padding: 16,
-    marginHorizontal: 16,
+    padding: 18,
+    marginHorizontal: 20,
     marginBottom: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   reportText: {
     fontSize: 14,
-    color: Colors.light.error,
-    fontWeight: '500',
+    color: '#FF3B30',
+    fontWeight: '600',
   },
   chatButton: {
-    backgroundColor: '#2C2C2E',
-    borderRadius: borderRadius.lg,
-    padding: 16,
-    marginHorizontal: 16,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 30,
+    padding: 18,
+    marginHorizontal: 20,
     marginBottom: 32,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   chatButtonText: {
-    color: '#FFFFFF',
+    color: '#FFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

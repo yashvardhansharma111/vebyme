@@ -6,52 +6,65 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors, borderRadius } from '@/constants/theme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { Ionicons } from '@expo/vector-icons';
 
+// Define the structure for our social links
 interface SocialPlatform {
   id: string;
-  name: string;
-  url?: string;
+  baseUrl: string;
+  value: string;
   enabled: boolean;
-  description: string;
+  iconName: any; 
+  isCustomIcon?: boolean; // Flag for X logo
 }
 
 export default function ManageSocialsScreen() {
   const router = useRouter();
+
   const [socials, setSocials] = useState<SocialPlatform[]>([
     {
-      id: 'facebook',
-      name: 'Facebook',
+      id: 'instagram',
+      baseUrl: 'instagram.com/',
+      value: '',
       enabled: true,
-      description: 'Display on your profile',
+      iconName: 'logo-instagram',
     },
     {
-      id: 'twitter',
-      name: 'X (Twitter)',
-      enabled: false,
-      description: 'Display on your profile',
+      id: 'x',
+      baseUrl: 'x.com/',
+      value: '',
+      enabled: true,
+      iconName: '', 
+      isCustomIcon: true,
     },
     {
-      id: 'whatsapp',
-      name: 'whatsapp.com',
+      id: 'snapchat',
+      baseUrl: 'snapchat.com/',
+      value: '',
       enabled: true,
-      description: 'Display on your profile',
+      iconName: 'logo-snapchat',
     },
   ]);
 
-  const toggleSocial = (id: string) => {
-    setSocials(
-      socials.map((social) =>
-        social.id === id ? { ...social, enabled: !social.enabled } : social
-      )
+  const handleTextChange = (id: string, text: string) => {
+    setSocials((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, value: text } : item))
     );
   };
 
-  const handleSave = async () => {
-    // TODO: Save social preferences to backend
+  const toggleSocial = (id: string) => {
+    setSocials((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, enabled: !item.enabled } : item))
+    );
+  };
+
+  const handleSave = () => {
+    // TODO: Save logic here
     router.back();
   };
 
@@ -59,39 +72,67 @@ export default function ManageSocialsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <IconSymbol name="chevron.left" size={24} color={Colors.light.text} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Socials</Text>
+        <Text style={styles.headerTitle}>Manage Your Socials</Text>
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionDescription}>
-            Connect your social media accounts to display on your profile
-          </Text>
-
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          
           {socials.map((social) => (
-            <View key={social.id} style={styles.socialItem}>
-              <View style={styles.socialInfo}>
-                <Text style={styles.socialName}>{social.name}</Text>
-                <Text style={styles.socialDescription}>{social.description}</Text>
+            <View key={social.id} style={styles.socialBlock}>
+              
+              {/* Input Gray Box */}
+              <View style={styles.inputWrapper}>
+                <View style={styles.iconContainer}>
+                  {social.isCustomIcon ? (
+                    // Custom X Logo
+                    <Text style={styles.customXIcon}>𝕏</Text>
+                  ) : (
+                    <Ionicons name={social.iconName} size={24} color="#1C1C1E" />
+                  )}
+                </View>
+                
+                <View style={styles.textInputContainer}>
+                  <Text style={styles.baseUrlText}>{social.baseUrl}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={social.value}
+                    onChangeText={(text) => handleTextChange(social.id, text)}
+                    autoCapitalize="none"
+                    placeholder=""
+                    placeholderTextColor="#999"
+                  />
+                </View>
               </View>
-              <Switch
-                value={social.enabled}
-                onValueChange={() => toggleSocial(social.id)}
-                trackColor={{
-                  false: Colors.light.border,
-                  true: Colors.light.primary,
-                }}
-                thumbColor="#FFFFFF"
-              />
+
+              {/* Toggle Row */}
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Display it on your profile</Text>
+                <Switch
+                  value={social.enabled}
+                  onValueChange={() => toggleSocial(social.id)}
+                  // Dark track color based on the zoomed image
+                  trackColor={{ false: '#E5E5EA', true: '#252525' }} 
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#E5E5EA"
+                  style={{ transform: [{ scaleX: 0.9 }, { scaleY: 0.9 }] }}
+                />
+              </View>
+
             </View>
           ))}
-        </View>
-      </ScrollView>
 
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Footer Save Button */}
       <View style={styles.footer}>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>Save</Text>
@@ -104,68 +145,111 @@ export default function ManageSocialsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 60, // Safe area adjustment
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  backButton: {
+    padding: 4,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   content: {
-    flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 100,
   },
-  section: {
-    marginBottom: 24,
+  
+  // Social Block
+  socialBlock: {
+    marginBottom: 8,
   },
-  sectionDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 24,
-  },
-  socialItem: {
+  
+  // Input Wrapper (The Gray Box)
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: '#F3F3F3', // Light gray background from screenshot
+    borderRadius: 12,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
   },
-  socialInfo: {
+  iconContainer: {
+    marginRight: 12,
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customXIcon: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#1C1C1E',
+  },
+  
+  // Text Input Area
+  textInputContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
-  socialName: {
+  baseUrlText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 4,
+    color: '#666666', // Gray text for the base url
+    fontWeight: '400',
   },
-  socialDescription: {
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1C1C1E',
+    fontWeight: '400',
+    padding: 0,
+  },
+
+  // Toggle Row Styles
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 24, // Space between blocks
+  },
+  toggleLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666666', // Gray text for label
+    fontWeight: '400',
   },
+
+  // Footer
   footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: 40, // Bottom safe area
+    backgroundColor: '#FFFFFF',
   },
   saveButton: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: borderRadius.lg,
-    padding: 16,
+    backgroundColor: '#1C1C1E', // Black button
+    borderRadius: 30, // Pill shape
+    paddingVertical: 18,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
-

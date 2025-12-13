@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
@@ -72,6 +72,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const swipeableRef = useRef<Swipeable>(null);
   
   // Logic: Reveal the Left Action (Save icon) when swiping
   const renderLeftActions = (progress: any, dragX: any) => {
@@ -91,27 +92,46 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     );
   };
 
-  const handleSwipeableWillOpen = () => {
-    // Show login modal if guest tries to save
-    if (!isAuthenticated && onRequireAuth) {
+  const handleSwipeableWillOpen = (direction: 'left' | 'right') => {
+    // Check auth before allowing left swipe (save action)
+    if (direction === 'left' && !isAuthenticated && onRequireAuth) {
       onRequireAuth();
       return false; // Prevent swipe
     }
     return true;
   };
 
+  const handleSwipeableOpen = (direction: 'left' | 'right') => {
+    // When left swipe is fully opened, save the post
+    if (direction === 'left' && isAuthenticated && authUser?.user_id) {
+      handleSave();
+    }
+  };
+
   const handleSave = async () => {
-    if (!isAuthenticated || !authUser?.user_id) {
+    if (!isAuthenticated || !authUser?.user_id || !authUser?.access_token) {
       onRequireAuth?.();
+      return;
+    }
+
+    if (!postId && !event?.id) {
+      Alert.alert('Error', 'Post ID not found');
       return;
     }
 
     setSaving(true);
     try {
-      // TODO: Implement save post API
+      await apiService.savePost(authUser.access_token, authUser.user_id, postId || event.id);
+      // Close the swipeable after saving
+      swipeableRef.current?.close();
       Alert.alert('Success', 'Post saved!');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save post');
+      if (error.message?.includes('already saved')) {
+        Alert.alert('Info', 'Post is already saved');
+        swipeableRef.current?.close();
+      } else {
+        Alert.alert('Error', error.message || 'Failed to save post');
+      }
     } finally {
       setSaving(false);
     }
@@ -134,9 +154,11 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   return (
     <>
       <Swipeable 
+        ref={swipeableRef}
         renderLeftActions={renderLeftActions} 
         containerStyle={styles.swipeContainer}
         onSwipeableWillOpen={handleSwipeableWillOpen}
+        onSwipeableOpen={handleSwipeableOpen}
       >
         <EventCard 
           user={user} 
