@@ -11,7 +11,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
@@ -28,6 +27,10 @@ interface ChatItem {
   author_id: string;
   author_name: string;
   author_image: string | null;
+  other_user?: {
+      name: string;
+      profile_image: string | null;
+  };
   last_message: {
     content: any;
     type: string;
@@ -95,42 +98,40 @@ export default function ChatScreen() {
     }
   };
 
+  // UPDATED: Returns the actual length of the data arrays
+  const getBadgeCount = (type: TabType) => {
+      switch(type) {
+          case 'their_plans': return theirPlans.length;
+          case 'my_plans': return myPlans.length;
+          case 'groups': return groups.length;
+          default: return 0;
+      }
+  };
+
   const formatTime = (timestamp: Date | string) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Just Now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
+    if (diff < 60000) return 'Just Now';
     
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   const getLastMessageText = (item: ChatItem) => {
     if (!item.last_message) return 'No messages yet';
     
     if (item.last_message.type === 'text') {
-      return typeof item.last_message.content === 'string' 
+      const text = typeof item.last_message.content === 'string' 
         ? item.last_message.content 
         : 'Message';
+      return text.length > 35 ? text.substring(0, 35) + '...' : text;
     }
-    if (item.last_message.type === 'image') {
-      return '📷 Photo';
-    }
-    if (item.last_message.type === 'poll') {
-      return '📊 Poll';
-    }
+    if (item.last_message.type === 'image') return '📷 Photo';
     return 'Message';
   };
 
   const handleChatPress = (item: ChatItem) => {
-    // Navigate to chat - the chat screen will show the conversation
     if (item.is_group) {
       router.push({
         pathname: '/chat/group/[groupId]',
@@ -145,11 +146,10 @@ export default function ChatScreen() {
   };
 
   const renderChatItem = ({ item }: { item: ChatItem }) => {
-    // For individual chats, show the other user's name and image
-    // For group chats, show group name and plan image
     const displayName = item.is_group 
       ? item.group_name 
       : (item.other_user?.name || item.author_name);
+    
     const displayImage = item.is_group 
       ? (item.plan_media?.[0]?.url || item.author_image)
       : (item.other_user?.profile_image || item.author_image);
@@ -203,57 +203,66 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header Title */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Chats</Text>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'their_plans' && styles.tabActive]}
           onPress={() => setActiveTab('their_plans')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'their_plans' && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === 'their_plans' && styles.tabTextActive]}>
             Their Plans
           </Text>
+          {getBadgeCount('their_plans') > 0 && (
+            <View style={[styles.badge, activeTab === 'their_plans' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'their_plans' && styles.badgeTextActive]}>
+                  {getBadgeCount('their_plans')}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.tab, activeTab === 'my_plans' && styles.tabActive]}
           onPress={() => setActiveTab('my_plans')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'my_plans' && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
             My Plans
           </Text>
+          {getBadgeCount('my_plans') > 0 && (
+            <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'my_plans' && styles.badgeTextActive]}>
+                  {getBadgeCount('my_plans')}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
           onPress={() => setActiveTab('groups')}
         >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'groups' && styles.tabTextActive,
-            ]}
-          >
+          <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
             Groups
           </Text>
+          {getBadgeCount('groups') > 0 && (
+            <View style={[styles.badge, activeTab === 'groups' && styles.badgeActive]}>
+              <Text style={[styles.badgeText, activeTab === 'groups' && styles.badgeTextActive]}>
+                  {getBadgeCount('groups')}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
       {/* Chat List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
+          <ActivityIndicator size="large" color="#1C1C1E" />
         </View>
       ) : (
         <FlatList
@@ -266,7 +275,6 @@ export default function ChatScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color="#9CA3AF" />
               <Text style={styles.emptyText}>No chats yet</Text>
               <Text style={styles.emptySubtext}>
                 Start a conversation from a plan
@@ -282,57 +290,83 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF', // White background
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 20,
     paddingTop: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingBottom: 16,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: Colors.light.text,
+    fontWeight: '800',
+    color: '#1C1C1E',
   },
-  tabs: {
+  
+  // Tabs Styles
+  tabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingHorizontal: 20,
+    marginBottom: 10,
+    gap: 10,
   },
   tab: {
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: borderRadius.md,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#F2F2F2', // Light gray default
+    gap: 6,
   },
   tabActive: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: '#1C1C1E', // Dark active
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   tabTextActive: {
     color: '#FFFFFF',
   },
+  // Badge Styles
+  badge: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeActive: {
+    backgroundColor: '#FFFFFF',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  badgeTextActive: {
+    color: '#1C1C1E',
+  },
+
+  // List Styles
   listContent: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   chatItem: {
     flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    marginRight: 16,
+    backgroundColor: '#F2F2F2',
   },
   chatInfo: {
     flex: 1,
@@ -346,18 +380,23 @@ const styles = StyleSheet.create({
   },
   chatName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.text,
+    fontWeight: '700',
+    color: '#1C1C1E',
     flex: 1,
+    marginRight: 8,
   },
   timestamp: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: '#8E8E93',
+    fontWeight: '400',
   },
   lastMessage: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#666666',
+    lineHeight: 20,
   },
+  
+  // Loading/Empty States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -367,17 +406,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 100,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.light.text,
-    marginTop: 16,
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6B7280',
-    marginTop: 8,
+    color: '#9CA3AF',
   },
 });

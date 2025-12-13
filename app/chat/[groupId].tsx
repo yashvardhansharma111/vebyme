@@ -11,11 +11,11 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 
@@ -37,11 +37,24 @@ interface Message {
   };
 }
 
+interface GroupDetails {
+  group_id: string;
+  group_name: string;
+  members: Array<{
+    user_id: string;
+    name: string;
+    profile_image: string;
+  }>;
+}
+
 export default function IndividualChatScreen() {
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { user } = useAppSelector((state) => state.auth);
+  const insets = useSafeAreaInsets();
+  
   const [messages, setMessages] = useState<Message[]>([]);
+  const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -49,24 +62,32 @@ export default function IndividualChatScreen() {
 
   useEffect(() => {
     if (groupId) {
+      loadGroupDetails();
       loadMessages();
-      // Poll for new messages every 3 seconds
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
     }
   }, [groupId]);
 
-  const loadMessages = async () => {
+  const loadGroupDetails = async () => {
     if (!groupId) return;
     
+    try {
+      const response = await apiService.getGroupDetails(groupId);
+      if (response.data) {
+        setGroupDetails(response.data);
+      }
+    } catch (error: any) {
+      console.error('Error loading group details:', error);
+    }
+  };
+
+  const loadMessages = async () => {
+    if (!groupId) return;
     try {
       const response = await apiService.getMessages(groupId);
       if (response.data) {
         setMessages(response.data);
-        // Scroll to bottom after loading
-        setTimeout(() => {
-          flatListRef.current?.scrollToEnd({ animated: false });
-        }, 100);
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -84,124 +105,122 @@ export default function IndividualChatScreen() {
       await apiService.sendMessage(groupId, user.user_id, 'text', content);
       setInputText('');
       await loadMessages();
-      // Show success feedback (message appears in chat, so no alert needed)
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-      console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message.');
     } finally {
       setSending(false);
     }
   };
 
-  const handleReaction = async (messageId: string, emoji: string) => {
-    if (!user?.user_id) return;
-
-    try {
-      const message = messages.find((m) => m.message_id === messageId);
-      const hasReaction = message?.reactions.some(
-        (r) => r.user_id === user.user_id && r.emoji_type === emoji
-      );
-
-      if (hasReaction) {
-        await apiService.removeReaction(messageId, user.user_id, emoji);
-      } else {
-        await apiService.addReaction(messageId, user.user_id, emoji);
-      }
-      await loadMessages();
-    } catch (error: any) {
-      console.error('Error toggling reaction:', error);
-    }
-  };
-
-  const formatTime = (timestamp: Date | string) => {
+  const formatTimeHeader = (timestamp: Date | string) => {
     const date = new Date(timestamp);
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-    const isYesterday = new Date(now.getTime() - 86400000).toDateString() === date.toDateString();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isYesterday = date.toDateString() === yesterday.toDateString();
 
-    if (isToday) {
-      return `Today, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-    }
-    if (isYesterday) {
-      return `Yesterday, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-    }
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    const timeStr = date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-    });
+      hour12: true,
+    }).toLowerCase();
+
+    if (isToday) return `Today, ${timeStr}`;
+    if (isYesterday) return `Yesterday, ${timeStr}`;
+    return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${timeStr}`;
   };
 
-  const shouldShowDateSeparator = (current: Message, previous: Message | null) => {
-    if (!previous) return true;
-    const currentDate = new Date(current.timestamp).toDateString();
-    const previousDate = new Date(previous.timestamp).toDateString();
-    return currentDate !== previousDate;
+  const renderHeader = () => {
+    // Get the other user from group details (for individual chats)
+    const otherUser = groupDetails?.members?.find(m => m.user_id !== user?.user_id);
+    const chatImage = otherUser?.profile_image;
+    const chatName = otherUser?.name || 'Chat';
+    const otherUserId = otherUser?.user_id;
+
+    const handleProfilePress = () => {
+      if (otherUserId) {
+        router.push(`/profile/${otherUserId}` as any);
+      }
+    };
+
+    return (
+      <View style={styles.headerContainer}>
+        <View style={styles.headerLeftGroup}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color="#000" />
+          </TouchableOpacity>
+
+          {/* Pill Shaped User Header - Left Aligned - Clickable to go to profile */}
+          <TouchableOpacity 
+            style={styles.headerPill}
+            onPress={handleProfilePress}
+            disabled={!otherUserId}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={{ uri: chatImage || 'https://via.placeholder.com/40' }}
+              style={styles.headerAvatar}
+            />
+            <Text style={styles.headerName} numberOfLines={1}>
+              {chatName}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Right side placeholder (optional, keeps layout balanced if needed) */}
+        <View style={styles.headerRightPlaceholder} />
+      </View>
+    );
   };
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isMe = item.user_id === user?.user_id;
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    const showDateSeparator = shouldShowDateSeparator(item, previousMessage);
-    const showAvatar = !isMe && (!previousMessage || previousMessage.user_id !== item.user_id);
+    
+    const showTimeHeader = !previousMessage || 
+      (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
 
     return (
-      <View>
-        {showDateSeparator && (
-          <View style={styles.dateSeparator}>
-            <Text style={styles.dateText}>{formatTime(item.timestamp)}</Text>
+      <View style={{ paddingHorizontal: 16 }}>
+        {showTimeHeader && (
+          <View style={styles.timeHeaderContainer}>
+            <Text style={styles.timeHeaderText}>{formatTimeHeader(item.timestamp)}</Text>
           </View>
         )}
+
         <View
           style={[
-            styles.messageContainer,
-            isMe ? styles.messageContainerRight : styles.messageContainerLeft,
+            styles.messageRow,
+            isMe ? styles.rowRight : styles.rowLeft,
           ]}
         >
-          {showAvatar && item.user && (
+          {!isMe && (
             <Image
-              source={{ uri: item.user.profile_image || 'https://via.placeholder.com/30' }}
+              source={{ uri: item.user?.profile_image || 'https://via.placeholder.com/30' }}
               style={styles.messageAvatar}
             />
           )}
+
           <View
             style={[
               styles.messageBubble,
-              isMe ? styles.messageBubbleRight : styles.messageBubbleLeft,
+              isMe ? styles.bubbleRight : styles.bubbleLeft,
             ]}
           >
-            {!isMe && item.user && (
-              <Text style={styles.senderName}>{item.user.name}</Text>
-            )}
             {item.type === 'text' && (
-              <Text style={[styles.messageText, isMe && styles.messageTextRight]}>
-                {typeof item.content === 'string' ? item.content : 'Message'}
+              <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                {typeof item.content === 'string' ? item.content : ''}
               </Text>
             )}
             {item.type === 'image' && (
               <Image
                 source={{ uri: item.content?.url || item.content }}
                 style={styles.messageImage}
-                resizeMode="cover"
               />
-            )}
-            {item.reactions && item.reactions.length > 0 && (
-              <View style={styles.reactionsContainer}>
-                {Array.from(new Set(item.reactions.map((r) => r.emoji_type))).map((emoji) => {
-                  const count = item.reactions.filter((r) => r.emoji_type === emoji).length;
-                  return (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={styles.reactionBadge}
-                      onPress={() => handleReaction(item.message_id, emoji)}
-                    >
-                      <Text style={styles.reactionEmoji}>{emoji}</Text>
-                      <Text style={styles.reactionCount}>{count}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
             )}
           </View>
         </View>
@@ -211,69 +230,63 @@ export default function IndividualChatScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-        </View>
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#333" />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>
-          {messages[0]?.user?.name || 'Chat'}
-        </Text>
-        <TouchableOpacity>
-          <Ionicons name="ellipsis-vertical" size={24} color={Colors.light.text} />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Header is OUTSIDE KeyboardAvoidingView to stay fixed at top */}
+      {renderHeader()}
 
       <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <FlatList
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.message_id}
-          contentContainerStyle={styles.messagesList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 10 }]}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
-        <View style={styles.inputContainer}>
-          <TouchableOpacity style={styles.inputIcon}>
-            <Ionicons name="happy-outline" size={24} color={Colors.light.text} />
-          </TouchableOpacity>
-          <TextInput
-            style={styles.input}
-            placeholder="Send a message..."
-            placeholderTextColor="#9CA3AF"
-            value={inputText}
-            onChangeText={setInputText}
-            multiline
-            maxLength={500}
-          />
-          <TouchableOpacity style={styles.inputIcon}>
-            <Ionicons name="camera-outline" size={24} color={Colors.light.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-            onPress={handleSend}
-            disabled={!inputText.trim() || sending}
-          >
-            <Ionicons
-              name="arrow-up"
-              size={20}
-              color={inputText.trim() ? '#FFFFFF' : '#9CA3AF'}
+        {/* Input Area */}
+        <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          
+          {/* Input Pill: Text + Camera Icon */}
+          <View style={styles.inputPill}>
+            <TextInput
+              style={styles.input}
+              placeholder="Send a message"
+              placeholderTextColor="#999"
+              value={inputText}
+              onChangeText={setInputText}
+              multiline={false} // Keeping single line usually looks cleaner for "pill" inputs
             />
+            
+            {/* Gallery/Camera Icon INSIDE the pill */}
+            <TouchableOpacity style={styles.iconButton}>
+               <Ionicons name="image-outline" size={24} color="#555" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Send Button OUTSIDE the pill */}
+          <TouchableOpacity 
+            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+            onPress={handleSend}
+            disabled={!inputText.trim()}
+          >
+            <Ionicons name="arrow-up" size={20} color="#FFF" />
           </TouchableOpacity>
+
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -283,150 +296,188 @@ export default function IndividualChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#FFF',
   },
-  header: {
+  
+  // --- Header Styles ---
+  headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: '#F3F4F6', // Subtle separator
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
-    flex: 1,
-    textAlign: 'center',
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  messagesList: {
-    padding: 16,
-  },
-  dateSeparator: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  dateText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    backgroundColor: Colors.light.background,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: borderRadius.md,
-  },
-  messageContainer: {
+  headerLeftGroup: {
     flexDirection: 'row',
-    marginBottom: 8,
+    alignItems: 'center',
+    flex: 1,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  headerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingRight: 16,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    // Soft shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+    backgroundColor: '#DDD',
+  },
+  headerName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1F2937',
+    maxWidth: 150, // prevent overly long names from breaking layout
+  },
+  headerRightPlaceholder: {
+    width: 40, 
+  },
+
+  // --- List Styles ---
+  listContent: {
+    paddingTop: 10,
+  },
+  timeHeaderContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  timeHeaderText: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+
+  // --- Message Bubbles ---
+  messageRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
     alignItems: 'flex-end',
   },
-  messageContainerLeft: {
+  rowLeft: {
     justifyContent: 'flex-start',
   },
-  messageContainerRight: {
+  rowRight: {
     justifyContent: 'flex-end',
   },
   messageAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     marginRight: 8,
+    marginBottom: 4,
   },
   messageBubble: {
     maxWidth: '75%',
-    padding: 12,
-    borderRadius: borderRadius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24, // Fully curvy
   },
-  messageBubbleLeft: {
+  bubbleLeft: {
     backgroundColor: '#F3F4F6',
     borderBottomLeftRadius: 4,
   },
-  messageBubbleRight: {
-    backgroundColor: Colors.light.primary,
+  bubbleRight: {
+    backgroundColor: '#2D2D2D',
     borderBottomRightRadius: 4,
-  },
-  senderName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 4,
   },
   messageText: {
     fontSize: 15,
-    color: Colors.light.text,
-    lineHeight: 20,
+    lineHeight: 22,
   },
-  messageTextRight: {
+  textLeft: {
+    color: '#1F2937',
+  },
+  textRight: {
     color: '#FFFFFF',
   },
   messageImage: {
-    width: 200,
-    height: 200,
-    borderRadius: borderRadius.md,
+    width: 220,
+    height: 160,
+    borderRadius: 16,
   },
-  reactionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-    gap: 4,
-  },
-  reactionBadge: {
+
+  // --- Input Bar Styles ---
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: borderRadius.md,
-    gap: 4,
-  },
-  reactionEmoji: {
-    fontSize: 14,
-  },
-  reactionCount: {
-    fontSize: 12,
-    color: Colors.light.text,
-    fontWeight: '500',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    backgroundColor: '#FFF',
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-    backgroundColor: Colors.light.background,
+    borderTopColor: '#F3F4F6',
   },
-  inputIcon: {
-    padding: 8,
+  inputPill: {
+    flex: 1, // Takes available space
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF',
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6, // Controls height of pill
+    marginRight: 10, // Space between pill and send button
+    // Shadow for pill
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   input: {
     flex: 1,
+    fontSize: 16,
+    color: '#1F2937',
+    paddingVertical: 4, // Adjust for centering text
     maxHeight: 100,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: Colors.light.inputBackground,
-    borderRadius: borderRadius.lg,
-    fontSize: 15,
-    color: Colors.light.text,
   },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.light.primary,
+  iconButton: {
+    padding: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#2D2D2D', // Dark circle
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Shadow for button
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   sendButtonDisabled: {
-    backgroundColor: Colors.light.inputBackground,
+    backgroundColor: '#9CA3AF',
   },
 });
-
