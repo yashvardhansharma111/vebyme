@@ -122,7 +122,7 @@ export default function YourPlansScreen() {
                     {displayTags.length > 0 && (
                       <View style={styles.tagsRow}>
                         {displayTags.map((tag, index) => (
-                          <View key={index} style={styles.tag}>
+                          <View key={`${plan.plan_id}-tag-${tag}-${index}`} style={styles.tag}>
                             <Ionicons 
                               name={(TAG_ICONS[tag] || 'ellipse') as any} 
                               size={12} 

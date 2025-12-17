@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -44,6 +45,9 @@ export default function EditProfileScreen() {
   }, [currentUser, user, dispatch]);
 
   const pickImage = async (source: 'camera' | 'gallery') => {
+    // Close modal first
+    setShowPhotoModal(false);
+    
     try {
       let result;
       if (source === 'camera') {
@@ -54,8 +58,7 @@ export default function EditProfileScreen() {
         }
         result = await ImagePicker.launchCameraAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
+          allowsEditing: false,
           quality: 0.8,
         });
       } else {
@@ -66,8 +69,7 @@ export default function EditProfileScreen() {
         }
         result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
+          allowsEditing: false,
           quality: 0.8,
         });
       }
@@ -76,22 +78,75 @@ export default function EditProfileScreen() {
         setUploading(true);
         const asset = result.assets[0];
         
-        // Create FormData for upload
-        const formData = new FormData();
-        // @ts-ignore
-        formData.append('image', {
-          uri: asset.uri,
-          type: 'image/jpeg',
-          name: 'profile.jpg',
-        } as any);
-
         try {
-          const uploadResponse = await apiService.uploadImage(formData, user?.access_token);
+          // Get file URI
+          const fileUri = asset.uri;
+          
+          // Get file name and type - ensure proper MIME type for JPG and PNG
+          let fileName = asset.fileName || asset.uri.split('/').pop() || `profile_${Date.now()}.jpg`;
+          let fileType = asset.type || 'image/jpeg';
+          
+          // Determine MIME type from file extension if not provided or if type is invalid (e.g., just "image")
+          // Check if fileType is a valid MIME type (contains a slash) or if it's missing
+          if ((!fileType || !fileType.includes('/')) && fileName) {
+            const ext = fileName.toLowerCase().split('.').pop();
+            if (ext === 'png') {
+              fileType = 'image/png';
+            } else if (ext === 'jpg' || ext === 'jpeg') {
+              fileType = 'image/jpeg';
+            } else if (ext === 'gif') {
+              fileType = 'image/gif';
+            } else if (ext === 'webp') {
+              fileType = 'image/webp';
+            } else {
+              // Default to jpeg if extension is unknown
+              fileType = 'image/jpeg';
+            }
+          }
+          
+          // Create FormData for upload
+          const formData = new FormData();
+          
+          // Handle web platform differently - need to convert URI to File/Blob
+          if (Platform.OS === 'web') {
+            // For web, fetch the image as a blob and create a File
+            const response = await fetch(fileUri);
+            const blob = await response.blob();
+            const file = new File([blob], fileName, { type: fileType });
+            formData.append('file', file);
+          } else {
+            // For native platforms (iOS/Android), use React Native FormData format
+            // @ts-ignore - React Native FormData format
+            formData.append('file', {
+              uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
+              name: fileName,
+              type: fileType,
+            } as any);
+          }
+          
+          console.log('📤 FormData prepared:', {
+            uri: fileUri,
+            fileName: fileName,
+            fileType: fileType,
+            assetSize: asset.fileSize,
+            platform: Platform.OS
+          });
+
+          // Use uploadProfileImage endpoint (expects 'file' field, returns single object)
+          const uploadResponse = await apiService.uploadProfileImage(formData, user?.access_token);
           if (uploadResponse.data?.url) {
             setProfileImage(uploadResponse.data.url);
             Alert.alert('Success', 'Profile photo updated');
+          } else {
+            Alert.alert('Error', 'Failed to get image URL from response');
           }
         } catch (error: any) {
+          console.error('❌ Upload error:', error);
+          console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
           Alert.alert('Error', error.message || 'Failed to upload image');
         } finally {
           setUploading(false);

@@ -361,20 +361,77 @@ class ApiService {
 
   // Upload API
   async uploadImage(formData: FormData, accessToken?: string) {
-    const headers: HeadersInit = {};
+    return this.uploadFile(formData, accessToken, '/upload/image');
+  }
+
+  // Upload multiple images (uses uploadMultiple which works in createPost)
+  async uploadImages(formData: FormData, accessToken?: string) {
+    return this.uploadFile(formData, accessToken, '/upload/images');
+  }
+
+  // Upload profile image (uses Cloudinary's profile folder)
+  async uploadProfileImage(formData: FormData, accessToken?: string) {
+    return this.uploadFile(formData, accessToken, '/upload/profile-image');
+  }
+
+  // Generic file upload method
+  private async uploadFile(formData: FormData, accessToken: string | undefined, endpoint: string) {
+    // For React Native FormData, we must NOT set Content-Type header
+    // The runtime will automatically set it with the correct boundary
+    const headers: HeadersInit = {
+      'ngrok-skip-browser-warning': 'true',
+    };
+    
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
     
-    const response = await fetch(`${this.baseUrl.replace('/api', '')}/api/upload/image`, {
+    // IMPORTANT: Do NOT set Content-Type for FormData in React Native
+    // The fetch API will automatically set it with the correct multipart boundary
+    
+    // Construct URL - baseUrl already includes /api, endpoint should start with /
+    // Example: baseUrl = "https://xxx.ngrok.io/api", endpoint = "/upload/image"
+    // Result: "https://xxx.ngrok.io/api/upload/image"
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log('📤 Uploading file to:', url);
+    console.log('📤 Base URL:', this.baseUrl);
+    console.log('📤 Endpoint:', endpoint);
+    console.log('📤 Full URL:', url);
+    console.log('📤 Headers:', JSON.stringify(headers, null, 2));
+    
+    // Log FormData contents if available (React Native FormData has _parts)
+    // @ts-ignore - React Native FormData internal structure
+    if (formData._parts) {
+      console.log('📤 FormData _parts:', JSON.stringify(formData._parts, null, 2));
+    }
+    
+    // Use the EXACT same fetch approach as createPost
+    const response = await fetch(url, {
       method: 'POST',
       body: formData,
       headers,
     });
-    const data = await response.json();
+    
+    // Check if response is ok before parsing JSON
+    const contentType = response.headers.get('content-type');
+    let data;
+    
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      // Check if ngrok warning page
+      if (text.includes('ngrok') || text.includes('ERR_NGROK') || text.includes('<!DOCTYPE html>')) {
+        throw new Error('ngrok verification required. Please check your backend connection.');
+      }
+      throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
+    }
+    
     if (!response.ok) {
+      console.error('❌ Upload failed:', response.status, data);
       throw new Error(data.message || 'Upload failed');
     }
+    
     return data;
   }
 
@@ -382,6 +439,7 @@ class ApiService {
   async createPost(accessToken: string, postData: FormData | any) {
     const headers: HeadersInit = {
       'Authorization': `Bearer ${accessToken}`,
+      'ngrok-skip-browser-warning': 'true',
     };
 
     // If FormData, don't set Content-Type (browser will set it with boundary)

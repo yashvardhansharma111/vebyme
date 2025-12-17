@@ -18,6 +18,7 @@ import { logout } from '@/store/slices/authSlice';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/api';
 import { BlurView } from 'expo-blur';
+import Avatar from '@/components/Avatar';
 
 export default function MyProfileScreen() {
   const router = useRouter();
@@ -72,8 +73,8 @@ export default function MyProfileScreen() {
         
         {/* --- HEADER IMAGE SECTION --- */}
         <ImageBackground
-          source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/400x300' }}
-          style={[styles.headerBackground, { paddingTop: insets.top }]}
+          source={currentUser?.profile_image ? { uri: currentUser.profile_image } : { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' }}
+          style={[styles.headerBackground, { paddingTop: insets.top, backgroundColor: '#E5E5E5' }]}
           resizeMode="cover"
         >
           <View style={styles.headerTopRow}>
@@ -90,8 +91,9 @@ export default function MyProfileScreen() {
         <View style={styles.profileCardWrapper}>
           <View style={styles.profileCard}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: currentUser?.profile_image || 'https://via.placeholder.com/100' }}
+              <Avatar
+                uri={currentUser?.profile_image}
+                size={100}
                 style={styles.avatar}
               />
             </View>
