@@ -18,6 +18,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import { Colors, borderRadius } from '@/constants/theme';
 import LoginModal from '@/components/LoginModal';
+import Avatar from '@/components/Avatar';
 
 interface Interaction {
   notification_id: string;
@@ -412,14 +413,14 @@ export default function NotificationsScreen() {
                   <View style={styles.headerLeft}>
                     <View style={styles.avatarStack}>
                       {avatars.map((avatar, index) => (
-                        <Image
+                        <View
                           key={index}
-                          source={{ uri: avatar }}
                           style={[
-                            styles.avatar,
                             { marginLeft: index > 0 ? -12 : 0, zIndex: 10 - index },
                           ]}
-                        />
+                        >
+                          <Avatar uri={avatar} size={32} />
+                        </View>
                       ))}
                       {remainingCount > 0 && (
                         <View
@@ -478,13 +479,11 @@ export default function NotificationsScreen() {
                             activeOpacity={0.7}
                           >
                             <View style={styles.avatarContainer}>
-                              <Image
-                                source={{
-                                  uri: userCache[interaction.source_user_id]?.profile_image || 
-                                       interaction.user?.profile_image || 
-                                       'https://via.placeholder.com/40',
-                                }}
-                                style={styles.userAvatar}
+                              <Avatar
+                                uri={userCache[interaction.source_user_id]?.profile_image || 
+                                     interaction.user?.profile_image || 
+                                     null}
+                                size={40}
                               />
                               {loadingUsers.has(interaction.source_user_id) && (
                                 <View style={styles.loadingOverlay}>

@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import LoginModal from '@/components/LoginModal';
 import { Colors } from '@/constants/theme';
+import Avatar from '@/components/Avatar';
 
 function ProfileAvatar() {
   const { user } = useAppSelector((state) => state.auth);
@@ -23,11 +24,12 @@ function ProfileAvatar() {
   }, [user, currentUser, dispatch]);
 
   return (
-    <Image
-      source={{
-        uri: currentUser?.profile_image || 'https://via.placeholder.com/44',
-      }}
+    <Avatar
+      uri={currentUser?.profile_image}
+      size={44}
       style={styles.headerAvatar}
+      showBorder={true}
+      borderColor="rgba(255,255,255,0.5)"
     />
   );
 }
@@ -85,10 +87,23 @@ export default function HomeScreen() {
   }, [user, currentUser, dispatch]);
 
   const fetchUserProfile = useCallback(async (user_id: string) => {
-    // Check cache first
+    // Check cache first - if we've already fetched this user (even if they don't exist), return cached data
     if (userCache[user_id]) {
       return userCache[user_id];
     }
+
+    // Check if we're currently fetching this user to avoid duplicate requests
+    const fetchingKey = `fetching_${user_id}`;
+    if ((userCache as any)[fetchingKey]) {
+      // Wait a bit and return default to avoid blocking
+      return {
+        name: 'Unknown User',
+        profile_image: 'https://via.placeholder.com/44',
+      };
+    }
+
+    // Mark as fetching
+    (userCache as any)[fetchingKey] = true;
 
     try {
       const response = await apiService.getUserProfile(user_id);
@@ -97,23 +112,38 @@ export default function HomeScreen() {
           name: response.data.name || 'Unknown User',
           profile_image: response.data.profile_image || 'https://via.placeholder.com/44',
         };
-        setUserCache((prev) => ({ ...prev, [user_id]: userData }));
+        setUserCache((prev) => {
+          const newCache = { ...prev, [user_id]: userData };
+          delete (newCache as any)[fetchingKey];
+          return newCache;
+        });
         return userData;
       }
     } catch (error: any) {
       // Silently handle missing users - don't log errors for 404s
       // This is expected when users are deleted or don't exist
       if (error.message?.includes('User not found') || error.message?.includes('404')) {
-        // User doesn't exist, use default values
+        // User doesn't exist, use default values and cache it to prevent future requests
         const defaultData = {
           name: 'Unknown User',
           profile_image: 'https://via.placeholder.com/44',
         };
-        setUserCache((prev) => ({ ...prev, [user_id]: defaultData }));
+        setUserCache((prev) => {
+          const newCache = { ...prev, [user_id]: defaultData };
+          delete (newCache as any)[fetchingKey];
+          return newCache;
+        });
         return defaultData;
       }
       // Only log unexpected errors (not user not found)
       // Silently ignore expected errors
+    } finally {
+      // Clean up fetching flag
+      setUserCache((prev) => {
+        const newCache = { ...prev };
+        delete (newCache as any)[fetchingKey];
+        return newCache;
+      });
     }
 
     // Return default if fetch fails
@@ -121,7 +151,11 @@ export default function HomeScreen() {
       name: 'Unknown User',
       profile_image: 'https://via.placeholder.com/44',
     };
-    setUserCache((prev) => ({ ...prev, [user_id]: defaultData }));
+    setUserCache((prev) => {
+      const newCache = { ...prev, [user_id]: defaultData };
+      delete (newCache as any)[fetchingKey];
+      return newCache;
+    });
     return defaultData;
   }, [userCache]);
 
@@ -147,9 +181,30 @@ export default function HomeScreen() {
 
   const formatFeedData = useCallback(async (posts: FeedPost[]): Promise<FormattedEvent[]> => {
     const formattedEvents = await Promise.all(
-      posts.map(async (post) => {
+      posts.map(async (post: any) => {
         const userData = await fetchUserProfile(post.user_id);
         const imageUrl = post.media && post.media.length > 0 ? post.media[0].url : 'https://picsum.photos/id/1011/200/300';
+
+        // Handle reposts
+        let originalAuthorName = null;
+        let originalPostTitle = null;
+        let originalPostDescription = null;
+        
+        if (post.is_repost && post.repost_data) {
+          const originalAuthorData = await fetchUserProfile(post.repost_data.original_author_id);
+          originalAuthorName = originalAuthorData.name;
+          
+          // Get original post details
+          try {
+            const originalPost = await apiService.getPost(post.repost_data.original_plan_id);
+            if (originalPost.data) {
+              originalPostTitle = originalPost.data.title;
+              originalPostDescription = originalPost.data.description;
+            }
+          } catch (error) {
+            // Silently handle errors
+          }
+        }
 
         return {
           id: post.post_id,
@@ -164,6 +219,11 @@ export default function HomeScreen() {
             description: post.description || 'No description',
             tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
             image: imageUrl,
+            is_repost: post.is_repost || false,
+            repost_data: post.repost_data || null,
+            original_author_name: originalAuthorName,
+            original_post_title: originalPostTitle || post.title,
+            original_post_description: originalPostDescription || post.description,
           },
         };
       })
@@ -347,6 +407,10 @@ export default function HomeScreen() {
                     user={item.user}
                     event={item.event}
                     postId={item.id}
+                    isRepost={item.event.is_repost || false}
+                    originalAuthor={item.event.original_author_name}
+                    originalPostTitle={item.event.original_post_title}
+                    originalPostDescription={item.event.original_post_description}
                     onUserPress={(userId: string) => {
                       if (isAuthenticated) {
                         router.push({ pathname: '/profile/[userId]', params: { userId } } as any);

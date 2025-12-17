@@ -4,17 +4,45 @@ import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import PostInteractionModal from './PostInteractionModal';
+import RepostModal from './RepostModal';
 import { apiService } from '@/services/api';
+import Avatar from './Avatar';
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
       <View style={styles.card}>
         <View style={styles.content}>
-          <Text style={styles.title}>{event.title}</Text>
-          <Text style={styles.description} numberOfLines={3}>{event.description}</Text>
+          {/* Repost Badge - Always visible for reposts */}
+          {isRepost && (
+            <View style={styles.repostBadge}>
+              <Ionicons name="repeat" size={16} color="#8B5CF6" />
+              <Text style={styles.repostBadgeText}>Repost</Text>
+            </View>
+          )}
+          
+          {/* User's Added Content/Thoughts - Prominently displayed */}
+          {isRepost && repostData?.added_content && (
+            <View style={styles.repostThoughtsContainer}>
+              <Text style={styles.repostThoughtsLabel}>Your thoughts:</Text>
+              <Text style={styles.repostThoughts}>{repostData.added_content}</Text>
+            </View>
+          )}
+          
+          {/* Original Post Info for Reposts */}
+          {isRepost && originalAuthor && (
+            <View style={styles.originalPostInfo}>
+              <Ionicons name="person-outline" size={14} color="#666" />
+              <Text style={styles.originalPostLabel}>
+                Original by {originalAuthor}
+              </Text>
+            </View>
+          )}
+          
+          <Text style={styles.title}>{isRepost ? (originalPostTitle || event.title) : event.title}</Text>
+          <Text style={styles.description} numberOfLines={3}>{isRepost ? (originalPostDescription || event.description) : event.description}</Text>
 
           <View style={styles.middleRow}>
             <View style={styles.tagsContainer}>
@@ -30,12 +58,14 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
         </View>
 
         <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={onRepostPress}
-          >
-            <Ionicons name="repeat-outline" size={20} color="#000" />
-          </TouchableOpacity>
+          {!isRepost && (
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={onRepostPress}
+            >
+              <Ionicons name="repeat-outline" size={20} color="#000" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity 
             style={styles.iconButton}
             onPress={() => onRequireAuth?.()}
@@ -57,7 +87,9 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
         onPress={() => onUserPress && user.id && onUserPress(user.id)}
         activeOpacity={0.7}
       >
-        <Image source={{ uri: user.avatar }} style={styles.avatar} />
+        <View style={styles.avatarContainer}>
+          <Avatar uri={user.avatar} size={32} />
+        </View>
         <View>
           <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.userTime}>{user.time}</Text>
@@ -68,9 +100,10 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
 }
 
 // --- The Swipe Wrapper ---
-export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth }: any) {
+export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [showRepostModal, setShowRepostModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const swipeableRef = useRef<Swipeable>(null);
   
@@ -137,18 +170,20 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     }
   };
 
-  const handleRepost = async () => {
+  const handleRepost = () => {
     if (!isAuthenticated || !authUser?.user_id) {
       onRequireAuth?.();
       return;
     }
 
-    try {
-      await apiService.createRepost(event.id, authUser.user_id);
-      Alert.alert('Success', 'Post reposted!');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to repost');
+    // Check if this is already a repost (cannot repost a repost)
+    const isRepostPost = event.is_repost || isRepost;
+    if (isRepostPost) {
+      Alert.alert('Info', 'You cannot repost a repost');
+      return;
     }
+
+    setShowRepostModal(true);
   };
 
   return (
@@ -173,12 +208,28 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
             }
           }}
           onRepostPress={handleRepost}
+          isRepost={isRepost}
+          repostData={event.repost_data}
+          originalAuthor={event.original_author_name}
+          originalPostTitle={event.original_post_title}
+          originalPostDescription={event.original_post_description}
         />
       </Swipeable>
       <PostInteractionModal
         visible={showInteractionModal}
         onClose={() => setShowInteractionModal(false)}
         postId={postId || event?.id}
+        onSuccess={() => {
+          // Refresh feed or update UI
+        }}
+      />
+      <RepostModal
+        visible={showRepostModal}
+        onClose={() => setShowRepostModal(false)}
+        postId={postId || event?.id}
+        originalPostTitle={originalPostTitle || event?.title}
+        originalPostDescription={originalPostDescription || event?.description}
+        originalAuthorName={originalAuthor}
         onSuccess={() => {
           // Refresh feed or update UI
         }}
@@ -248,10 +299,59 @@ const styles = StyleSheet.create({
     borderColor: '#F0F0F0',
     zIndex: 10,
   },
-  avatar: { width: 32, height: 32, borderRadius: 16, marginRight: 8 },
+  avatarContainer: { marginRight: 8 },
   userName: { fontSize: 14, fontWeight: '700', color: '#000' },
   userTime: { fontSize: 11, color: '#888' },
   content: { marginBottom: 16 },
+  // Repost Styles
+  repostBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F0FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  repostBadgeText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#8B5CF6',
+    marginLeft: 6,
+  },
+  repostThoughtsContainer: {
+    backgroundColor: '#F8F9FA',
+    borderLeftWidth: 3,
+    borderLeftColor: '#8B5CF6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  repostThoughtsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  repostThoughts: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  originalPostInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingVertical: 4,
+  },
+  originalPostLabel: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 6,
+    fontWeight: '500',
+  },
   title: { fontSize: 18, fontWeight: '800', color: '#1C1C1E', marginBottom: 8 },
   description: { fontSize: 14, color: '#444', lineHeight: 20, marginBottom: 16 },
   middleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

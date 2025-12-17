@@ -495,10 +495,10 @@ class ApiService {
   }
 
   // Repost APIs
-  async createRepost(original_post_id: string, repost_author_id: string, added_content?: string) {
+  async createRepost(original_plan_id: string, repost_author_id: string, added_content?: string) {
     return this.request<{ repost_id: string }>('/repost/create', {
       method: 'POST',
-      body: JSON.stringify({ original_post_id, repost_author_id, added_content }),
+      body: JSON.stringify({ original_plan_id, repost_author_id, added_content }),
     });
   }
 
