@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import PostInteractionModal from './PostInteractionModal';
@@ -9,7 +9,7 @@ import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
@@ -68,9 +68,9 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
           )}
           <TouchableOpacity 
             style={styles.iconButton}
-            onPress={() => onRequireAuth?.()}
+            onPress={onSharePress}
           >
-            <Ionicons name="navigate-outline" size={20} color="#000" />
+            <Ionicons name="paper-plane-outline" size={20} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.joinButton}
@@ -186,6 +186,54 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     setShowRepostModal(true);
   };
 
+  const handleShare = async () => {
+    try {
+      // For reposts, use the original plan ID; otherwise use the current plan ID
+      let planId = postId || event?.id;
+      
+      // Check if this is a repost and get the original plan ID
+      if ((event?.is_repost || isRepost) && event?.repost_data?.original_plan_id) {
+        planId = event.repost_data.original_plan_id;
+      }
+      
+      if (!planId) {
+        Alert.alert('Error', 'Plan ID not found');
+        return;
+      }
+
+      // Generate plan-specific link
+      // Update this URL with your actual website domain when ready
+      const planUrl = `https://vybeme.com/plan/${planId}`;
+      
+      // Get the plan title (use original title for reposts if available)
+      const planTitle = originalPostTitle || event?.title || 'Amazing Plan';
+      
+      // Prepare share message
+      const shareMessage = `Check out this plan: ${planTitle}\n\n${planUrl}`;
+
+      const result = await Share.share({
+        message: shareMessage,
+        url: planUrl, // iOS will use this for better sharing
+        title: planTitle,
+      });
+
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type of result.activityType
+          console.log('Shared with activity type:', result.activityType);
+        } else {
+          // Shared
+          console.log('Plan shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Dismissed
+        console.log('Share dismissed');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to share plan');
+    }
+  };
+
   return (
     <>
       <Swipeable 
@@ -208,6 +256,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
             }
           }}
           onRepostPress={handleRepost}
+          onSharePress={handleShare}
           isRepost={isRepost}
           repostData={event.repost_data}
           originalAuthor={event.original_author_name}
