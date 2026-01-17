@@ -3,11 +3,15 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useAppSelector } from '@/store/hooks';
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
-  // Hide tab bar when on createPost screen
+  const { currentUser } = useAppSelector((state) => state.profile);
+  const isBusinessUser = currentUser?.is_business === true;
+  
+  // Hide tab bar when on createPost or createBusinessPost screen
   const currentRoute = state.routes[state.index];
-  if (currentRoute.name === 'createPost') {
+  if (currentRoute.name === 'createPost' || currentRoute.name === 'createBusinessPost') {
     return null;
   }
 
@@ -61,7 +65,14 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       {/* 2. The Separate "+" Button */}
       <TouchableOpacity 
         style={styles.actionButton} 
-        onPress={() => navigation.navigate('createPost')}
+        onPress={() => {
+          // Business users go to createBusinessPost, regular users go to createPost
+          if (isBusinessUser) {
+            navigation.navigate('createBusinessPost');
+          } else {
+            navigation.navigate('createPost');
+          }
+        }}
       >
         <Ionicons name="add" size={32} color="#FFF" />
       </TouchableOpacity>
@@ -80,6 +91,7 @@ export default function TabLayout() {
       <Tabs.Screen name="notifications" options={{ title: 'Notifications' }} />
       <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
       <Tabs.Screen name="createPost" options={{ title: 'Create Post', href: null }} />
+      <Tabs.Screen name="createBusinessPost" options={{ title: 'Create Business Post', href: null }} />
     </Tabs>
   );
 }

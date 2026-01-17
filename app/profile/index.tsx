@@ -127,6 +127,18 @@ export default function MyProfileScreen() {
               <Ionicons name="bookmark-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
               <Text style={styles.menuText}>Saved Plans</Text>
             </TouchableOpacity>
+            {currentUser?.is_business && (
+              <>
+                <View style={styles.divider} />
+                <TouchableOpacity 
+                  style={styles.menuItem} 
+                  onPress={() => router.push('/(tabs)/createBusinessPost')}
+                >
+                  <Ionicons name="business-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+                  <Text style={styles.menuText}>Create Business Post</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
           {/* Group 2: Preferences */}

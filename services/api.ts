@@ -460,6 +460,36 @@ class ApiService {
     return data;
   }
 
+  // Business Plan APIs
+  async createBusinessPlan(accessToken: string, planData: any) {
+    return this.request<any>('/plan/business', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(planData),
+    });
+  }
+
+  async getBusinessPlan(planId: string) {
+    return this.request<any>(`/plan/${planId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getBusinessPlans(filters?: { category_main?: string; user_id?: string }, pagination?: { limit?: number; offset?: number }) {
+    const queryParams = new URLSearchParams();
+    if (filters?.category_main) queryParams.append('category_main', filters.category_main);
+    if (filters?.user_id) queryParams.append('user_id', filters.user_id);
+    if (pagination?.limit) queryParams.append('limit', pagination.limit.toString());
+    if (pagination?.offset) queryParams.append('offset', pagination.offset.toString());
+    
+    const query = queryParams.toString();
+    return this.request<any[]>(`/plan${query ? `?${query}` : ''}`, {
+      method: 'GET',
+    });
+  }
+
   // Feed APIs
   async getHomeFeed(user_id?: string, filters?: { category_main?: string; category_sub?: string[]; location?: any }, pagination?: { limit?: number; offset?: number }) {
     return this.request<any[]>('/feed/home', {

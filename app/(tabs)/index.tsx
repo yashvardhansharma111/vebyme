@@ -370,7 +370,12 @@ export default function HomeScreen() {
                 style={styles.createBtn}
                 onPress={() => {
                   if (isAuthenticated) {
+                    // Business users go to createBusinessPost, regular users go to createPost
+                    if (currentUser?.is_business) {
+                      router.push('/(tabs)/createBusinessPost');
+                    } else {
                     router.push('/(tabs)/createPost');
+                    }
                   } else {
                     setShowLoginModal(true);
                   }

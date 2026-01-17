@@ -10,6 +10,8 @@ interface UserProfile {
   interests: string[];
   gender?: string;
   phone_number?: string;
+  is_business?: boolean;
+  business_id?: string;
   social_media?: {
     instagram?: string;
     twitter?: string;

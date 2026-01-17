@@ -60,6 +60,13 @@ export default function CreatePostScreen() {
     }
   }, [user, currentUser, dispatch]);
 
+  // Redirect business users to business post creation
+  useEffect(() => {
+    if (currentUser?.is_business) {
+      router.replace('/(tabs)/createBusinessPost');
+    }
+  }, [currentUser, router]);
+
   const handleAddMedia = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
