@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // CONFIGURATION: Backend URL
 // ============================================
 // Priority order:
-// 1. Environment variable (EXPO_PUBLIC_API_URL) - for ngrok or production
+// 1. Environment variable (EXPO_PUBLIC_API_URL) - for production
 // 2. app.json extra.apiUrl - for development
 // 3. Fallback to IP-based URLs
 // ============================================
@@ -15,7 +15,7 @@ const PHYSICAL_DEVICE_IP = '10.75.201.7'; // Fallback IP (only used if env vars 
 // Get the correct base URL based on platform
 const getBaseURL = () => {
   // Priority 1: Check environment variable (EXPO_PUBLIC_API_URL)
-  // This works with ngrok: EXPO_PUBLIC_API_URL=https://your-ngrok-url.ngrok.io/api
+  // Example: EXPO_PUBLIC_API_URL=https://api.example.com/api
   const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envApiUrl) {
     console.log('📡 Using API URL from environment variable:', envApiUrl);
@@ -87,10 +87,15 @@ interface ApiResponse<T> {
 
 class ApiService {
   private baseUrl: string;
+  private isRefreshing = false;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || API_BASE_URL;
-    console.log('API Base URL:', this.baseUrl);
+    console.log('🔗 API Base URL:', this.baseUrl);
+    console.log('🔗 Environment API URL:', process.env.EXPO_PUBLIC_API_URL || 'Not set');
+    console.log('🔗 app.json API URL:', Constants.expoConfig?.extra?.apiUrl || 'Not set');
+
   }
 
   private async getAccessToken(): Promise<string | null> {
@@ -106,9 +111,91 @@ class ApiService {
     return null;
   }
 
+  private async getRefreshToken(): Promise<string | null> {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (userData) {
+        const user = JSON.parse(userData);
+        return user.refresh_token || null;
+      }
+    } catch (error) {
+      console.error('Error getting refresh token:', error);
+    }
+    return null;
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    // If already refreshing, return the existing promise
+    if (this.isRefreshing && this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const refreshToken = await this.getRefreshToken();
+        if (!refreshToken) {
+          console.warn('⚠️ No refresh token available');
+          await this.clearAuthData();
+          return null;
+        }
+
+        const response = await fetch(`${this.baseUrl}/auth/refresh-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('❌ Token refresh failed:', response.status, errorData);
+          await this.clearAuthData();
+          return null;
+        }
+
+        const data = await response.json();
+        if (data.success && data.data?.access_token) {
+          // Update stored access token
+          const userData = await AsyncStorage.getItem('user');
+          if (userData) {
+            const user = JSON.parse(userData);
+            user.access_token = data.data.access_token;
+            await AsyncStorage.setItem('user', JSON.stringify(user));
+            console.log('✅ Access token refreshed successfully');
+            return data.data.access_token;
+          }
+        }
+
+        await this.clearAuthData();
+        return null;
+      } catch (error: any) {
+        console.error('❌ Error refreshing token:', error);
+        await this.clearAuthData();
+        return null;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  private async clearAuthData(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem('user');
+      console.log('🔓 Cleared authentication data - user should re-login');
+    } catch (error) {
+      console.error('Error clearing auth data:', error);
+    }
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryOn401 = true
   ): Promise<ApiResponse<T>> {
     let timeoutId: NodeJS.Timeout | null = null;
     const controller = new AbortController();
@@ -120,16 +207,14 @@ class ApiService {
       
       // Get access token for authenticated requests
       const accessToken = await this.getAccessToken();
-      const headers: HeadersInit = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        // ngrok bypass headers (for free tier)
-        'ngrok-skip-browser-warning': 'true',
-        ...options.headers,
+        ...(options.headers as Record<string, string> || {}),
       };
       
       // Add authorization header if token exists and endpoint requires auth
       // Skip auth for public endpoints
-      const publicEndpoints = ['/auth/send-otp', '/auth/verify-otp', '/auth/resend-otp'];
+      const publicEndpoints = ['/auth/send-otp', '/auth/verify-otp', '/auth/resend-otp', '/auth/refresh-token'];
       const requiresAuth = !publicEndpoints.some(ep => endpoint.includes(ep));
       
       if (accessToken && requiresAuth) {
@@ -139,7 +224,7 @@ class ApiService {
       // Create abort controller for timeout
       timeoutId = setTimeout(() => {
         controller.abort();
-      }, 30000); // 30 second timeout
+      }, 30000) as any; // 30 second timeout
       
       const response = await fetch(url, {
         ...options,
@@ -161,100 +246,136 @@ class ApiService {
       } else {
         const text = await response.text();
         
-        // Check if ngrok warning page
-        if (text.includes('ngrok') || text.includes('ERR_NGROK') || text.includes('<!DOCTYPE html>')) {
-          console.error('❌ ngrok warning page detected. This usually means:');
-          console.error('1. The ngrok URL requires browser verification');
-          console.error('2. Add "ngrok-skip-browser-warning: true" header (already added)');
-          console.error('3. Or visit the ngrok URL in a browser first to verify');
-          throw new Error('ngrok verification required. Please visit the ngrok URL in a browser first, or check your backend is running.');
+        // Check if HTML response (unexpected)
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+          console.error('❌ Received HTML instead of JSON. This usually means:');
+          console.error('1. The server returned an error page');
+          console.error('2. The endpoint does not exist');
+          console.error('3. Check your backend is running and the URL is correct');
+          throw new Error('Invalid response from server. Check backend logs.');
         }
         
         console.error('❌ Invalid response type:', text.substring(0, 200));
         throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
       }
       
+      // Handle 401 Unauthorized - try to refresh token
+      if (response.status === 401 && retryOn401 && requiresAuth && !endpoint.includes('/auth/refresh-token')) {
+        const errorMessage = data.message || 'Invalid or expired access token';
+        
+        // Check if it's a token expiration error
+        if (errorMessage.includes('token') || errorMessage.includes('expired') || errorMessage.includes('Invalid')) {
+          console.warn('⚠️ Access token expired or invalid. Attempting to refresh...');
+          
+          const newAccessToken = await this.refreshAccessToken();
+          
+          if (newAccessToken) {
+            console.log('🔄 Retrying request with refreshed token...');
+            // Retry the request with new token (only once)
+            return this.request<T>(endpoint, options, false);
+          } else {
+            // Refresh failed - clear auth and throw error
+            const authError = new Error('Session expired. Please log in again.');
+            (authError as any).isAuthError = true;
+            (authError as any).statusCode = 401;
+            throw authError;
+          }
+        } else {
+          // Other 401 errors (not token-related)
+          const error = new Error(errorMessage);
+          (error as any).statusCode = 401;
+          throw error;
+        }
+      }
+      
       if (!response.ok) {
         // Don't log 404 errors for user profiles (expected for missing users)
         if (response.status === 404 && endpoint.includes('/user/profile/')) {
-          // Silently return error without logging - this is expected behavior
-          // Return a clean error that won't spam the console
           const error = new Error('User not found');
           (error as any).isExpected = true;
+          (error as any).statusCode = 404;
           throw error;
         }
+        
+        // Categorize errors by status code
+        const error = new Error(data.message || `Request failed with status ${response.status}`);
+        (error as any).statusCode = response.status;
+        
         // Only log non-404 errors or 404s for non-profile endpoints
         if (response.status !== 404 || !endpoint.includes('/user/profile/')) {
-          console.error('❌ Request failed:', response.status, data);
+          if (response.status >= 500) {
+            console.error('❌ Server Error:', response.status, data);
+          } else if (response.status >= 400) {
+            console.warn('⚠️ Client Error:', response.status, data);
+          }
         }
-        throw new Error(data.message || `Request failed with status ${response.status}`);
+        
+        throw error;
       }
 
       console.log('✅ Request successful:', endpoint);
       return data;
     } catch (error: any) {
-      // Don't log expected 404 errors for user profiles (missing users are expected)
+      // Don't log expected 404 errors for user profiles
       const isExpectedUserNotFound = 
         ((error as any).isExpected || 
          error.message?.includes('User not found') || 
          error.message?.includes('404')) && 
         endpoint.includes('/user/profile/');
       
-      if (!isExpectedUserNotFound) {
+      // Handle network errors
+      if (error.message?.includes('Failed to fetch') || 
+          error.message?.includes('Network request failed') ||
+          error.message?.includes('NetworkError') ||
+          error.name === 'TypeError') {
+        
+        if (!isExpectedUserNotFound) {
+          console.error('❌ Network Error:', error.message);
+        }
+        
+        const isPhysicalDevice = Constants.isDevice !== false;
+        let errorMsg = 'Network connection error or server is unreachable.\n\n';
+        errorMsg += `Current API URL: ${this.baseUrl}\n`;
+        errorMsg += 'Please ensure:\n';
+        errorMsg += '1. Your backend server is running and accessible.\n';
+        errorMsg += '2. Your device has a stable internet connection.\n';
+        errorMsg += '3. If using a local IP, it is correct and accessible from your device.';
+        
+        const networkError = new Error(errorMsg);
+        (networkError as any).isNetworkError = true;
+        throw networkError;
+      }
+      
+      // Handle timeout errors
+      if (error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Aborted')) {
+        if (!isExpectedUserNotFound) {
+          console.error('❌ Timeout Error:', error.message);
+        }
+        
+        let timeoutMsg = 'Request timed out. The server took too long to respond.\n\n';
+        timeoutMsg += 'Possible causes:\n';
+        timeoutMsg += '1. Backend server is slow or overloaded.\n';
+        timeoutMsg += '2. Network connection is unstable.\n';
+        timeoutMsg += `3. Verify backend is accessible at: ${this.baseUrl}\n`;
+        
+        const timeoutError = new Error(timeoutMsg);
+        (timeoutError as any).isTimeoutError = true;
+        throw timeoutError;
+      }
+      
+      // Log other errors (except expected ones)
+      if (!isExpectedUserNotFound && !(error as any).isAuthError) {
         console.error('❌ API Request Error:', error);
         console.error('Error details:', {
           message: error.message,
           name: error.name,
+          statusCode: (error as any).statusCode,
           url: `${this.baseUrl}${endpoint}`,
         });
       }
       
       // Re-throw the error so calling code can handle it
       throw error;
-      
-      // Provide more helpful error messages
-      if (error.message?.includes('Network request failed') || 
-          error.message?.includes('Failed to fetch') ||
-          error.message?.includes('NetworkError') ||
-          error.name === 'TypeError') {
-        
-        // Use same detection logic as getBaseURL
-        const isPhysicalDevice = Constants.isDevice !== false;
-        let errorMsg = 'Cannot connect to server.\n\n';
-        errorMsg += '1. Make sure the backend is running: cd vybeme_backend && npm start\n';
-        errorMsg += '2. Check the server is on port 8000\n';
-        errorMsg += `3. Current API URL: ${this.baseUrl}\n`;
-        
-        if (isPhysicalDevice && Platform.OS !== 'web') {
-          errorMsg += '\n⚠️ You are on a PHYSICAL DEVICE.\n';
-          errorMsg += 'Make sure PHYSICAL_DEVICE_IP is set correctly in services/api.ts\n';
-          errorMsg += `Current IP setting: ${PHYSICAL_DEVICE_IP}\n`;
-          errorMsg += 'Find your IP: ipconfig (Windows) or ifconfig (Mac/Linux)\n';
-          errorMsg += 'Update PHYSICAL_DEVICE_IP at the top of services/api.ts';
-        } else {
-          errorMsg += '\n💡 If using emulator/simulator, make sure:\n';
-          errorMsg += '- Android: Use 10.0.2.2 (already configured)\n';
-          errorMsg += '- iOS: Use localhost (already configured)';
-        }
-        
-        throw new Error(errorMsg);
-      }
-      
-      if (error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Aborted')) {
-        let timeoutMsg = 'Request timeout. The server is taking too long to respond.\n\n';
-        timeoutMsg += 'Possible causes:\n';
-        timeoutMsg += '1. Backend server is not running\n';
-        timeoutMsg += '2. Backend server is slow or overloaded\n';
-        timeoutMsg += '3. Network connection is slow\n';
-        timeoutMsg += `4. Check if backend is accessible at: ${this.baseUrl}\n`;
-        timeoutMsg += '\nTry:\n';
-        timeoutMsg += '- Restart the backend server\n';
-        timeoutMsg += '- Check backend logs for errors\n';
-        timeoutMsg += '- Verify the IP address is correct';
-        throw new Error(timeoutMsg);
-      }
-      
-      throw new Error(error.message || 'Network error');
     } finally {
       // Always clear timeout
       if (timeoutId) {
@@ -378,9 +499,7 @@ class ApiService {
   private async uploadFile(formData: FormData, accessToken: string | undefined, endpoint: string) {
     // For React Native FormData, we must NOT set Content-Type header
     // The runtime will automatically set it with the correct boundary
-    const headers: HeadersInit = {
-      'ngrok-skip-browser-warning': 'true',
-    };
+    const headers: Record<string, string> = {};
     
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -390,22 +509,15 @@ class ApiService {
     // The fetch API will automatically set it with the correct multipart boundary
     
     // Construct URL - baseUrl already includes /api, endpoint should start with /
-    // Example: baseUrl = "https://xxx.ngrok.io/api", endpoint = "/upload/image"
-    // Result: "https://xxx.ngrok.io/api/upload/image"
     const url = `${this.baseUrl}${endpoint}`;
     console.log('📤 Uploading file to:', url);
-    console.log('📤 Base URL:', this.baseUrl);
-    console.log('📤 Endpoint:', endpoint);
-    console.log('📤 Full URL:', url);
-    console.log('📤 Headers:', JSON.stringify(headers, null, 2));
     
     // Log FormData contents if available (React Native FormData has _parts)
-    // @ts-ignore - React Native FormData internal structure
-    if (formData._parts) {
-      console.log('📤 FormData _parts:', JSON.stringify(formData._parts, null, 2));
+    // React Native FormData has an internal _parts property that TypeScript doesn't know about
+    if ((formData as any)._parts) {
+      console.log('📤 FormData parts count:', (formData as any)._parts.length);
     }
     
-    // Use the EXACT same fetch approach as createPost
     const response = await fetch(url, {
       method: 'POST',
       body: formData,
@@ -420,16 +532,21 @@ class ApiService {
       data = await response.json();
     } else {
       const text = await response.text();
-      // Check if ngrok warning page
-      if (text.includes('ngrok') || text.includes('ERR_NGROK') || text.includes('<!DOCTYPE html>')) {
-        throw new Error('ngrok verification required. Please check your backend connection.');
+      
+      // Check if HTML response (unexpected)
+      if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+        console.error('❌ Received HTML instead of JSON during upload');
+        throw new Error('Invalid response from server. Check backend logs.');
       }
+      
       throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
     }
     
     if (!response.ok) {
+      const error = new Error(data.message || 'Upload failed');
+      (error as any).statusCode = response.status;
       console.error('❌ Upload failed:', response.status, data);
-      throw new Error(data.message || 'Upload failed');
+      throw error;
     }
     
     return data;
@@ -437,9 +554,8 @@ class ApiService {
 
   // Post APIs
   async createPost(accessToken: string, postData: FormData | any) {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${accessToken}`,
-      'ngrok-skip-browser-warning': 'true',
     };
 
     // If FormData, don't set Content-Type (browser will set it with boundary)
@@ -455,7 +571,9 @@ class ApiService {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || 'Failed to create post');
+      const error = new Error(data.message || 'Failed to create post');
+      (error as any).statusCode = response.status;
+      throw error;
     }
     return data;
   }
@@ -648,7 +766,7 @@ class ApiService {
     });
   }
 
-  async sendMessage(group_id: string, user_id: string, type: 'text' | 'image' | 'poll', content: any) {
+  async sendMessage(group_id: string, user_id: string, type: 'text' | 'image' | 'poll' | 'plan', content: any) {
     return this.request<{ message_id: string }>('/chat/send', {
       method: 'POST',
       body: JSON.stringify({ group_id, user_id, type, content }),
@@ -661,14 +779,14 @@ class ApiService {
     });
   }
 
-  async addReaction(message_id: string, user_id: string, emoji_type: string) {
+  async addMessageReaction(message_id: string, user_id: string, emoji_type: string) {
     return this.request<any>('/chat/message/reaction', {
       method: 'POST',
       body: JSON.stringify({ message_id, user_id, emoji_type }),
     });
   }
 
-  async removeReaction(message_id: string, user_id: string, emoji_type: string) {
+  async removeMessageReaction(message_id: string, user_id: string, emoji_type: string) {
     return this.request<any>('/chat/message/reaction', {
       method: 'DELETE',
       body: JSON.stringify({ message_id, user_id, emoji_type }),
@@ -706,6 +824,21 @@ class ApiService {
     return this.request<any>('/chat/group/reopen', {
       method: 'POST',
       body: JSON.stringify({ group_id, user_id }),
+    });
+  }
+
+  async getPlanGroups(plan_id: string, user_id: string) {
+    return this.request<{
+      has_active_group: boolean;
+      latest_group: {
+        group_id: string;
+        group_name: string | null;
+        members: string[];
+        created_at: string;
+      } | null;
+      total_active_groups: number;
+    }>(`/chat/plan/groups?plan_id=${plan_id}&user_id=${user_id}`, {
+      method: 'GET',
     });
   }
 }

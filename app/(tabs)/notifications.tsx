@@ -5,7 +5,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
+  Modal,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -14,11 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
-import { Colors, borderRadius } from '@/constants/theme';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
+import NotificationCard from '@/components/NotificationCard';
+import NotificationListItem from '@/components/NotificationListItem';
 
 interface Interaction {
   notification_id: string;
@@ -40,25 +41,40 @@ interface NotificationGroup {
     title: string;
     description: string;
     media: any[];
+    category_main?: string;
+    category_sub?: string[];
   } | null;
   interactions: Interaction[];
   created_at: string;
 }
 
+interface PlanGroupInfo {
+  has_active_group: boolean;
+  latest_group: {
+    group_id: string;
+    group_name: string | null;
+    members: string[];
+    created_at: string;
+  } | null;
+}
+
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationGroup[]>([]);
-  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [groupName, setGroupName] = useState<{ [postId: string]: string }>({});
+  const [groupName, setGroupName] = useState<string>('');
   const [creatingGroup, setCreatingGroup] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
+  const [planGroupInfo, setPlanGroupInfo] = useState<{ [postId: string]: PlanGroupInfo }>({});
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
   const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
   const router = useRouter();
   
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
 
   const loadNotifications = useCallback(async (isRefresh = false) => {
     if (!isAuthenticated || !user?.user_id) {
@@ -76,6 +92,28 @@ export default function NotificationsScreen() {
       const response = await apiService.getNotifications(user.user_id);
       if (response.data) {
         setNotifications(response.data);
+        
+        // Load group info for each plan
+        const groupInfoPromises = response.data.map(async (group) => {
+          if (group.post_id) {
+            try {
+              const groupInfo = await apiService.getPlanGroups(group.post_id, user.user_id);
+              return { postId: group.post_id, info: groupInfo.data };
+            } catch (error) {
+              return { postId: group.post_id, info: { has_active_group: false, latest_group: null, total_active_groups: 0 } };
+            }
+          }
+          return null;
+        });
+        
+        const groupInfos = await Promise.all(groupInfoPromises);
+        const groupInfoMap: { [postId: string]: PlanGroupInfo } = {};
+        groupInfos.forEach((item) => {
+          if (item && item.info) {
+            groupInfoMap[item.postId] = item.info;
+          }
+        });
+        setPlanGroupInfo(groupInfoMap);
       }
     } catch (error: any) {
       console.error('Error loading notifications:', error);
@@ -97,12 +135,10 @@ export default function NotificationsScreen() {
   }, [isAuthenticated, loadNotifications]);
 
   const fetchUserProfile = useCallback(async (user_id: string) => {
-    // Check cache first
     if (userCache[user_id]) {
       return userCache[user_id];
     }
 
-    // Add to loading set
     setLoadingUsers((prev) => new Set(prev).add(user_id));
 
     try {
@@ -121,220 +157,141 @@ export default function NotificationsScreen() {
         return userData;
       }
     } catch (error: any) {
-      // Handle error - use fallback
       console.error(`Error fetching user ${user_id}:`, error);
+      setLoadingUsers((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(user_id);
+        return newSet;
+      });
     }
-
-    // Fallback if fetch fails
-    const fallback = {
-      name: 'Unknown',
-      profile_image: null,
-    };
-    setUserCache((prev) => ({ ...prev, [user_id]: fallback }));
-    setLoadingUsers((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(user_id);
-      return newSet;
-    });
-    return fallback;
+    return null;
   }, [userCache]);
 
-  const toggleExpand = useCallback(async (postId: string) => {
-    if (expandedPostId === postId) {
-      setExpandedPostId(null);
-      setSelectedUsers(new Set());
-      setGroupName((prev) => {
-        const newState = { ...prev };
-        delete newState[postId];
-        return newState;
-      });
-    } else {
-      setExpandedPostId(postId);
-      
-      // Fetch user profiles for all interactions in this group
-      const group = notifications.find((n) => n.post_id === postId);
-      if (group) {
-        const uniqueUserIds = [...new Set(group.interactions.map((i) => i.source_user_id))];
-        // Fetch all users (caching handles duplicates)
-        uniqueUserIds.forEach((userId) => {
-          if (!userCache[userId] && !loadingUsers.has(userId)) {
-            fetchUserProfile(userId);
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const userIds = new Set<string>();
+      notifications.forEach((group) => {
+        group.interactions.forEach((interaction) => {
+          if (interaction.source_user_id && !userCache[interaction.source_user_id]) {
+            userIds.add(interaction.source_user_id);
           }
         });
-      }
+      });
+
+      userIds.forEach((userId) => {
+        fetchUserProfile(userId);
+      });
     }
-  }, [expandedPostId, notifications, userCache, loadingUsers, fetchUserProfile]);
+  }, [notifications, userCache, fetchUserProfile]);
+
+  const openGroupModal = (postId: string) => {
+    setCurrentPostId(postId);
+    setSelectedUsers(new Set());
+    setGroupName('');
+    setShowGroupModal(true);
+  };
+
+  const closeGroupModal = () => {
+    setShowGroupModal(false);
+    setCurrentPostId(null);
+    setSelectedUsers(new Set());
+    setGroupName('');
+  };
 
   const toggleUserSelection = (userId: string) => {
-    const newSelected = new Set(selectedUsers);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedUsers(newSelected);
-  };
-
-  const handleApprove = async (interactionId: string, postId?: string, requesterId?: string) => {
-    if (!isAuthenticated || !user?.user_id) return;
-
-    try {
-      await apiService.approveJoinRequest(interactionId);
-      Alert.alert(
-        'Request Approved! ✅',
-        'The user has been notified and can now chat with you.',
-        [
-          {
-            text: 'Start Chat',
-            onPress: async () => {
-              if (postId && requesterId) {
-                try {
-                  const chatResponse = await apiService.createIndividualChat(postId, user.user_id, requesterId);
-                  if (chatResponse.data && chatResponse.data.group_id) {
-                    router.push({
-                      pathname: '/chat/[groupId]',
-                      params: { groupId: chatResponse.data.group_id },
-                    } as any);
-                  }
-                } catch (error: any) {
-                  console.error('Error creating individual chat:', error);
-                }
-              }
-            },
-          },
-          { text: 'OK', style: 'cancel' },
-        ]
-      );
-      loadNotifications();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to approve request');
-    }
-  };
-
-  const handleReject = async (interactionId: string) => {
-    if (!isAuthenticated || !user?.user_id) return;
-
-    try {
-      await apiService.rejectJoinRequest(interactionId);
-      Alert.alert('Request Rejected', 'The user has been notified.');
-      loadNotifications();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to reject request');
-    }
-  };
-
-  const handleStartIndividualChat = async (postId: string, otherUserId: string) => {
-    if (!isAuthenticated || !user?.user_id) return;
-
-    try {
-      const response = await apiService.createIndividualChat(postId, user.user_id, otherUserId);
-      if (response.data?.group_id) {
-        router.push({
-          pathname: '/chat/[groupId]',
-          params: { groupId: response.data.group_id },
-        } as any);
+    setSelectedUsers((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
       }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to start chat');
-      console.error('Error creating individual chat:', error);
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const currentGroup = currentPostId ? notifications.find((n) => n.post_id === currentPostId) : null;
+    if (!currentGroup) return;
+
+    const uniqueUserIds = [...new Set(currentGroup.interactions.map((i) => i.source_user_id))];
+    const allSelected = uniqueUserIds.length > 0 && selectedUsers.size === uniqueUserIds.length;
+
+    if (allSelected) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(uniqueUserIds));
     }
   };
 
-  const handleCreateGroup = async (postId: string) => {
-    if (!isAuthenticated || !user?.user_id) {
-      setShowLoginModal(true);
-      return;
-    }
+  const handleCreateGroup = async () => {
+    if (!currentPostId || !user?.user_id) return;
 
+    const name = groupName.trim();
     if (selectedUsers.size === 0) {
       Alert.alert('Error', 'Please select at least one user');
       return;
     }
 
-    const name = groupName[postId]?.trim();
-    if (!name) {
+    if (!name && !planGroupInfo[currentPostId]?.has_active_group) {
       Alert.alert('Error', 'Please enter a group name');
       return;
     }
 
-    setCreatingGroup(postId);
+    setCreatingGroup(currentPostId);
     try {
       const memberIds = Array.from(selectedUsers);
-      const response = await apiService.createGroup(postId, user.user_id, memberIds, name);
+      const groupInfo = planGroupInfo[currentPostId];
+      const hasActiveGroup = groupInfo?.has_active_group || false;
       
-      if (response.data && response.data.group_id) {
+      if (hasActiveGroup && groupInfo?.latest_group) {
+        // Add to existing group
+        await apiService.addMembersToGroup(groupInfo.latest_group.group_id, memberIds);
         Alert.alert(
-          'Group Created! 🎉',
-          `"${name}" group has been created. You can now chat with ${selectedUsers.size} member${selectedUsers.size > 1 ? 's' : ''} about this plan.`,
+          'Members Added! 🎉',
+          `${memberIds.length} member${memberIds.length > 1 ? 's' : ''} added to "${groupInfo.latest_group.group_name || 'the group'}"`,
           [
             {
               text: 'Go to Chat',
               onPress: () => {
                 router.push({
                   pathname: '/chat/group/[groupId]',
-                  params: { groupId: response.data!.group_id },
+                  params: { groupId: groupInfo.latest_group!.group_id },
                 } as any);
               },
             },
             { text: 'OK', style: 'cancel' },
           ]
         );
-        setExpandedPostId(null);
-        setSelectedUsers(new Set());
-        setGroupName((prev) => {
-          const newState = { ...prev };
-          delete newState[postId];
-          return newState;
-        });
-        loadNotifications();
+      } else {
+        // Create new group
+        const response = await apiService.createGroup(currentPostId, user.user_id, memberIds, name);
+        if (response.data && response.data.group_id) {
+          Alert.alert(
+            'Group Created! 🎉',
+            `"${name}" group has been created. You can now chat with ${selectedUsers.size} member${selectedUsers.size > 1 ? 's' : ''} about this plan.`,
+            [
+              {
+                text: 'Go to Chat',
+                onPress: () => {
+                  router.push({
+                    pathname: '/chat/group/[groupId]',
+                    params: { groupId: response.data!.group_id },
+                  } as any);
+                },
+              },
+              { text: 'OK', style: 'cancel' },
+            ]
+          );
+        }
       }
+      
+      closeGroupModal();
+      loadNotifications();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to create group');
     } finally {
       setCreatingGroup(null);
-    }
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
-  const getInteractionText = (interaction: Interaction) => {
-    // Use cached user name if available, otherwise use interaction.user, then fallback
-    const cachedUser = userCache[interaction.source_user_id];
-    const userName = cachedUser?.name || 
-                     interaction.user?.name || 
-                     'Unknown';
-    switch (interaction.type) {
-      case 'comment':
-        return `${userName} commented`;
-      case 'reaction':
-        return `${userName} reacted`;
-      case 'join':
-        return `${userName} joined`;
-      case 'repost':
-        return `${userName} reposted`;
-      default:
-        return `${userName} interacted`;
-    }
-  };
-
-  const handleUserPress = (userId: string) => {
-    if (userId) {
-      router.push({
-        pathname: '/profile/[userId]',
-        params: { userId },
-      } as any);
     }
   };
 
@@ -375,10 +332,33 @@ export default function NotificationsScreen() {
     );
   }
 
+  const currentGroup = currentPostId ? notifications.find((n) => n.post_id === currentPostId) : null;
+  const uniqueUserIds = currentGroup ? [...new Set(currentGroup.interactions.map((i) => i.source_user_id))] : [];
+  const allSelected = uniqueUserIds.length > 0 && selectedUsers.size === uniqueUserIds.length;
+  const groupInfo = currentPostId ? planGroupInfo[currentPostId] : null;
+  const hasActiveGroup = groupInfo?.has_active_group || false;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.headerText}>Notifications</Text>
+        <View style={styles.headerLeft}>
+          {currentUser?.profile_image && (
+            <View style={styles.headerAvatarContainer}>
+              <Avatar uri={currentUser.profile_image} size={40} />
+              {notifications.length > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {notifications.length > 99 ? '99+' : notifications.length}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+          <Text style={styles.headerText}>Notifications</Text>
+        </View>
+        <TouchableOpacity style={styles.editButton}>
+          <Ionicons name="create-outline" size={22} color="#FFD700" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -394,181 +374,164 @@ export default function NotificationsScreen() {
             <Text style={styles.emptySubtext}>Interactions on your posts will appear here</Text>
           </View>
         ) : (
-          notifications.map((group) => {
-            const isExpanded = expandedPostId === group.post_id;
-            const avatars = group.interactions
-              .slice(0, 3)
-              .map((i) => i.user?.profile_image || 'https://via.placeholder.com/44');
-            const remainingCount = Math.max(0, group.interactions.length - 3);
-            const postText = group.post?.description || group.post?.title || 'Post interaction';
-
-            return (
-              <View key={group.post_id} style={styles.notificationCard}>
-                {/* Collapsed Header */}
-                <TouchableOpacity
-                  style={styles.cardHeader}
-                  onPress={() => toggleExpand(group.post_id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.headerLeft}>
-                    <View style={styles.avatarStack}>
-                      {avatars.map((avatar, index) => (
-                        <View
-                          key={index}
-                          style={[
-                            { marginLeft: index > 0 ? -12 : 0, zIndex: 10 - index },
-                          ]}
-                        >
-                          <Avatar uri={avatar} size={32} />
-                        </View>
-                      ))}
-                      {remainingCount > 0 && (
-                        <View
-                          style={[
-                            styles.avatar,
-                            styles.avatarOverlay,
-                            { marginLeft: -12, zIndex: 0 },
-                          ]}
-                        >
-                          <Text style={styles.avatarOverlayText}>+{remainingCount}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.postText} numberOfLines={3}>
-                      {postText}
-                    </Text>
-                  </View>
-                  <View style={styles.headerRight}>
-                    <Text style={styles.timeText}>{formatTime(group.created_at)}</Text>
-                    <TouchableOpacity 
-                      style={styles.chevronButton}
-                      onPress={() => toggleExpand(group.post_id)}
-                    >
-                      <Ionicons
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={20}
-                        color="#1C1C1E"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-
-                {/* Expanded Content */}
-                {isExpanded && (
-                  <View style={styles.expandedContent}>
-                    {group.interactions.map((interaction) => {
-                      const isSelected = selectedUsers.has(interaction.source_user_id);
-                      const isPending = interaction.payload?.request_id && 
-                                       interaction.payload?.status === 'pending';
-                      const isApproved = interaction.payload?.status === 'approved';
-                      
-                      return (
-                        <View key={interaction.notification_id} style={styles.interactionItem}>
-                          <TouchableOpacity
-                            style={styles.checkbox}
-                            onPress={() => toggleUserSelection(interaction.source_user_id)}
-                          >
-                            {isSelected && (
-                              <Ionicons name="checkmark" size={16} color="#1C1C1E" />
-                            )}
-                          </TouchableOpacity>
-                          
-                          <TouchableOpacity
-                            style={styles.userInfoRow}
-                            onPress={() => handleUserPress(interaction.source_user_id)}
-                            activeOpacity={0.7}
-                          >
-                            <View style={styles.avatarContainer}>
-                              <Avatar
-                                uri={userCache[interaction.source_user_id]?.profile_image || 
-                                     interaction.user?.profile_image || 
-                                     null}
-                                size={40}
-                              />
-                              {loadingUsers.has(interaction.source_user_id) && (
-                                <View style={styles.loadingOverlay}>
-                                  <ActivityIndicator size="small" color="#1C1C1E" />
-                                </View>
-                              )}
-                            </View>
-                            <View style={styles.userInfo}>
-                              {loadingUsers.has(interaction.source_user_id) ? (
-                                <View style={styles.loadingTextContainer}>
-                                  <ActivityIndicator size="small" color="#8E8E93" style={{ marginRight: 8 }} />
-                                  <Text style={styles.loadingText}>Loading...</Text>
-                                </View>
-                              ) : (
-                                <>
-                                  <Text style={styles.interactionText}>
-                                    {getInteractionText(interaction)}
-                                  </Text>
-                                  {interaction.type === 'comment' && interaction.payload?.text && (
-                                    <Text style={styles.commentText} numberOfLines={1}>
-                                      {interaction.payload.text}
-                                    </Text>
-                                  )}
-                                  {interaction.type === 'reaction' && interaction.payload?.emoji_type && (
-                                    <Text style={styles.emojiText}>{interaction.payload.emoji_type}</Text>
-                                  )}
-                                </>
-                              )}
-                            </View>
-                          </TouchableOpacity>
-
-                          <Ionicons
-                            name={
-                              interaction.type === 'comment' ? 'chatbubble-outline' :
-                              interaction.type === 'reaction' ? 'heart-outline' :
-                              interaction.type === 'join' ? 'person-add-outline' :
-                              'repeat-outline'
-                            }
-                            size={20}
-                            color="#1C1C1E"
-                            style={styles.interactionIcon}
-                          />
-                        </View>
-                      );
-                    })}
-
-                    {/* Group Creation Section - Only show when users are selected */}
-                    {selectedUsers.size > 0 && (
-                      <View style={styles.groupCreationSection}>
-                        <TextInput
-                          style={styles.groupNameInput}
-                          placeholder="Group Name"
-                          placeholderTextColor="#9CA3AF"
-                          value={groupName[group.post_id] || ''}
-                          onChangeText={(text) => {
-                            setGroupName((prev) => ({
-                              ...prev,
-                              [group.post_id]: text,
-                            }));
-                          }}
-                        />
-                        <TouchableOpacity
-                          style={[
-                            styles.createGroupButton,
-                            (!groupName[group.post_id]?.trim() || creatingGroup === group.post_id) &&
-                              styles.createGroupButtonDisabled,
-                          ]}
-                          onPress={() => handleCreateGroup(group.post_id)}
-                          disabled={!groupName[group.post_id]?.trim() || creatingGroup === group.post_id}
-                        >
-                          {creatingGroup === group.post_id ? (
-                            <ActivityIndicator color="#FFFFFF" size="small" />
-                          ) : (
-                            <Text style={styles.createGroupButtonText}>Create Group</Text>
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                )}
+          <>
+            {/* TOP SECTION: First notification as highlighted card */}
+            {notifications.length > 0 && (
+              <View style={styles.highlightedCardContainer}>
+                <NotificationCard
+                  key={notifications[0].post_id}
+                  post_id={notifications[0].post_id}
+                  post={notifications[0].post}
+                  interactions={notifications[0].interactions}
+                  created_at={notifications[0].created_at}
+                  userCache={userCache}
+                  onPress={() => openGroupModal(notifications[0].post_id)}
+                />
               </View>
-            );
-          })
+            )}
+
+            {/* BELOW SECTION: All other notifications as list items */}
+            <View style={styles.listContainer}>
+              {notifications.slice(1).flatMap((group, groupIndex) =>
+                group.interactions.map((interaction, interactionIndex) => {
+                  const allInteractions = notifications.slice(1).flatMap(g => g.interactions);
+                  const currentIndex = notifications.slice(1).slice(0, groupIndex).reduce((sum, g) => sum + g.interactions.length, 0) + interactionIndex;
+                  const isLast = currentIndex === allInteractions.length - 1;
+                  
+                  return (
+                    <NotificationListItem
+                      key={`${group.post_id}-${interaction.notification_id}`}
+                      interaction={interaction}
+                      userCache={userCache}
+                      onPress={() => {
+                        // Navigate to post details or open group modal
+                        if (group.post?.plan_id) {
+                          router.push({
+                            pathname: '/plan/[planId]',
+                            params: { planId: group.post.plan_id },
+                          } as any);
+                        }
+                      }}
+                      showDivider={!isLast}
+                    />
+                  );
+                })
+              )}
+            </View>
+          </>
         )}
       </ScrollView>
+
+      {/* Group Creation Modal - Centered */}
+      <Modal
+        visible={showGroupModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeGroupModal}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={closeGroupModal}
+        >
+          <TouchableOpacity 
+            style={styles.modalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeaderLeft}>
+                <Ionicons name="bicycle-outline" size={24} color="#1C1C1E" />
+                <Text style={styles.modalHeaderText}>
+                  {hasActiveGroup ? (groupInfo?.latest_group?.group_name || 'Group') : 'Cycling Group'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={closeGroupModal}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+
+            {/* User List */}
+            <ScrollView 
+              style={styles.userList}
+              showsVerticalScrollIndicator={false}
+            >
+              {currentGroup && uniqueUserIds.map((userId) => {
+                const interaction = currentGroup.interactions.find((i) => i.source_user_id === userId);
+                const cachedUser = userCache[userId];
+                const user = cachedUser || interaction?.user;
+                const isSelected = selectedUsers.has(userId);
+                
+                return (
+                  <TouchableOpacity
+                    key={userId}
+                    style={styles.userItem}
+                    onPress={() => toggleUserSelection(userId)}
+                    activeOpacity={0.7}
+                  >
+                    <Avatar
+                      uri={user?.profile_image || null}
+                      size={40}
+                    />
+                    <Text style={styles.userName}>{user?.name || 'Unknown'}</Text>
+                    <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                      {isSelected && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              
+              {/* Select All */}
+              <TouchableOpacity
+                style={styles.selectAllItem}
+                onPress={toggleSelectAll}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.selectAllText}>Select All</Text>
+                <View style={[styles.checkbox, allSelected && styles.checkboxSelected]}>
+                  {allSelected && (
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Group Name Input */}
+            {!hasActiveGroup && (
+              <TextInput
+                style={styles.groupNameInput}
+                placeholder="Group Name"
+                placeholderTextColor="#9CA3AF"
+                value={groupName}
+                onChangeText={setGroupName}
+              />
+            )}
+
+            {/* Action Button */}
+            <TouchableOpacity
+              style={[
+                styles.modalActionButton,
+                (selectedUsers.size === 0 || (!hasActiveGroup && !groupName.trim()) || creatingGroup !== null) &&
+                  styles.modalActionButtonDisabled,
+              ]}
+              onPress={handleCreateGroup}
+              disabled={selectedUsers.size === 0 || (!hasActiveGroup && !groupName.trim()) || creatingGroup !== null}
+              activeOpacity={0.8}
+            >
+              {creatingGroup ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.modalActionButtonText}>
+                  {hasActiveGroup ? 'Add to Group' : 'Create group'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <LoginModal
         visible={showLoginModal}
@@ -582,24 +545,74 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 20,
-    paddingTop: 10,
-    paddingBottom: 16,
+    paddingTop: 12,
+    paddingBottom: 20,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerAvatarContainer: {
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#F2F2F7',
+    zIndex: 10,
+  },
+  notificationBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   headerText: {
     fontSize: 28,
     fontWeight: '800',
     color: '#1C1C1E',
   },
+  editButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
   scrollView: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
+  },
+  highlightedCardContainer: {
+    padding: 20,
+    paddingBottom: 0,
+    backgroundColor: '#F2F2F7',
+  },
+  listContainer: {
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
@@ -635,87 +648,80 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  notificationCard: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
+    borderRadius: 24,
+    padding: 20,
+    paddingBottom: 24,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '80%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  cardHeader: {
+  modalHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    padding: 16,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    marginRight: 12,
-  },
-  avatarStack: {
-    flexDirection: 'row',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#E5E5EA',
-  },
-  avatarOverlay: {
-    backgroundColor: '#1C1C1E',
-    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
-  avatarOverlayText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  postText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1C1C1E',
-    lineHeight: 20,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    minHeight: 40,
-  },
-  timeText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginBottom: 8,
-  },
-  chevronButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  modalHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
-  expandedContent: {
-    padding: 16,
-    paddingTop: 0,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+  modalHeaderText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginLeft: 8,
   },
-  interactionItem: {
+  userList: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  userItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F7',
+  },
+  userName: {
+    fontSize: 16,
+    color: '#1C1C1E',
+    marginLeft: 12,
+    flex: 1,
+  },
+  selectAllItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  selectAllText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   checkbox: {
     width: 24,
@@ -723,71 +729,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#1C1C1E',
-    marginRight: 12,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  userInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  userAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.7)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    fontStyle: 'italic',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  interactionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 2,
-  },
-  commentText: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 2,
-  },
-  emojiText: {
-    fontSize: 16,
-    marginTop: 2,
-  },
-  interactionIcon: {
-    marginLeft: 8,
-  },
-  groupCreationSection: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+  checkboxSelected: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
   },
   groupNameInput: {
     backgroundColor: '#F2F2F7',
@@ -795,22 +743,22 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: '#1C1C1E',
-    marginBottom: 12,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#E5E5EA',
   },
-  createGroupButton: {
+  modalActionButton: {
     backgroundColor: '#1C1C1E',
     borderRadius: 24,
     padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  createGroupButtonDisabled: {
+  modalActionButtonDisabled: {
     backgroundColor: '#8E8E93',
     opacity: 0.6,
   },
-  createGroupButtonText: {
+  modalActionButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',

@@ -12,6 +12,8 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -19,12 +21,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
+import Avatar from '@/components/Avatar';
 
 // --- Interfaces ---
 interface Message {
   message_id: string;
   user_id: string;
-  type: 'text' | 'image' | 'poll';
+  type: 'text' | 'image' | 'poll' | 'plan';
   content: any;
   timestamp: Date | string;
   reactions: Array<{
@@ -44,7 +47,18 @@ interface Message {
       option_id: string;
       option_text: string;
       vote_count: number;
+      voters?: Array<{
+        user_id: string;
+        profile_image?: string;
+      }>;
     }>;
+    user_vote?: string; // option_id that current user voted for
+  };
+  shared_plan?: {
+    plan_id: string;
+    title: string;
+    description: string;
+    media: any[];
   };
 }
 
@@ -76,6 +90,9 @@ export default function GroupChatScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -150,6 +167,11 @@ export default function GroupChatScreen() {
     }
   };
 
+  const getUserVote = (poll: Message['poll']) => {
+    if (!poll || !user?.user_id) return null;
+    return poll.user_vote || null;
+  };
+
   const handlePickImage = async () => {
     if (groupDetails?.is_closed) {
       Alert.alert('Chat Disabled', 'Messaging has been disabled by admin');
@@ -216,6 +238,51 @@ export default function GroupChatScreen() {
       pathname: '/chat/poll/create',
       params: { groupId: groupId || '' },
     } as any);
+  };
+
+  const handleOpenShareModal = async () => {
+    if (groupDetails?.is_closed) {
+      Alert.alert('Chat Disabled', 'Messaging has been disabled by admin');
+      return;
+    }
+    if (!user?.user_id) return;
+    
+    setShowShareModal(true);
+    setLoadingPlans(true);
+    try {
+      const response = await apiService.getUserPlans(user.user_id, 50, 0);
+      if (response.data) {
+        setAvailablePlans(response.data);
+      }
+    } catch (error: any) {
+      console.error('Error loading plans:', error);
+      Alert.alert('Error', 'Failed to load plans');
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  const handleSharePlan = async (plan: any) => {
+    if (!groupId || !user?.user_id) return;
+    
+    try {
+      setSending(true);
+      await apiService.sendMessage(groupId, user.user_id, 'plan', {
+        plan_id: plan.plan_id || plan.post_id,
+        title: plan.title,
+        description: plan.description,
+        media: plan.media || [],
+      });
+      setShowShareModal(false);
+      await loadMessages();
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error: any) {
+      Alert.alert('Error', 'Failed to share plan.');
+    } finally {
+      setSending(false);
+    }
   };
 
   const formatTimeHeader = (timestamp: Date | string) => {
@@ -304,42 +371,46 @@ export default function GroupChatScreen() {
   const renderPoll = (message: Message) => {
     if (!message.poll) return null;
     const totalVotes = message.poll.options.reduce((sum, opt) => sum + opt.vote_count, 0);
-
-    // Sort to find the "winner" visual for styling
-    const maxVotes = Math.max(...message.poll.options.map(o => o.vote_count));
+    const userVote = getUserVote(message.poll);
 
     return (
       <View style={styles.pollWrapper}>
         <Text style={styles.pollQuestion}>{message.poll.question}</Text>
-        <Text style={styles.pollVoteCount}>{totalVotes} votes</Text>
+        <Text style={styles.pollVoteCount}>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</Text>
         
         {message.poll.options.map((option) => {
           const percentage = totalVotes > 0 ? Math.round((option.vote_count / totalVotes) * 100) : 0;
-          // If this option is the leader (or arbitrarily selected), make it dark
-          const isLeader = option.vote_count === maxVotes && option.vote_count > 0;
+          const isSelected = userVote === option.option_id;
+          const hasVotes = option.vote_count > 0;
 
           return (
             <TouchableOpacity
               key={option.option_id}
-              style={[styles.pollOptionPill, isLeader ? styles.pollOptionDark : styles.pollOptionLight]}
+              style={[styles.pollOptionButton, isSelected ? styles.pollOptionSelected : styles.pollOptionUnselected]}
               onPress={() => handleVotePoll(message.poll!.poll_id, option.option_id)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.pollOptionText, isLeader ? { color: '#FFF' } : { color: '#000' }]}>
-                {option.option_text}
-              </Text>
-
-              <View style={styles.pollRightContent}>
-                {/* Mocking voter avatars for visual match */}
-                {option.vote_count > 0 && (
-                   <View style={styles.voterStack}>
-                      <Image source={{uri: 'https://via.placeholder.com/20'}} style={styles.voterAvatar} />
-                      <Image source={{uri: 'https://via.placeholder.com/20'}} style={[styles.voterAvatar, { marginLeft: -8 }]} />
-                      <Image source={{uri: 'https://via.placeholder.com/20'}} style={[styles.voterAvatar, { marginLeft: -8 }]} />
-                   </View>
-                )}
-                <Text style={[styles.pollPercent, isLeader ? { color: '#FFF' } : { color: '#000' }]}>
-                  {percentage}%
+              <View style={styles.pollOptionContent}>
+                <Text style={[styles.pollOptionText, isSelected ? styles.pollOptionTextSelected : styles.pollOptionTextUnselected]}>
+                  {option.option_text}
                 </Text>
+                <View style={styles.pollOptionRight}>
+                  {hasVotes && (
+                    <View style={styles.voterAvatarStack}>
+                      {option.voters?.slice(0, 3).map((voter, idx) => (
+                        <View
+                          key={voter.user_id}
+                          style={[styles.voterAvatarContainer, { marginLeft: idx > 0 ? -6 : 0, zIndex: 3 - idx }]}
+                        >
+                          <Avatar uri={voter.profile_image || null} size={18} />
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                  <Text style={[styles.pollPercent, isSelected ? styles.pollPercentSelected : styles.pollPercentUnselected]}>
+                    {percentage}%
+                  </Text>
+                </View>
               </View>
             </TouchableOpacity>
           );
@@ -381,12 +452,38 @@ export default function GroupChatScreen() {
                   {item.content}
                 </Text>
               )}
-              {item.type === 'image' && (
-                 <Image 
-                    source={{ uri: item.content?.url || item.content }} 
+              {item.type === 'image' && (() => {
+                const imageUri = typeof item.content === 'string' 
+                  ? item.content 
+                  : item.content?.url || null;
+                return imageUri && imageUri.trim() !== '' ? (
+                  <Image 
+                    source={{ uri: imageUri }} 
                     style={styles.messageImage} 
                     resizeMode="cover"
-                 />
+                  />
+                ) : null;
+              })()}
+              {item.type === 'plan' && item.shared_plan && (
+                <View style={styles.sharedPlanCard}>
+                  <Text style={styles.sharedPlanTitle}>{item.shared_plan.title}</Text>
+                  <Text style={styles.sharedPlanDescription} numberOfLines={2}>
+                    {item.shared_plan.description}
+                  </Text>
+                  {item.shared_plan.media && item.shared_plan.media.length > 0 && (() => {
+                    const mediaItem = item.shared_plan.media[0];
+                    const mediaUri = typeof mediaItem === 'string' 
+                      ? mediaItem 
+                      : mediaItem?.url || null;
+                    return mediaUri && mediaUri.trim() !== '' ? (
+                      <Image
+                        source={{ uri: mediaUri }}
+                        style={styles.sharedPlanImage}
+                        resizeMode="cover"
+                      />
+                    ) : null;
+                  })()}
+                </View>
               )}
             </View>
           </View>
@@ -446,6 +543,13 @@ export default function GroupChatScreen() {
                </TouchableOpacity>
                <TouchableOpacity 
                  style={styles.iconButton}
+                 onPress={handleOpenShareModal}
+                 disabled={sending}
+               >
+                  <Ionicons name="share-outline" size={24} color="#999" />
+               </TouchableOpacity>
+               <TouchableOpacity 
+                 style={styles.iconButton}
                  onPress={handleCreatePoll}
                  disabled={sending}
                >
@@ -466,6 +570,71 @@ export default function GroupChatScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      {/* Share Plan Modal */}
+      <Modal
+        visible={showShareModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowShareModal(false)}
+      >
+        <View style={styles.shareModalOverlay}>
+          <View style={styles.shareModalContent}>
+            <View style={styles.shareModalHeader}>
+              <Text style={styles.shareModalTitle}>Share Plan</Text>
+              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+            
+            {loadingPlans ? (
+              <View style={styles.shareModalLoading}>
+                <ActivityIndicator size="large" color="#1C1C1E" />
+              </View>
+            ) : (
+              <ScrollView style={styles.shareModalList}>
+                {availablePlans.length === 0 ? (
+                  <View style={styles.shareModalEmpty}>
+                    <Text style={styles.shareModalEmptyText}>No plans available to share</Text>
+                  </View>
+                ) : (
+                  availablePlans.map((plan) => {
+                    const mediaItem = plan.media?.[0];
+                    const mediaUri = mediaItem 
+                      ? (typeof mediaItem === 'string' ? mediaItem : mediaItem?.url || null)
+                      : null;
+                    return (
+                      <TouchableOpacity
+                        key={plan.plan_id || plan.post_id}
+                        style={styles.sharePlanItem}
+                        onPress={() => handleSharePlan(plan)}
+                        activeOpacity={0.7}
+                      >
+                        {mediaUri && mediaUri.trim() !== '' && (
+                          <Image
+                            source={{ uri: mediaUri }}
+                            style={styles.sharePlanImage}
+                            resizeMode="cover"
+                          />
+                        )}
+                      <View style={styles.sharePlanInfo}>
+                        <Text style={styles.sharePlanTitle} numberOfLines={1}>
+                          {plan.title}
+                        </Text>
+                        <Text style={styles.sharePlanDescription} numberOfLines={2}>
+                          {plan.description}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                    </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -584,59 +753,80 @@ const styles = StyleSheet.create({
 
   // --- Poll Styles ---
   pollWrapper: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   pollQuestion: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111',
-    marginBottom: 4,
+    color: '#1C1C1E',
+    marginBottom: 6,
   },
   pollVoteCount: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#8E8E93',
     marginBottom: 16,
+    fontWeight: '500',
   },
-  pollOptionPill: {
+  pollOptionButton: {
+    borderRadius: 12,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  pollOptionSelected: {
+    backgroundColor: '#2D2D2D',
+  },
+  pollOptionUnselected: {
+    backgroundColor: '#E5E7EB',
+  },
+  pollOptionContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 30, // Fully rounded
-    marginBottom: 8,
-  },
-  pollOptionDark: {
-    backgroundColor: '#333', // Dark selection
-  },
-  pollOptionLight: {
-    backgroundColor: '#E5E7EB', // Light default
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   pollOptionText: {
     fontSize: 14,
     fontWeight: '600',
+    flex: 1,
   },
-  pollRightContent: {
+  pollOptionTextSelected: {
+    color: '#FFFFFF',
+  },
+  pollOptionTextUnselected: {
+    color: '#1C1C1E',
+  },
+  pollOptionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voterAvatarStack: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  voterStack: {
-    flexDirection: 'row',
-    marginRight: 8,
-  },
-  voterAvatar: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'transparent',
+  voterAvatarContainer: {
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    overflow: 'hidden',
   },
   pollPercent: {
     fontSize: 14,
     fontWeight: '700',
+    minWidth: 35,
+    textAlign: 'right',
+  },
+  pollPercentSelected: {
+    color: '#FFFFFF',
+  },
+  pollPercentUnselected: {
+    color: '#1C1C1E',
   },
 
   // --- List & Messages ---
@@ -760,5 +950,104 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
-  }
+  },
+  
+  // --- Shared Plan Styles ---
+  sharedPlanCard: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+  },
+  sharedPlanTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  sharedPlanDescription: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  sharedPlanImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  
+  // --- Share Modal Styles ---
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  shareModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+    paddingTop: 12,
+  },
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  shareModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  shareModalLoading: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  shareModalList: {
+    maxHeight: 500,
+  },
+  shareModalEmpty: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  shareModalEmptyText: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  sharePlanItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  sharePlanImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#F2F2F7',
+  },
+  sharePlanInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  sharePlanTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  sharePlanDescription: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
+  },
 });

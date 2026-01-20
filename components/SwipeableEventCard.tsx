@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share, ActionSheetIOS, Platform } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import PostInteractionModal from './PostInteractionModal';
 import RepostModal from './RepostModal';
+import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 
@@ -104,6 +105,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const swipeableRef = useRef<Swipeable>(null);
   
@@ -186,7 +188,44 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     setShowRepostModal(true);
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
+    if (!isAuthenticated) {
+      onRequireAuth?.();
+      return;
+    }
+
+    if (Platform.OS === 'ios') {
+      // Show action sheet on iOS
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', 'Share to Chat', 'Share Externally'],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) {
+            // Share to Chat
+            setShowShareModal(true);
+          } else if (buttonIndex === 2) {
+            // Share Externally
+            handleExternalShare();
+          }
+        }
+      );
+    } else {
+      // On Android, show a simple alert to choose
+      Alert.alert(
+        'Share',
+        'Choose how to share',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Share to Chat', onPress: () => setShowShareModal(true) },
+          { text: 'Share Externally', onPress: handleExternalShare },
+        ]
+      );
+    }
+  };
+
+  const handleExternalShare = async () => {
     try {
       // For reposts, use the original plan ID; otherwise use the current plan ID
       let planId = postId || event?.id;
@@ -202,7 +241,6 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
       }
 
       // Generate plan-specific link
-      // Update this URL with your actual website domain when ready
       const planUrl = `https://vybeme.com/plan/${planId}`;
       
       // Get the plan title (use original title for reposts if available)
@@ -213,20 +251,17 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
 
       const result = await Share.share({
         message: shareMessage,
-        url: planUrl, // iOS will use this for better sharing
+        url: planUrl,
         title: planTitle,
       });
 
       if (result.action === Share.sharedAction) {
         if (result.activityType) {
-          // Shared with activity type of result.activityType
           console.log('Shared with activity type:', result.activityType);
         } else {
-          // Shared
           console.log('Plan shared successfully');
         }
       } else if (result.action === Share.dismissedAction) {
-        // Dismissed
         console.log('Share dismissed');
       }
     } catch (error: any) {
@@ -283,6 +318,20 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           // Refresh feed or update UI
         }}
       />
+      {isAuthenticated && authUser?.user_id && (
+        <ShareToChatModal
+          visible={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          postId={postId || event?.id}
+          postTitle={originalPostTitle || event?.title || 'Untitled Post'}
+          postDescription={originalPostDescription || event?.description || ''}
+          postMedia={event?.image ? [{ url: event.image, type: 'image' }] : []}
+          userId={authUser.user_id}
+          onShareSuccess={() => {
+            // Optionally refresh feed or show success message
+          }}
+        />
+      )}
     </>
   );
 }
