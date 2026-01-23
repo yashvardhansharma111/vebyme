@@ -1,6 +1,6 @@
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -156,7 +156,7 @@ export default function QRScannerScreen() {
       <View style={styles.scannerContainer}>
         <CameraView
           style={StyleSheet.absoluteFillObject}
-          facing={CameraType.back}
+          facing="back"
           onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
           barcodeScannerSettings={{
             barcodeTypes: ['qr'],

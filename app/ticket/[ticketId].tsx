@@ -64,12 +64,25 @@ export default function TicketScreen() {
         try {
           const parsedTicket = JSON.parse(decodeURIComponent(ticketData));
           if (parsedTicket) {
+            // Ensure plan object exists
+            if (!parsedTicket.plan) {
+              console.warn('Ticket data missing plan, creating default plan object');
+              parsedTicket.plan = {
+                plan_id: parsedTicket.plan_id || planId || '',
+                title: '',
+                description: '',
+                location_text: null,
+                date: null,
+                time: null,
+                media: []
+              };
+            }
             setTicket(parsedTicket);
             setLoading(false);
             return;
           }
         } catch (e) {
-          console.log('Failed to parse ticket data from params, fetching from API');
+          console.log('Failed to parse ticket data from params, fetching from API', e);
         }
       }
       
@@ -77,10 +90,36 @@ export default function TicketScreen() {
       if (ticketId) {
         const response = await apiService.getTicketById(ticketId);
         if (response.success && response.data?.ticket) {
-          setTicket(response.data.ticket);
+          const ticketData = response.data.ticket;
+          // Ensure plan object exists
+          if (!ticketData.plan) {
+            console.warn('Ticket from API missing plan data');
+            ticketData.plan = {
+              plan_id: ticketData.plan_id || '',
+              title: '',
+              description: '',
+              location_text: null,
+              date: null,
+              time: null,
+              media: []
+            };
+          }
+          setTicket(ticketData);
         } else if (response.data?.ticket) {
           // Some APIs might not have success field
-          setTicket(response.data.ticket);
+          const ticketData = response.data.ticket;
+          if (!ticketData.plan) {
+            ticketData.plan = {
+              plan_id: ticketData.plan_id || '',
+              title: '',
+              description: '',
+              location_text: null,
+              date: null,
+              time: null,
+              media: []
+            };
+          }
+          setTicket(ticketData);
         } else {
           throw new Error(response.message || 'Ticket not found in response');
         }
@@ -99,7 +138,7 @@ export default function TicketScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out my ticket for ${ticket?.plan.title || 'this event'}`,
+        message: `Check out my ticket for ${ticket?.plan?.title || 'this event'}`,
       });
     } catch (error: any) {
       console.error('Error sharing:', error);
@@ -149,7 +188,7 @@ export default function TicketScreen() {
     );
   }
 
-  const mainImage = ticket.plan.media && ticket.plan.media.length > 0 
+  const mainImage = ticket.plan?.media && ticket.plan.media.length > 0 
     ? ticket.plan.media[0].url 
     : 'https://picsum.photos/id/1011/400/500';
 
@@ -188,7 +227,7 @@ export default function TicketScreen() {
           </View>
 
           {/* Event Title */}
-          <Text style={styles.eventTitle}>{ticket.plan.title}</Text>
+          <Text style={styles.eventTitle}>{ticket.plan?.title || 'Event'}</Text>
 
           {/* QR Code Section */}
           <View style={styles.qrCodeSection}>
@@ -198,7 +237,7 @@ export default function TicketScreen() {
               <View style={styles.qrCodePlaceholder}>
                 <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
                 <Text style={styles.qrCodeData} numberOfLines={3}>
-                  {ticket.qr_code.substring(0, 50)}...
+                  {ticket.qr_code ? ticket.qr_code.substring(0, 50) + '...' : 'QR Code'}
                 </Text>
               </View>
               {/* Uncomment when QR library is installed:
@@ -222,10 +261,10 @@ export default function TicketScreen() {
             style={styles.detailsSection}
           >
             <View style={styles.detailsRow}>
-              <Text style={styles.detailDate}>{formatDate(ticket.plan.date)}</Text>
-              <Text style={styles.detailTime}>{formatTime(ticket.plan.time)}</Text>
+              <Text style={styles.detailDate}>{formatDate(ticket.plan?.date)}</Text>
+              <Text style={styles.detailTime}>{formatTime(ticket.plan?.time)}</Text>
             </View>
-            {ticket.plan.location_text && (
+            {ticket.plan?.location_text && (
               <Text style={styles.detailLocation}>{ticket.plan.location_text}</Text>
             )}
 
@@ -238,7 +277,7 @@ export default function TicketScreen() {
                   </View>
                   <Text style={styles.infoPillText}>3km</Text>
                 </View>
-                {ticket.plan.location_text && (
+                {ticket.plan?.location_text && (
                   <View style={styles.infoPill}>
                     <View style={styles.infoPillIcon}>
                       <Ionicons name="train" size={12} color="#FFF" />
