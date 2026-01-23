@@ -1,4 +1,5 @@
 import { apiService } from '@/services/api';
+import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -99,12 +100,47 @@ export default function BusinessPlanDetailScreen() {
     return time;
   };
 
-  const handleRegister = () => {
+  const { user } = useAppSelector((state) => state.auth);
+
+  const handleRegister = async () => {
+    if (!user?.user_id || !user?.access_token) {
+      Alert.alert('Login Required', 'Please log in to register for this event');
+      return;
+    }
+
     if (!selectedPass && plan?.passes && plan.passes.length > 0) {
       Alert.alert('Select Ticket', 'Please select a ticket type first');
       return;
     }
-    Alert.alert('Registration', 'Registration functionality will be implemented');
+
+    try {
+      const response = await apiService.registerForEvent(
+        planId,
+        user.user_id,
+        selectedPass || undefined
+      );
+      
+      console.log('Registration response:', response);
+      
+      if (response.success && response.data?.ticket) {
+        // Navigate to ticket display screen with ticket data
+        const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+        router.push({
+          pathname: '/ticket/[ticketId]',
+          params: { 
+            ticketId: response.data.ticket.ticket_id,
+            planId: planId,
+            ticketData: ticketData
+          }
+        } as any);
+      } else {
+        console.error('Registration response missing ticket:', response);
+        Alert.alert('Registration Failed', 'Ticket was not created. Please try again.');
+      }
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+    }
   };
 
   if (loading) {

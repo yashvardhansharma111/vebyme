@@ -1,10 +1,11 @@
 import SwipeableEventCard from '@/components/SwipeableEventCard';
+import BusinessCard from '@/components/BusinessCard';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
@@ -68,6 +69,8 @@ interface FormattedEvent {
 export default function HomeScreen() {
   const [activeFilter, setActiveFilter] = useState('Clubs');
   const [events, setEvents] = useState<FormattedEvent[]>([]);
+  const [businessEvents, setBusinessEvents] = useState<FormattedEvent[]>([]);
+  const [businessPostsData, setBusinessPostsData] = useState<any[]>([]); // Store raw post data for BusinessCard
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -251,12 +254,32 @@ export default function HomeScreen() {
       // For now, we'll just show all posts when these are selected
 
       // Allow guests to view feed (user_id is optional)
-      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 20, offset: 0 });
+      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 30, offset: 0 });
       
       if (response.data && Array.isArray(response.data)) {
         const formatted = await formatFeedData(response.data);
-        setEvents(formatted);
+        
+        // Separate business plans from regular plans
+        const businessPlans = formatted.filter(item => {
+          const post = response.data.find((p: any) => p.post_id === item.id);
+          return post?.type === 'business';
+        });
+        
+        // Store raw business post data for BusinessCard component
+        const rawBusinessPosts = response.data.filter((p: any) => p.type === 'business');
+        setBusinessPostsData(rawBusinessPosts);
+        
+        // Filter out business plans from main feed
+        const regularPlans = formatted.filter(item => {
+          const post = response.data.find((p: any) => p.post_id === item.id);
+          return post?.type !== 'business';
+        });
+        
+        setBusinessEvents(businessPlans);
+        setEvents(regularPlans);
       } else {
+        setBusinessEvents([]);
+        setBusinessPostsData([]);
         setEvents([]);
       }
     } catch (err: any) {
@@ -311,23 +334,34 @@ export default function HomeScreen() {
                   <Text style={styles.locationSubtitle}>Bengaluru</Text>
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (isAuthenticated) {
-                    router.push('/profile');
-                  } else {
-                    setShowLoginModal(true);
-                  }
-                }}
-              >
-                {isAuthenticated ? (
-                  <ProfileAvatar />
-                ) : (
-                  <View style={styles.guestAvatar}>
-                    <Ionicons name="person-outline" size={24} color={Colors.light.text} />
-                  </View>
+              <View style={styles.headerRight}>
+                {/* QR Scanner Icon for Business Owners */}
+                {isAuthenticated && currentUser?.is_business && (
+                  <TouchableOpacity
+                    style={styles.qrScannerButton}
+                    onPress={() => router.push('/qr-scanner')}
+                  >
+                    <Ionicons name="qr-code-outline" size={24} color="#FFF" />
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (isAuthenticated) {
+                      router.push('/profile');
+                    } else {
+                      setShowLoginModal(true);
+                    }
+                  }}
+                >
+                  {isAuthenticated ? (
+                    <ProfileAvatar />
+                  ) : (
+                    <View style={styles.guestAvatar}>
+                      <Ionicons name="person-outline" size={24} color={Colors.light.text} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Filters */}
@@ -349,42 +383,78 @@ export default function HomeScreen() {
               })}
             </ScrollView>
 
-            {/* Summary Card */}
-            <View style={styles.summaryCard}>
-               {/* ... (Same summary card code as before) ... */}
-               <View style={styles.summaryHeader}>
-                <Text style={styles.summaryTitle}>vybeme.weekly</Text>
-                <TouchableOpacity><Ionicons name="close" size={20} color="#888" /></TouchableOpacity>
+            {/* Business Plans Horizontal Section */}
+            {businessEvents.length > 0 && (
+              <View style={styles.businessSection}>
+                <View style={styles.businessSectionHeader}>
+                  <Text style={styles.businessSectionTitle}>Business Plans</Text>
+                  <TouchableOpacity
+                    style={styles.businessSectionArrow}
+                    onPress={() => router.push('/business-posts')}
+                  >
+                    <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.businessScrollContent}
+                >
+                  {businessEvents.map((item, index) => {
+                    const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+                    return (
+                      <BusinessCard
+                        key={item.id}
+                        plan={{
+                          plan_id: item.id,
+                          title: item.event.title,
+                          description: item.event.description,
+                          media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                          category_sub: item.event.tags,
+                          location_text: rawPost?.location_text || '',
+                          date: rawPost?.timestamp || new Date(),
+                          time: rawPost?.time || '',
+                        }}
+                        user={item.user}
+                        attendeesCount={7}
+                        isSwipeable={false}
+                        containerStyle={styles.businessCardContainer}
+                        onPress={() => {
+                          router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
+                        }}
+                        onRegisterPress={async () => {
+                          if (isAuthenticated && user?.user_id) {
+                            try {
+                              const response = await apiService.registerForEvent(item.id, user.user_id);
+                              if (response.success && response.data?.ticket) {
+                                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                                router.push({
+                                  pathname: '/ticket/[ticketId]',
+                                  params: { 
+                                    ticketId: response.data.ticket.ticket_id,
+                                    planId: item.id,
+                                    ticketData: ticketData
+                                  }
+                                } as any);
+                              }
+                            } catch (error: any) {
+                              Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+                            }
+                          } else {
+                            setShowLoginModal(true);
+                          }
+                        }}
+                        onRequireAuth={() => {
+                          if (!isAuthenticated) {
+                            setShowLoginModal(true);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </ScrollView>
               </View>
-              <View style={styles.statsRow}>
-                <View style={styles.statBox}><Text style={styles.statNumber}>67</Text><Text style={styles.statLabel}>#plans</Text></View>
-                <View style={styles.statBox}><Text style={styles.statNumber}>120</Text><Text style={styles.statLabel}>#interactions</Text></View>
-              </View>
-              <Text style={styles.avatarsLabel}>Top 10 Most Interacted Plans</Text>
-              <View style={styles.avatarRow}>
-                {[1, 2, 3, 4, 5].map((_, i) => (
-                  <Image key={i} source={{ uri: `https://i.pravatar.cc/150?u=${i + 10}` }} style={[styles.miniAvatar, { marginLeft: i === 0 ? 0 : -12, zIndex: 10-i }]} />
-                ))}
-              </View>
-              <TouchableOpacity
-                style={styles.createBtn}
-                onPress={() => {
-                  if (isAuthenticated) {
-                    // Business users go to createBusinessPost, regular users go to createPost
-                    if (currentUser?.is_business) {
-                      router.push('/(tabs)/createBusinessPost');
-                    } else {
-                    router.push('/(tabs)/createPost');
-                    }
-                  } else {
-                    setShowLoginModal(true);
-                  }
-                }}
-              >
-                <Ionicons name="add" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                <Text style={styles.createBtnText}>Create your own plan</Text>
-              </TouchableOpacity>
-            </View>
+            )}
 
             {/* Feed */}
             <View style={styles.feed}>
@@ -487,6 +557,15 @@ const styles = StyleSheet.create({
   },
   // ... Header, Filter, and Card Styles remain exactly as previously defined ...
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 24 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  qrScannerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   locationContainer: { flexDirection: 'row', alignItems: 'center' },
   locationIconBg: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 12 },
   locationTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
@@ -499,18 +578,6 @@ const styles = StyleSheet.create({
   activeFilterText: { color: '#FFF', fontWeight: '600' },
   filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   filterText: { color: '#333', fontWeight: '600' },
-  summaryCard: { marginHorizontal: 16, backgroundColor: '#FFF', borderRadius: 32, padding: 24, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 15, elevation: 3 },
-  summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-  summaryTitle: { fontSize: 20, fontWeight: '900', color: '#1C1C1E' },
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  statBox: { flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#EFEFEF', borderRadius: 20, paddingVertical: 16, alignItems: 'center' },
-  statNumber: { fontSize: 28, fontWeight: '800', color: '#1C1C1E' },
-  statLabel: { fontSize: 12, color: '#666', fontWeight: '500' },
-  avatarsLabel: { fontSize: 14, fontWeight: '600', marginBottom: 12, color: '#333' },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24 },
-  miniAvatar: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: '#FFF' },
-  createBtn: { backgroundColor: '#1C1C1E', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 16, borderRadius: 30 },
-  createBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   feed: { paddingBottom: 20 },
   loadingContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: '#666' },
@@ -521,4 +588,36 @@ const styles = StyleSheet.create({
   emptyContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#666', marginBottom: 8 },
   emptySubtext: { fontSize: 14, color: '#999', textAlign: 'center' },
+  businessSection: {
+    marginBottom: 24,
+  },
+  businessSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  businessSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  businessSectionArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  businessScrollContent: {
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  businessCardContainer: {
+    width: 320,
+    marginHorizontal: 0,
+    marginRight: 16,
+  },
 });

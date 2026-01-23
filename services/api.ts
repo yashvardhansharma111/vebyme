@@ -841,6 +841,46 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  // Ticket APIs
+  async registerForEvent(plan_id: string, user_id: string, pass_id?: string, message?: string) {
+    return this.request<any>('/ticket/register', {
+      method: 'POST',
+      body: JSON.stringify({ plan_id, user_id, pass_id, message }),
+    });
+  }
+
+  async getUserTicket(plan_id: string, user_id: string) {
+    return this.request<any>(`/ticket/${plan_id}/${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async getTicketById(ticket_id: string) {
+    return this.request<any>(`/ticket/by-id/${ticket_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async scanQRCode(qr_code_hash: string, scanner_user_id: string) {
+    return this.request<any>('/ticket/scan', {
+      method: 'POST',
+      body: JSON.stringify({ qr_code_hash, scanner_user_id }),
+    });
+  }
+
+  async getAttendeeList(plan_id: string, user_id: string) {
+    return this.request<any>(`/ticket/attendees/${plan_id}?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
+  async manualCheckIn(registration_id: string, user_id: string, action: 'checkin' | 'checkout') {
+    return this.request<any>('/ticket/checkin', {
+      method: 'POST',
+      body: JSON.stringify({ registration_id, user_id, action }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

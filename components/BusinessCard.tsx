@@ -38,6 +38,7 @@ interface BusinessCardProps {
   };
   attendeesCount?: number;
   isSwipeable?: boolean;
+  containerStyle?: any;
   onPress?: () => void;
   onRegisterPress?: () => void;
   onRequireAuth?: () => void;
@@ -48,6 +49,7 @@ function BusinessCardBase({
   plan,
   user,
   attendeesCount = 0,
+  containerStyle,
   onPress,
   onRegisterPress,
   onRequireAuth,
@@ -79,7 +81,7 @@ function BusinessCardBase({
 
   return (
     <TouchableOpacity 
-      style={styles.cardContainer}
+      style={[styles.cardContainer, containerStyle]}
       onPress={onPress}
       activeOpacity={0.95}
     >
@@ -160,6 +162,7 @@ export default function BusinessCard({
   user,
   attendeesCount,
   isSwipeable = true,
+  containerStyle,
   onPress,
   onRegisterPress,
   onRequireAuth,
@@ -234,6 +237,7 @@ export default function BusinessCard({
         plan={plan}
         user={user}
         attendeesCount={attendeesCount}
+        containerStyle={containerStyle}
         onPress={onPress}
         onRegisterPress={onRegisterPress}
         onRequireAuth={onRequireAuth}
@@ -254,6 +258,7 @@ export default function BusinessCard({
         plan={plan}
         user={user}
         attendeesCount={attendeesCount}
+        containerStyle={containerStyle}
         onPress={onPress}
         onRegisterPress={onRegisterPress}
         onRequireAuth={onRequireAuth}
