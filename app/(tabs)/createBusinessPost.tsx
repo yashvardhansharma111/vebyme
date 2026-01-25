@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
   Alert,
@@ -76,6 +77,8 @@ export default function CreateBusinessPostScreen() {
   const [shareToAnnouncementGroup, setShareToAnnouncementGroup] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -90,6 +93,98 @@ export default function CreateBusinessPostScreen() {
       ]);
     }
   }, [isBusinessUser, currentUser, router]);
+
+  // Load plan data from AsyncStorage if available (for duplicate/edit)
+  useEffect(() => {
+    const loadPlanData = async () => {
+      try {
+        const planDataStr = await AsyncStorage.getItem('planForCreation');
+        if (planDataStr) {
+          const planData = JSON.parse(planDataStr);
+          const isEdit = planData.mode === 'edit';
+          
+          setEditMode(isEdit);
+          if (isEdit) {
+            setPlanId(planData.plan_id);
+          }
+
+          // Pre-fill form fields
+          if (planData.title) setTitle(planData.title);
+          if (planData.description) setDescription(planData.description);
+          if (planData.location_text) setLocation(planData.location_text);
+          if (planData.category_main) setSelectedCategory(planData.category_main);
+          if (planData.is_women_only) setWomenOnly(planData.is_women_only);
+          if (planData.venue_required) setVenueRequired(planData.venue_required);
+          if (planData.allow_view_guest_list) setAllowViewGuestList(planData.allow_view_guest_list);
+          if (planData.reshare_to_announcement_group) setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
+          
+          // Handle date
+          if (planData.date) {
+            setSelectedDate(new Date(planData.date));
+          }
+          
+          // Handle time
+          if (planData.time) {
+            setTimeEnabled(true);
+            // Parse time string (e.g., "2:30 PM")
+            const timeMatch = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+            if (timeMatch) {
+              let hours = parseInt(timeMatch[1]);
+              const minutes = parseInt(timeMatch[2]);
+              const ampm = timeMatch[3].toUpperCase();
+              if (ampm === 'PM' && hours !== 12) hours += 12;
+              if (ampm === 'AM' && hours === 12) hours = 0;
+              const timeDate = new Date();
+              timeDate.setHours(hours, minutes, 0, 0);
+              setStartTime(timeDate);
+            }
+          }
+
+          // Handle passes/tickets
+          if (planData.passes && planData.passes.length > 0) {
+            setTicketsEnabled(true);
+            setPasses(planData.passes);
+          }
+
+          // Handle additional details
+          if (planData.add_details && planData.add_details.length > 0) {
+            const settings: string[] = [];
+            const details: { [key: string]: { title: string; description: string } } = {};
+            planData.add_details.forEach((detail: any) => {
+              settings.push(detail.detail_type);
+              details[detail.detail_type] = {
+                title: detail.title,
+                description: detail.description || '',
+              };
+            });
+            setSelectedAdditionalSettings(settings);
+            setAdditionalDetails(details);
+          }
+
+          // Handle event production
+          if (planData.event_production && planData.event_production.length > 0) {
+            setEventProduction(planData.event_production);
+          }
+
+          // Handle media
+          if (planData.media && planData.media.length > 0) {
+            const mediaItems = planData.media.map((item: any) => ({
+              uri: item.url,
+              type: item.type === 'video' ? ('video' as const) : ('image' as const),
+            }));
+            setMedia(mediaItems);
+          }
+
+          // Clear AsyncStorage after loading
+          await AsyncStorage.removeItem('planForCreation');
+        }
+      } catch (error) {
+        console.error('Error loading plan data:', error);
+      }
+    };
+
+    loadPlanData();
+  }, []);
 
   const handleAddMedia = async () => {
     try {
@@ -310,8 +405,12 @@ export default function CreateBusinessPostScreen() {
         description: description.trim(),
         category_main: selectedCategory.toLowerCase(),
         category_sub: selectedCategory ? [selectedCategory] : [],
-        post_status: 'published',
       };
+
+      // Only set post_status when creating, not when editing
+      if (!editMode) {
+        planData.post_status = 'published';
+      }
 
       // Optional fields - only include if they have values
       if (uploadedMedia.length > 0) {
@@ -356,11 +455,30 @@ export default function CreateBusinessPostScreen() {
         planData.reshare_to_announcement_group = true;
       }
 
-      const response = await apiService.createBusinessPlan(user.access_token, planData);
-      if (response.success) {
-        Alert.alert('Success', 'Business plan created successfully!', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+      let response;
+      if (editMode && planId) {
+        // Update existing business plan
+        response = await apiService.updateBusinessPlan(user.access_token, planId, planData);
+        if (response.success) {
+          Alert.alert('Success', 'Business plan updated successfully!', [
+            { 
+              text: 'OK', 
+              onPress: () => {
+                setEditMode(false);
+                setPlanId(null);
+                router.back();
+              },
+            },
+          ]);
+        }
+      } else {
+        // Create new business plan
+        response = await apiService.createBusinessPlan(user.access_token, planData);
+        if (response.success) {
+          Alert.alert('Success', 'Business plan created successfully!', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+        }
       }
     } catch (error: any) {
       // Provide more detailed error messages
@@ -814,7 +932,7 @@ export default function CreateBusinessPostScreen() {
               {isSubmitting ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.postButtonText}>Post</Text>
+                <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
               )}
             </TouchableOpacity>
           </View>

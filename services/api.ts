@@ -595,6 +595,55 @@ class ApiService {
     });
   }
 
+  async updatePost(accessToken: string, post_id: string, postData: FormData | any) {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+    };
+
+    // If FormData, don't set Content-Type (browser will set it with boundary)
+    if (!(postData instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const response = await fetch(`${this.baseUrl}/post/update/${post_id}`, {
+      method: 'PUT',
+      headers,
+      body: postData instanceof FormData ? postData : JSON.stringify(postData),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const error = new Error(data.message || 'Failed to update post');
+      (error as any).statusCode = response.status;
+      throw error;
+    }
+    return data;
+  }
+
+  async updateBusinessPlan(accessToken: string, post_id: string, planData: any) {
+    return this.request<any>(`/business-post/update/${post_id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(planData),
+    });
+  }
+
+  async cancelPlan(accessToken: string, plan_id: string, planType: 'regular' | 'business') {
+    const endpoint = planType === 'business' 
+      ? `/business-post/update/${plan_id}`
+      : `/post/update/${plan_id}`;
+    
+    return this.request<any>(endpoint, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ post_status: 'deleted' }),
+    });
+  }
+
   async getBusinessPlans(filters?: { category_main?: string; user_id?: string }, pagination?: { limit?: number; offset?: number }) {
     const queryParams = new URLSearchParams();
     if (filters?.category_main) queryParams.append('category_main', filters.category_main);

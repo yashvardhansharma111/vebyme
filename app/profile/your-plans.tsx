@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme'; // Assuming Colors has basic definitions
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Plan {
   plan_id: string;
@@ -20,10 +22,27 @@ interface Plan {
   description: string;
   media?: Array<{ url: string; type: string }>;
   category_sub?: string[];
+  category_main?: string;
   temporal_tags?: string[]; // Added to support tags like 'Weekend'
   location_text?: string;
   created_at: string;
   is_repost?: boolean;
+  type?: 'regular' | 'business';
+  post_status?: string;
+  external_link?: string;
+  is_women_only?: boolean;
+  post_type?: 'individual' | 'group';
+  num_people?: number;
+  date?: string;
+  time?: string;
+  // Business plan specific fields
+  passes?: Array<{ pass_id: string; name: string; price: number; description: string; capacity?: number }>;
+  is_paid_plan?: boolean;
+  add_details?: Array<{ detail_type: string; title: string; description: string }>;
+  event_production?: string[];
+  venue_required?: boolean;
+  allow_view_guest_list?: boolean;
+  reshare_to_announcement_group?: boolean;
 }
 
 const TAG_ICONS: { [key: string]: string } = {
@@ -40,6 +59,7 @@ export default function YourPlansScreen() {
   const { user } = useAppSelector((state) => state.auth);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingPlanId, setCancellingPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPlans();
@@ -58,6 +78,88 @@ export default function YourPlansScreen() {
       console.error('Error loading plans:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDuplicatePlan = async (plan: Plan) => {
+    try {
+      // Store plan data in AsyncStorage for the creation page to read
+      const planData = {
+        ...plan,
+        mode: 'duplicate',
+      };
+      await AsyncStorage.setItem('planForCreation', JSON.stringify(planData));
+      
+      // Navigate to appropriate creation page
+      if (plan.type === 'business') {
+        router.push('/(tabs)/createBusinessPost');
+      } else {
+        router.push('/(tabs)/createPost');
+      }
+    } catch (error) {
+      console.error('Error duplicating plan:', error);
+      Alert.alert('Error', 'Failed to duplicate plan');
+    }
+  };
+
+  const handleCancelPlan = async (plan: Plan) => {
+    if (!user?.access_token) {
+      Alert.alert('Error', 'Please log in to cancel plans');
+      return;
+    }
+
+    Alert.alert(
+      'Cancel Plan',
+      'Are you sure you want to cancel this plan? It will no longer be visible to other users.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setCancellingPlanId(plan.plan_id);
+              const planType = plan.type || 'regular';
+              await apiService.cancelPlan(user.access_token, plan.plan_id, planType as 'regular' | 'business');
+              
+              // Update local state
+              setPlans(plans.map(p => 
+                p.plan_id === plan.plan_id 
+                  ? { ...p, post_status: 'deleted' }
+                  : p
+              ));
+              
+              Alert.alert('Success', 'Plan cancelled successfully');
+            } catch (error: any) {
+              console.error('Error cancelling plan:', error);
+              Alert.alert('Error', error.message || 'Failed to cancel plan');
+            } finally {
+              setCancellingPlanId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditPlan = async (plan: Plan) => {
+    try {
+      // Store plan data in AsyncStorage for the creation page to read
+      const planData = {
+        ...plan,
+        mode: 'edit',
+      };
+      await AsyncStorage.setItem('planForCreation', JSON.stringify(planData));
+      
+      // Navigate to appropriate creation page
+      if (plan.type === 'business') {
+        router.push('/(tabs)/createBusinessPost');
+      } else {
+        router.push('/(tabs)/createPost');
+      }
+    } catch (error) {
+      console.error('Error editing plan:', error);
+      Alert.alert('Error', 'Failed to edit plan');
     }
   };
 
@@ -92,20 +194,30 @@ export default function YourPlansScreen() {
             <Text style={styles.emptySubtext}>Create your first plan to get started!</Text>
           </View>
         ) : (
-          plans.map((plan) => {
+          plans.map((plan, index) => {
             // Combine tags for display (Sub-categories + Temporal tags)
             const displayTags = [
               ...(plan.temporal_tags || []),
               ...(plan.category_sub || [])
             ].slice(0, 3); // Limit to 3 tags
 
+            const isCancelled = plan.post_status === 'deleted';
+            const isCancelling = cancellingPlanId === plan.plan_id;
+
             return (
-              <View key={plan.plan_id} style={styles.planCard}>
+              <View key={plan.plan_id || `plan-${index}`} style={styles.planCard}>
                 
                 {/* Repost Badge */}
                 {plan.is_repost && (
                   <View style={styles.repostBadge}>
                     <Text style={styles.repostText}>You Reposted</Text>
+                  </View>
+                )}
+
+                {/* Cancelled Badge */}
+                {isCancelled && (
+                  <View style={styles.cancelledBadge}>
+                    <Text style={styles.cancelledText}>Cancelled</Text>
                   </View>
                 )}
 
@@ -121,8 +233,8 @@ export default function YourPlansScreen() {
                     {/* Tags Row */}
                     {displayTags.length > 0 && (
                       <View style={styles.tagsRow}>
-                        {displayTags.map((tag, index) => (
-                          <View key={`${plan.plan_id}-tag-${tag}-${index}`} style={styles.tag}>
+                        {displayTags.map((tag, tagIndex) => (
+                          <View key={`${plan.plan_id}-tag-${tag}-${tagIndex}`} style={styles.tag}>
                             <Ionicons 
                               name={(TAG_ICONS[tag] || 'ellipse') as any} 
                               size={12} 
@@ -145,6 +257,42 @@ export default function YourPlansScreen() {
                     />
                   )}
                 </View>
+
+                {/* Action Buttons */}
+                {!isCancelled && (
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.duplicateButton]}
+                      onPress={() => handleDuplicatePlan(plan)}
+                    >
+                      <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
+                      <Text style={styles.actionButtonText}>Duplicate</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.editButton]}
+                      onPress={() => handleEditPlan(plan)}
+                    >
+                      <Ionicons name="create-outline" size={16} color="#1C1C1E" />
+                      <Text style={styles.actionButtonText}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.cancelButton]}
+                      onPress={() => handleCancelPlan(plan)}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? (
+                        <ActivityIndicator size="small" color="#FF3B30" />
+                      ) : (
+                        <>
+                          <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
+                          <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           })
@@ -292,5 +440,57 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 16,
+  },
+
+  // Cancelled Badge
+  cancelledBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  cancelledText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+
+  // Action Buttons
+  actionButtons: {
+    flexDirection: 'row',
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F5',
+    gap: 8,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  duplicateButton: {
+    backgroundColor: '#F2F2F7',
+  },
+  editButton: {
+    backgroundColor: '#F2F2F7',
+  },
+  cancelButton: {
+    backgroundColor: '#FFF5F5',
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  cancelButtonText: {
+    color: '#FF3B30',
   },
 });

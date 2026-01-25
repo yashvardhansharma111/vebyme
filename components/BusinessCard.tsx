@@ -5,6 +5,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
+import RepostModal from './RepostModal';
 
 interface BusinessCardProps {
   plan: {
@@ -53,7 +54,8 @@ function BusinessCardBase({
   onPress,
   onRegisterPress,
   onRequireAuth,
-}: Omit<BusinessCardProps, 'isSwipeable'>) {
+  onRepostPress,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
@@ -140,7 +142,7 @@ function BusinessCardBase({
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.iconButton}
-            onPress={handleShare}
+            onPress={onRepostPress}
           >
             <Ionicons name="repeat-outline" size={20} color="#000" />
           </TouchableOpacity>
@@ -169,6 +171,7 @@ export default function BusinessCard({
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
+  const [showRepostModal, setShowRepostModal] = useState(false);
   const swipeableRef = useRef<Swipeable>(null);
 
   const handleSave = async () => {
@@ -230,40 +233,80 @@ export default function BusinessCard({
     }
   };
 
+  const handleRepost = () => {
+    if (!isAuthenticated) {
+      onRequireAuth?.();
+      return;
+    }
+    setShowRepostModal(true);
+  };
+
+  const organizerName = user?.name || plan.user?.name || 'Organizer';
+
   // If not swipeable, render base card directly
   if (!isSwipeable) {
     return (
-      <BusinessCardBase
-        plan={plan}
-        user={user}
-        attendeesCount={attendeesCount}
-        containerStyle={containerStyle}
-        onPress={onPress}
-        onRegisterPress={onRegisterPress}
-        onRequireAuth={onRequireAuth}
-      />
+      <>
+        <BusinessCardBase
+          plan={plan}
+          user={user}
+          attendeesCount={attendeesCount}
+          containerStyle={containerStyle}
+          onPress={onPress}
+          onRegisterPress={onRegisterPress}
+          onRequireAuth={onRequireAuth}
+          onRepostPress={handleRepost}
+        />
+        <RepostModal
+          visible={showRepostModal}
+          onClose={() => setShowRepostModal(false)}
+          postId={plan.plan_id}
+          originalPostTitle={plan.title}
+          originalPostDescription={plan.description}
+          originalAuthorName={organizerName}
+          onSuccess={() => {
+            setShowRepostModal(false);
+            // Optionally refresh or update UI
+          }}
+        />
+      </>
     );
   }
 
   // If swipeable, wrap in Swipeable component
   return (
-    <Swipeable
-      ref={swipeableRef}
-      renderLeftActions={renderLeftActions}
-      containerStyle={styles.swipeContainer}
-      onSwipeableWillOpen={handleSwipeableWillOpen}
-      onSwipeableOpen={handleSwipeableOpen}
-    >
-      <BusinessCardBase
-        plan={plan}
-        user={user}
-        attendeesCount={attendeesCount}
-        containerStyle={containerStyle}
-        onPress={onPress}
-        onRegisterPress={onRegisterPress}
-        onRequireAuth={onRequireAuth}
+    <>
+      <Swipeable
+        ref={swipeableRef}
+        renderLeftActions={renderLeftActions}
+        containerStyle={styles.swipeContainer}
+        onSwipeableWillOpen={handleSwipeableWillOpen}
+        onSwipeableOpen={handleSwipeableOpen}
+      >
+        <BusinessCardBase
+          plan={plan}
+          user={user}
+          attendeesCount={attendeesCount}
+          containerStyle={containerStyle}
+          onPress={onPress}
+          onRegisterPress={onRegisterPress}
+          onRequireAuth={onRequireAuth}
+          onRepostPress={handleRepost}
+        />
+      </Swipeable>
+      <RepostModal
+        visible={showRepostModal}
+        onClose={() => setShowRepostModal(false)}
+        postId={plan.plan_id}
+        originalPostTitle={plan.title}
+        originalPostDescription={plan.description}
+        originalAuthorName={organizerName}
+        onSuccess={() => {
+          setShowRepostModal(false);
+          // Optionally refresh or update UI
+        }}
       />
-    </Swipeable>
+    </>
   );
 }
 

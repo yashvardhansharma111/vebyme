@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Tag options based on the screenshot
 const DAY_TAGS = ['Today', 'Tomorrow', 'Weekend'];
@@ -53,6 +54,8 @@ export default function CreatePostScreen() {
   const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [planId, setPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -66,6 +69,60 @@ export default function CreatePostScreen() {
       router.replace('/(tabs)/createBusinessPost');
     }
   }, [currentUser, router]);
+
+  // Load plan data from AsyncStorage if available (for duplicate/edit)
+  useEffect(() => {
+    const loadPlanData = async () => {
+      try {
+        const planDataStr = await AsyncStorage.getItem('planForCreation');
+        if (planDataStr) {
+          const planData = JSON.parse(planDataStr);
+          const isEdit = planData.mode === 'edit';
+          
+          setEditMode(isEdit);
+          if (isEdit) {
+            setPlanId(planData.plan_id);
+          }
+
+          // Pre-fill form fields
+          if (planData.title) setTitle(planData.title);
+          if (planData.description) setDescription(planData.description);
+          if (planData.external_link) setExternalLink(planData.external_link);
+          if (planData.is_women_only) setIsWomenOnly(planData.is_women_only);
+          if (planData.post_type) setPostType(planData.post_type);
+          if (planData.num_people) setNumPeople(planData.num_people.toString());
+          if (planData.category_main) setSelectedCategory(planData.category_main);
+          if (planData.category_sub && planData.category_sub.length > 0) {
+            setSelectedSubCategory(planData.category_sub[0]);
+          }
+          
+          // Handle temporal tags
+          if (planData.temporal_tags && planData.temporal_tags.length > 0) {
+            planData.temporal_tags.forEach((tag: string) => {
+              if (DAY_TAGS.includes(tag)) setSelectedDay(tag);
+              if (TIME_TAGS.includes(tag)) setSelectedTime(tag);
+            });
+          }
+
+          // Handle media
+          if (planData.media && planData.media.length > 0) {
+            const mediaItems = planData.media.map((item: any) => ({
+              uri: item.url,
+              type: item.type === 'video' ? ('video' as const) : ('image' as const),
+            }));
+            setMedia(mediaItems);
+          }
+
+          // Clear AsyncStorage after loading
+          await AsyncStorage.removeItem('planForCreation');
+        }
+      } catch (error) {
+        console.error('Error loading plan data:', error);
+      }
+    };
+
+    loadPlanData();
+  }, []);
 
   const handleAddMedia = async () => {
     try {
@@ -199,35 +256,67 @@ export default function CreatePostScreen() {
         } as any);
       });
 
-      const response = await apiService.createPost(user.access_token, formData);
-
-      if (response.success) {
-        Alert.alert('Success', 'Post created successfully!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setDescription('');
-              setTitle('');
-              setExternalLink('');
-              setIsWomenOnly(false);
-              setPostType('individual');
-              setNumPeople('');
-              setSelectedDay('');
-              setSelectedTime('');
-              setSelectedCategory('');
-              setSelectedSubCategory('');
-              setMedia([]);
-              setShowPreview(false);
-              // Navigate back or to home
-              router.back();
+      let response;
+      if (editMode && planId) {
+        // Update existing post
+        response = await apiService.updatePost(user.access_token, planId, formData);
+        if (response.success) {
+          Alert.alert('Success', 'Post updated successfully!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset form
+                setDescription('');
+                setTitle('');
+                setExternalLink('');
+                setIsWomenOnly(false);
+                setPostType('individual');
+                setNumPeople('');
+                setSelectedDay('');
+                setSelectedTime('');
+                setSelectedCategory('');
+                setSelectedSubCategory('');
+                setMedia([]);
+                setShowPreview(false);
+                setEditMode(false);
+                setPlanId(null);
+                // Navigate back
+                router.back();
+              },
             },
-          },
-        ]);
+          ]);
+        }
+      } else {
+        // Create new post
+        response = await apiService.createPost(user.access_token, formData);
+        if (response.success) {
+          Alert.alert('Success', 'Post created successfully!', [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset form
+                setDescription('');
+                setTitle('');
+                setExternalLink('');
+                setIsWomenOnly(false);
+                setPostType('individual');
+                setNumPeople('');
+                setSelectedDay('');
+                setSelectedTime('');
+                setSelectedCategory('');
+                setSelectedSubCategory('');
+                setMedia([]);
+                setShowPreview(false);
+                // Navigate back or to home
+                router.back();
+              },
+            },
+          ]);
+        }
       }
     } catch (error: any) {
-      console.error('Error creating post:', error);
-      Alert.alert('Error', error.message || 'Failed to create post');
+      console.error('Error creating/updating post:', error);
+      Alert.alert('Error', error.message || `Failed to ${editMode ? 'update' : 'create'} post`);
     } finally {
       setIsSubmitting(false);
     }
@@ -272,7 +361,7 @@ export default function CreatePostScreen() {
               {isSubmitting ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <Text style={styles.postButtonText}>Post</Text>
+                <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -287,13 +376,13 @@ export default function CreatePostScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>New Post</Text>
-          <View style={{ width: 24 }} />
-        </View>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+              <Ionicons name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{editMode ? 'Edit Post' : 'New Post'}</Text>
+            <View style={{ width: 24 }} />
+          </View>
 
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -570,17 +659,17 @@ export default function CreatePostScreen() {
           >
             <Text style={styles.previewButtonText}>Preview</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.postButton]}
-            onPress={handlePost}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <Text style={styles.postButtonText}>Post</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.postButton]}
+              onPress={handlePost}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
+              )}
+            </TouchableOpacity>
         </View>
       </SafeAreaView>
     </KeyboardAvoidingView>
