@@ -579,7 +579,37 @@ class ApiService {
   }
 
   // Business Plan APIs
-  async createBusinessPlan(accessToken: string, planData: any) {
+  async createBusinessPlan(accessToken: string, planData: any, formData?: FormData) {
+    // If FormData is provided, use it (for file uploads)
+    if (formData) {
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${accessToken}`,
+      };
+      // Don't set Content-Type - let browser set it with boundary for FormData
+      
+      const url = `${this.baseUrl}/business-post/create`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to create business plan';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      return await response.json();
+    }
+    
+    // Otherwise use JSON
     return this.request<any>('/plan/business', {
       method: 'POST',
       headers: {
@@ -620,7 +650,37 @@ class ApiService {
     return data;
   }
 
-  async updateBusinessPlan(accessToken: string, post_id: string, planData: any) {
+  async updateBusinessPlan(accessToken: string, post_id: string, planData: any, formData?: FormData) {
+    // If FormData is provided, use it (for file uploads)
+    if (formData) {
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${accessToken}`,
+      };
+      // Don't set Content-Type - let browser set it with boundary for FormData
+      
+      const url = `${this.baseUrl}/business-post/update/${post_id}`;
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = 'Failed to update business plan';
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      return await response.json();
+    }
+    
+    // Otherwise use JSON
     return this.request<any>(`/business-post/update/${post_id}`, {
       method: 'PUT',
       headers: {

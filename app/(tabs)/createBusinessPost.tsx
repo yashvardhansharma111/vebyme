@@ -57,6 +57,7 @@ export default function CreateBusinessPostScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
+  const [ticketImage, setTicketImage] = useState<{ uri: string; type: 'image' } | null>(null);
   const [location, setLocation] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -174,6 +175,14 @@ export default function CreateBusinessPostScreen() {
             }));
             setMedia(mediaItems);
           }
+          
+          // Load ticket image if available
+          if (planData.ticket_image) {
+            setTicketImage({
+              uri: planData.ticket_image,
+              type: 'image' as const,
+            });
+          }
 
           // Clear AsyncStorage after loading
           await AsyncStorage.removeItem('planForCreation');
@@ -214,6 +223,36 @@ export default function CreateBusinessPostScreen() {
 
   const removeMedia = () => {
     setMedia([]);
+  };
+
+  const handleAddTicketImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll permissions');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setTicketImage({
+          uri: result.assets[0].uri,
+          type: 'image' as const,
+        });
+      }
+    } catch (error) {
+      console.error('Error picking ticket image:', error);
+      Alert.alert('Error', 'Failed to pick ticket image');
+    }
+  };
+
+  const removeTicketImage = () => {
+    setTicketImage(null);
   };
 
   const addPass = () => {
@@ -365,26 +404,30 @@ export default function CreateBusinessPostScreen() {
 
     setIsSubmitting(true);
     try {
-      // Upload media first if exists
-      let uploadedMedia: Array<{ url: string; type: string }> = [];
+      // Create FormData for file uploads
+      const formData = new FormData();
+      let hasFiles = false;
+      
+      // Add post media files if exists
       if (media.length > 0) {
-        try {
-          const formData = new FormData();
-          formData.append('file', {
-            uri: media[0].uri,
-            type: 'image/jpeg',
-            name: 'image.jpg',
+        media.forEach((item, index) => {
+          formData.append('files', {
+            uri: Platform.OS === 'ios' ? item.uri.replace('file://', '') : item.uri,
+            type: item.type === 'video' ? 'video/mp4' : 'image/jpeg',
+            name: `media-${index}.${item.type === 'video' ? 'mp4' : 'jpg'}`,
           } as any);
-          const uploadResponse = await apiService.uploadImage(formData, user.access_token);
-          if (uploadResponse.data?.url) {
-            uploadedMedia = [{ url: uploadResponse.data.url, type: 'image' }];
-          }
-        } catch (uploadError: any) {
-          // If upload fails (e.g., Cloudinary not configured), continue without media
-          console.warn('Media upload failed, continuing without image:', uploadError.message);
-          // Optionally, you could use the local URI as a fallback
-          // uploadedMedia = [{ url: media[0].uri, type: 'image' }];
-        }
+          hasFiles = true;
+        });
+      }
+
+      // Add ticket image if exists
+      if (ticketImage) {
+        formData.append('ticket_image', {
+          uri: Platform.OS === 'ios' ? ticketImage.uri.replace('file://', '') : ticketImage.uri,
+          type: 'image/jpeg',
+          name: 'ticket-image.jpg',
+        } as any);
+        hasFiles = true;
       }
 
       // Prepare add_details from additional settings
@@ -413,9 +456,6 @@ export default function CreateBusinessPostScreen() {
       }
 
       // Optional fields - only include if they have values
-      if (uploadedMedia.length > 0) {
-        planData.media = uploadedMedia;
-      }
       if (location.trim()) {
         planData.location_text = location.trim();
       }
@@ -455,10 +495,31 @@ export default function CreateBusinessPostScreen() {
         planData.reshare_to_announcement_group = true;
       }
 
+      // If we have files, append all plan data to FormData
+      if (hasFiles) {
+        Object.keys(planData).forEach(key => {
+          const value = planData[key];
+          if (value !== undefined && value !== null) {
+            if (typeof value === 'object' && !Array.isArray(value)) {
+              formData.append(key, JSON.stringify(value));
+            } else if (Array.isArray(value)) {
+              formData.append(key, JSON.stringify(value));
+            } else {
+              formData.append(key, String(value));
+            }
+          }
+        });
+      }
+
       let response;
       if (editMode && planId) {
         // Update existing business plan
-        response = await apiService.updateBusinessPlan(user.access_token, planId, planData);
+        response = await apiService.updateBusinessPlan(
+          user.access_token, 
+          planId, 
+          hasFiles ? {} : planData,
+          hasFiles ? formData : undefined
+        );
         if (response.success) {
           Alert.alert('Success', 'Business plan updated successfully!', [
             { 
@@ -473,7 +534,11 @@ export default function CreateBusinessPostScreen() {
         }
       } else {
         // Create new business plan
-        response = await apiService.createBusinessPlan(user.access_token, planData);
+        response = await apiService.createBusinessPlan(
+          user.access_token, 
+          hasFiles ? {} : planData,
+          hasFiles ? formData : undefined
+        );
         if (response.success) {
           Alert.alert('Success', 'Business plan created successfully!', [
             { text: 'OK', onPress: () => router.back() },
@@ -761,35 +826,36 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           {ticketsEnabled && (
-            <View style={styles.passesSection}>
-              {passes.map((pass, index) => (
-                <View key={pass.pass_id} style={styles.passCard}>
-                  <View style={styles.passHeader}>
-                    <Text style={styles.passTitle}>Pass {index + 1}</Text>
-                    <TouchableOpacity onPress={() => removePass(index)}>
-                      <Ionicons name="close" size={20} color="#666" />
-                    </TouchableOpacity>
-                  </View>
-                  <TextInput
-                    style={styles.passInput}
-                    placeholder="Ticket Name"
-                    value={pass.name}
-                    onChangeText={(text) => updatePass(index, 'name', text)}
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    style={styles.passInput}
-                    placeholder="Ticket Fee"
-                    value={pass.price > 0 ? pass.price.toString() : ''}
-                    onChangeText={(text) => updatePass(index, 'price', parseFloat(text) || 0)}
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    style={[styles.passInput, styles.passDescription]}
-                    placeholder="Description (Optional)"
-                    value={pass.description}
-                    onChangeText={(text) => updatePass(index, 'description', text)}
+            <>
+              <View style={styles.passesSection}>
+                {passes.map((pass, index) => (
+                  <View key={pass.pass_id} style={styles.passCard}>
+                    <View style={styles.passHeader}>
+                      <Text style={styles.passTitle}>Pass {index + 1}</Text>
+                      <TouchableOpacity onPress={() => removePass(index)}>
+                        <Ionicons name="close" size={20} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={styles.passInput}
+                      placeholder="Ticket Name"
+                      value={pass.name}
+                      onChangeText={(text) => updatePass(index, 'name', text)}
+                      placeholderTextColor="#999"
+                    />
+                    <TextInput
+                      style={styles.passInput}
+                      placeholder="Ticket Fee"
+                      value={pass.price > 0 ? pass.price.toString() : ''}
+                      onChangeText={(text) => updatePass(index, 'price', parseFloat(text) || 0)}
+                      keyboardType="numeric"
+                      placeholderTextColor="#999"
+                    />
+                    <TextInput
+                      style={[styles.passInput, styles.passDescription]}
+                      placeholder="Description (Optional)"
+                      value={pass.description}
+                      onChangeText={(text) => updatePass(index, 'description', text)}
                     multiline
                     numberOfLines={3}
                     placeholderTextColor="#999"
@@ -800,6 +866,31 @@ export default function CreateBusinessPostScreen() {
                 <Text style={styles.addPassText}>+ Add Type</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Ticket Image Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>TICKET IMAGE</Text>
+              <Text style={styles.sectionDescription}>
+                Add an image that will appear on the ticket (different from post image)
+              </Text>
+              {ticketImage ? (
+                <View style={styles.mediaPreview}>
+                  <Image source={{ uri: ticketImage.uri }} style={styles.mediaImage} />
+                  <TouchableOpacity
+                    style={styles.removeMediaButton}
+                    onPress={removeTicketImage}
+                  >
+                    <Ionicons name="close" size={20} color="#FFF" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addMediaButton} onPress={handleAddTicketImage}>
+                  <Ionicons name="image-outline" size={24} color="#666" />
+                  <Text style={styles.addMediaText}>+ Add Ticket Image</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
           )}
 
           {/* Share to Announcement Group */}
@@ -1077,8 +1168,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#666',
-    marginBottom: 12,
+    marginBottom: 8,
     textTransform: 'uppercase',
+  },
+  sectionDescription: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 12,
   },
   categoryContainer: {
     flexDirection: 'row',

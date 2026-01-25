@@ -33,6 +33,7 @@ interface TicketData {
     date?: string;
     time?: string;
     media?: Array<{ url: string; type: string }>;
+    ticket_image?: string;
   };
   user: {
     user_id: string;
@@ -188,9 +189,12 @@ export default function TicketScreen() {
     );
   }
 
-  const mainImage = ticket.plan?.media && ticket.plan.media.length > 0 
-    ? ticket.plan.media[0].url 
-    : 'https://picsum.photos/id/1011/400/500';
+  // Use ticket_image if available, otherwise fallback to plan media or placeholder
+  const mainImage = ticket.plan?.ticket_image 
+    ? ticket.plan.ticket_image
+    : (ticket.plan?.media && ticket.plan.media.length > 0 
+      ? ticket.plan.media[0].url 
+      : 'https://picsum.photos/id/1011/400/500');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -216,42 +220,28 @@ export default function TicketScreen() {
 
         {/* Ticket Card */}
         <View style={styles.ticketCard}>
-          {/* Action Buttons (Top Right) */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleAddToWallet}>
-              <Ionicons name="add-outline" size={20} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-              <Ionicons name="share-outline" size={20} color="#000" />
-            </TouchableOpacity>
-          </View>
+          {/* Event Image */}
+          {mainImage && (
+            <View style={styles.eventImageContainer}>
+              <Image 
+                source={{ uri: mainImage }} 
+                style={styles.eventImage}
+                resizeMode="cover"
+              />
+              {/* Action Buttons (Overlay on Image) */}
+              <View style={styles.actionButtons}>
+                <TouchableOpacity style={styles.actionButton} onPress={handleAddToWallet}>
+                  <Ionicons name="download-outline" size={20} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+                  <Ionicons name="share-outline" size={20} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Event Title */}
           <Text style={styles.eventTitle}>{ticket.plan?.title || 'Event'}</Text>
-
-          {/* QR Code Section */}
-          <View style={styles.qrCodeSection}>
-            <View style={styles.qrCodeContainer}>
-              {/* QR Code - Install react-native-qrcode-svg: npm install react-native-qrcode-svg react-native-svg */}
-              {/* For now, showing QR code data */}
-              <View style={styles.qrCodePlaceholder}>
-                <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
-                <Text style={styles.qrCodeData} numberOfLines={3}>
-                  {ticket.qr_code ? ticket.qr_code.substring(0, 50) + '...' : 'QR Code'}
-                </Text>
-              </View>
-              {/* Uncomment when QR library is installed:
-              <QRCode
-                value={ticket.qr_code}
-                size={200}
-                color="#1C1C1E"
-                backgroundColor="#FFF"
-              />
-              */}
-            </View>
-            <Text style={styles.ticketType}>Early Bird Pass</Text>
-            <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>
-          </View>
 
           {/* Event Details Section (Gradient Bottom) */}
           <LinearGradient
@@ -302,6 +292,50 @@ export default function TicketScreen() {
               </View>
             </View>
           </LinearGradient>
+
+          {/* QR Code Section */}
+          <View style={styles.qrCodeSection}>
+            <View style={styles.qrCodeContainer}>
+              {/* QR Code - Install react-native-qrcode-svg: npm install react-native-qrcode-svg react-native-svg */}
+              {/* For now, showing QR code data */}
+              <View style={styles.qrCodePlaceholder}>
+                <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
+                <Text style={styles.qrCodeData} numberOfLines={3}>
+                  {ticket.qr_code ? ticket.qr_code.substring(0, 50) + '...' : 'QR Code'}
+                </Text>
+              </View>
+              {/* Uncomment when QR library is installed:
+              <QRCode
+                value={ticket.qr_code}
+                size={200}
+                color="#1C1C1E"
+                backgroundColor="#FFF"
+              />
+              */}
+            </View>
+            <Text style={styles.ticketType}>Early Bird Pass</Text>
+            <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>
+          </View>
+        </View>
+
+        {/* Action Buttons at Bottom */}
+        <View style={styles.bottomActions}>
+          <TouchableOpacity style={styles.bottomActionButton} onPress={() => router.push(`/feed/post/${ticket.plan?.plan_id}`)}>
+            <Ionicons name="arrow-back" size={20} color="#1C1C1E" />
+            <Text style={styles.bottomActionText}>View event</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.bottomActionButton, styles.bottomActionButtonPrimary]} 
+            onPress={() => {
+              if (ticket.plan?.plan_id) {
+                // Navigate to event chat group
+                router.push(`/chat/group/${ticket.plan.plan_id}`);
+              }
+            }}
+          >
+            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+            <Text style={[styles.bottomActionText, styles.bottomActionTextPrimary]}>Go to event chat</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -363,24 +397,35 @@ const styles = StyleSheet.create({
   ticketCard: {
     backgroundColor: '#FFF',
     borderRadius: 24,
-    padding: 20,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
   },
+  eventImageContainer: {
+    width: '100%',
+    height: 250,
+    position: 'relative',
+    marginBottom: 0,
+  },
+  eventImage: {
+    width: '100%',
+    height: '100%',
+  },
   actionButtons: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     gap: 8,
-    marginBottom: 20,
   },
   actionButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -389,12 +434,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#1C1C1E',
     textAlign: 'center',
+    marginTop: 20,
     marginBottom: 30,
+    paddingHorizontal: 20,
     textTransform: 'uppercase',
   },
   qrCodeSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    padding: 20,
+    paddingTop: 30,
   },
   qrCodeContainer: {
     backgroundColor: '#FFF',
@@ -497,5 +545,35 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '600',
     fontSize: 14,
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  bottomActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  bottomActionButtonPrimary: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  bottomActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  bottomActionTextPrimary: {
+    color: '#FFF',
   },
 });
