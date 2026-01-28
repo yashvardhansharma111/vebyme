@@ -6,13 +6,14 @@ import Avatar from './Avatar';
 interface NotificationListItemProps {
   interaction: {
     notification_id: string;
-    type: 'comment' | 'reaction' | 'join' | 'repost';
+    type: 'comment' | 'reaction' | 'join' | 'repost' | 'message';
     source_user_id: string;
     user?: {
       user_id: string;
       name: string;
       profile_image?: string;
     };
+    payload?: any;
     created_at: string;
   };
   userCache: { [key: string]: { name: string; profile_image: string | null } };
@@ -32,6 +33,11 @@ export default function NotificationListItem({
   const userAvatar = user?.profile_image || null;
 
   const getInteractionText = () => {
+    // Check if payload has custom notification text
+    if (interaction.payload?.notification_text) {
+      return interaction.payload.notification_text;
+    }
+    
     switch (interaction.type) {
       case 'comment':
         return 'commented';
@@ -41,6 +47,8 @@ export default function NotificationListItem({
         return 'joined';
       case 'repost':
         return 'reposted';
+      case 'message':
+        return 'sent a message';
       default:
         return 'interacted';
     }
@@ -56,6 +64,8 @@ export default function NotificationListItem({
         return 'person-add-outline';
       case 'repost':
         return 'repeat-outline';
+      case 'message':
+        return 'mail-outline';
       default:
         return null;
     }

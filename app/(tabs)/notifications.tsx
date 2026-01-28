@@ -20,6 +20,8 @@ import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 import NotificationCard from '@/components/NotificationCard';
 import NotificationListItem from '@/components/NotificationListItem';
+import GroupedPlanCard from '@/components/GroupedPlanCard';
+import SummaryCard from '@/components/SummaryCard';
 
 interface Interaction {
   notification_id: string;
@@ -71,6 +73,8 @@ export default function NotificationsScreen() {
   const [planGroupInfo, setPlanGroupInfo] = useState<{ [postId: string]: PlanGroupInfo }>({});
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
   const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'summary' | 'eventsList' | 'eventDetail'>('summary');
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const router = useRouter();
   
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -92,6 +96,9 @@ export default function NotificationsScreen() {
       const response = await apiService.getNotifications(user.user_id);
       if (response.data) {
         setNotifications(response.data);
+        // Always start in summary view (Level 1)
+        setViewMode('summary');
+        setSelectedEventId(null);
         
         // Load group info for each plan
         const groupInfoPromises = response.data.map(async (group) => {
@@ -338,6 +345,124 @@ export default function NotificationsScreen() {
   const groupInfo = currentPostId ? planGroupInfo[currentPostId] : null;
   const hasActiveGroup = groupInfo?.has_active_group || false;
 
+  // Separate grouped plan cards from individual notifications
+  const groupedPlanCards = notifications
+    .filter((n) => n.post !== null && n.post.plan_id && n.interactions.length > 0)
+    .sort((a, b) => {
+      const aLatest = Math.max(...a.interactions.map(i => new Date(i.created_at).getTime()));
+      const bLatest = Math.max(...b.interactions.map(i => new Date(i.created_at).getTime()));
+      return bLatest - aLatest;
+    });
+
+  // All interactions as flat list for Instagram-style notifications below the cards
+  // Include plan context so each row can show "Yash commented" (and optionally "on Plan title")
+  const allInteractionsForList = notifications.flatMap((group) =>
+    group.interactions.map((interaction) => ({
+      ...interaction,
+      _planTitle: group.post?.title || null,
+      _planId: group.post?.plan_id || group.post_id || null,
+    }))
+  );
+
+  // Get all unique avatars from all plan cards for summary
+  const getAllAvatars = () => {
+    const avatarSet = new Set<string | null>();
+    groupedPlanCards.forEach((group) => {
+      group.interactions.forEach((interaction) => {
+        const cachedUser = userCache[interaction.source_user_id];
+        const user = cachedUser || interaction.user;
+        if (user?.profile_image) {
+          avatarSet.add(user.profile_image);
+        }
+      });
+    });
+    return Array.from(avatarSet).slice(0, 6);
+  };
+
+  type InteractionWithPlan = Interaction & { _planTitle?: string | null; _planId?: string | null };
+
+  // Group individual notifications by time (Today, Yesterday, then by date for Earlier)
+  const groupNotificationsByTime = (notifs: InteractionWithPlan[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const todayNotifs: InteractionWithPlan[] = [];
+    const yesterdayNotifs: InteractionWithPlan[] = [];
+    const earlierByDate: { [key: string]: InteractionWithPlan[] } = {};
+
+    notifs.forEach((interaction) => {
+      const interactionDate = new Date(interaction.created_at);
+      const interactionDay = new Date(interactionDate.getFullYear(), interactionDate.getMonth(), interactionDate.getDate());
+
+      if (interactionDay.getTime() === today.getTime()) {
+        todayNotifs.push(interaction);
+      } else if (interactionDay.getTime() === yesterday.getTime()) {
+        yesterdayNotifs.push(interaction);
+      } else {
+        const dateKey = interactionDay.toISOString().slice(0, 10);
+        if (!earlierByDate[dateKey]) earlierByDate[dateKey] = [];
+        earlierByDate[dateKey].push(interaction);
+      }
+    });
+
+    const sortByDate = (a: Interaction, b: Interaction) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+
+    todayNotifs.sort(sortByDate);
+    yesterdayNotifs.sort(sortByDate);
+    Object.keys(earlierByDate).forEach((key) => earlierByDate[key].sort(sortByDate));
+
+    // Earlier as array of { dateLabel, items } sorted by date (newest first)
+    const earlierSections = Object.entries(earlierByDate)
+      .map(([dateKey, items]) => ({
+        dateLabel: new Date(dateKey + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        dateKey,
+        items,
+      }))
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+
+    return { today: todayNotifs, yesterday: yesterdayNotifs, earlierSections };
+  };
+
+  const timeGroupedNotifications = groupNotificationsByTime(allInteractionsForList);
+
+  // 3-Level Navigation Handlers
+  const handleSummaryCardPress = () => {
+    if (viewMode === 'summary') {
+      // Expand to Level 2: Show all event cards (collapsed)
+      setViewMode('eventsList');
+      setSelectedEventId(null); // Ensure no event is selected
+    } else {
+      // Collapse back to Level 1: Show summary card
+      setViewMode('summary');
+      setSelectedEventId(null);
+    }
+  };
+
+  const handleEventCardPress = (postId: string) => {
+    if (viewMode === 'eventsList') {
+      // Expand to Level 3: Show interactions for this specific event
+      setViewMode('eventDetail');
+      setSelectedEventId(postId);
+    } else if (viewMode === 'eventDetail' && selectedEventId === postId) {
+      // Collapse back to Level 2: Hide interactions, keep cards visible
+      setViewMode('eventsList');
+      setSelectedEventId(null);
+    } else if (viewMode === 'eventDetail') {
+      // Switch to different event (keep in Level 3, just change selection)
+      setSelectedEventId(postId);
+    }
+  };
+
+  const handleCreateGroupFromCard = (postId: string) => {
+    setCurrentPostId(postId);
+    setSelectedUsers(new Set());
+    setGroupName('');
+    setShowGroupModal(true);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -375,49 +500,144 @@ export default function NotificationsScreen() {
           </View>
         ) : (
           <>
-            {/* TOP SECTION: First notification as highlighted card */}
-            {notifications.length > 0 && (
-              <View style={styles.highlightedCardContainer}>
-                <NotificationCard
-                  key={notifications[0].post_id}
-                  post_id={notifications[0].post_id}
-                  post={notifications[0].post}
-                  interactions={notifications[0].interactions}
-                  created_at={notifications[0].created_at}
-                  userCache={userCache}
-                  onPress={() => openGroupModal(notifications[0].post_id)}
-                />
+            {/* TOP SECTION: Event Cards (3-Level System) */}
+            {groupedPlanCards.length > 0 && (
+              <View style={styles.groupedCardsContainer}>
+                {/* Level 1: Summary Card */}
+                {viewMode === 'summary' && (
+                  <SummaryCard
+                    totalCount={groupedPlanCards.length}
+                    avatars={getAllAvatars()}
+                    onPress={handleSummaryCardPress}
+                    isExpanded={false}
+                  />
+                )}
+
+                {/* Level 2 & 3: Events List / Event Detail */}
+                {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
+                  <>
+                    {groupedPlanCards.map((group, index) => {
+                      // In Level 2, all cards are collapsed. In Level 3, only selected card is expanded
+                      const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+                      const shouldShowInteractions = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+                      
+                      return (
+                        <GroupedPlanCard
+                          key={group.post_id}
+                          post_id={group.post_id}
+                          post={group.post}
+                          interactions={group.interactions}
+                          created_at={group.created_at}
+                          userCache={userCache}
+                          isExpanded={isExpanded}
+                          onExpand={() => handleEventCardPress(group.post_id)}
+                          onCreateGroup={() => handleCreateGroupFromCard(group.post_id)}
+                          index={index}
+                          showInteractions={shouldShowInteractions} // Only show interactions in Level 3
+                        />
+                      );
+                    })}
+                  </>
+                )}
               </View>
             )}
 
-            {/* BELOW SECTION: All other notifications as list items */}
-            <View style={styles.listContainer}>
-              {notifications.slice(1).flatMap((group, groupIndex) =>
-                group.interactions.map((interaction, interactionIndex) => {
-                  const allInteractions = notifications.slice(1).flatMap(g => g.interactions);
-                  const currentIndex = notifications.slice(1).slice(0, groupIndex).reduce((sum, g) => sum + g.interactions.length, 0) + interactionIndex;
-                  const isLast = currentIndex === allInteractions.length - 1;
-                  
-                  return (
-                    <NotificationListItem
-                      key={`${group.post_id}-${interaction.notification_id}`}
-                      interaction={interaction}
-                      userCache={userCache}
-                      onPress={() => {
-                        // Navigate to post details or open group modal
-                        if (group.post?.plan_id) {
-                          router.push({
-                            pathname: '/plan/[planId]',
-                            params: { planId: group.post.plan_id },
-                          } as any);
-                        }
-                      }}
-                      showDivider={!isLast}
-                    />
-                  );
-                })
-              )}
-            </View>
+            {/* BOTTOM SECTION: Individual Notifications (Instagram-style, always below cards) */}
+            {(timeGroupedNotifications.today.length > 0 ||
+              timeGroupedNotifications.yesterday.length > 0 ||
+              timeGroupedNotifications.earlierSections.length > 0) && (
+              <View style={styles.listContainer}>
+                {/* Today Section */}
+                {timeGroupedNotifications.today.length > 0 && (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionHeaderText}>Today</Text>
+                    </View>
+                    {timeGroupedNotifications.today.map((interaction, index) => {
+                      const isLast = index === timeGroupedNotifications.today.length - 1 &&
+                        timeGroupedNotifications.yesterday.length === 0 &&
+                        timeGroupedNotifications.earlierSections.length === 0;
+                      return (
+                        <NotificationListItem
+                          key={interaction.notification_id}
+                          interaction={interaction}
+                          userCache={userCache}
+                          onPress={() => {
+                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                            if (planId) {
+                              router.push({
+                                pathname: '/plan/[planId]',
+                                params: { planId },
+                              } as any);
+                            }
+                          }}
+                          showDivider={!isLast}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Yesterday Section */}
+                {timeGroupedNotifications.yesterday.length > 0 && (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionHeaderText}>Yesterday</Text>
+                    </View>
+                    {timeGroupedNotifications.yesterday.map((interaction, index) => {
+                      const isLast = index === timeGroupedNotifications.yesterday.length - 1 &&
+                        timeGroupedNotifications.earlierSections.length === 0;
+                      return (
+                        <NotificationListItem
+                          key={interaction.notification_id}
+                          interaction={interaction}
+                          userCache={userCache}
+                          onPress={() => {
+                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                            if (planId) {
+                              router.push({
+                                pathname: '/plan/[planId]',
+                                params: { planId },
+                              } as any);
+                            }
+                          }}
+                          showDivider={!isLast}
+                        />
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Earlier: one section per date */}
+                {timeGroupedNotifications.earlierSections.map((section) => (
+                  <React.Fragment key={section.dateKey}>
+                    <View style={styles.sectionHeader}>
+                      <Text style={styles.sectionHeaderText}>{section.dateLabel}</Text>
+                    </View>
+                    {section.items.map((interaction, index) => {
+                      const isLast = index === section.items.length - 1;
+                      return (
+                        <NotificationListItem
+                          key={interaction.notification_id}
+                          interaction={interaction}
+                          userCache={userCache}
+                          onPress={() => {
+                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                            if (planId) {
+                              router.push({
+                                pathname: '/plan/[planId]',
+                                params: { planId },
+                              } as any);
+                            }
+                          }}
+                          showDivider={!isLast}
+                        />
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -611,8 +831,28 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     backgroundColor: '#F2F2F7',
   },
+  groupedCardsContainer: {
+    padding: 20,
+    paddingBottom: 20,
+    backgroundColor: '#F2F2F7',
+  },
   listContainer: {
     backgroundColor: '#FFFFFF',
+    paddingTop: 8,
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F2F2F7',
+  },
+  sectionHeaderText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,
