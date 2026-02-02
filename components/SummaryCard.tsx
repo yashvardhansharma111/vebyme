@@ -1,94 +1,91 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Avatar from './Avatar';
 
 interface SummaryCardProps {
   totalCount: number;
   avatars: (string | null)[];
-  /** Single avatar shown at top-right (reference design) */
-  rightAvatarUrl?: string | null;
+  /** Event description shown in state one; "vybeme!" is shown on the next line */
+  eventDescription: string;
   onPress: () => void;
-  isExpanded: boolean;
 }
 
 export default function SummaryCard({
   totalCount,
   avatars,
-  rightAvatarUrl,
+  eventDescription,
   onPress,
-  isExpanded,
 }: SummaryCardProps) {
+  // DPs first: non-null avatars first, up to 3
+  const displayAvatars = [...avatars]
+    .filter((a) => a != null && a !== '')
+    .slice(0, 3);
+  const showCount = totalCount > 1 ? `+${totalCount}` : `${totalCount}`;
+
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      activeOpacity={0.9}
-    >
-      {/* Count Badge - top left */}
-      <View style={styles.badgeContainer}>
-        <Text style={styles.badgeText}>{totalCount}</Text>
-      </View>
-
-      {/* Single avatar - top right (reference design) */}
-      {rightAvatarUrl != null && (
-        <View style={styles.rightAvatarContainer}>
-          <Avatar uri={rightAvatarUrl} size={36} />
-        </View>
-      )}
-
-      {/* Expand/Collapse Icon - left of right avatar when present */}
+    <View style={styles.outerWrapper}>
+      {/* Back card (stacked effect) */}
+      <View style={styles.backCard} />
       <TouchableOpacity
-        style={[styles.expandButton, rightAvatarUrl != null && { right: 56 }]}
+        style={styles.card}
         onPress={onPress}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        activeOpacity={0.9}
       >
-        <Ionicons
-          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-          size={20}
-          color="#8E8E93"
-        />
-      </TouchableOpacity>
-
-      {/* Title */}
-      <Text style={styles.title}>
-        {totalCount} {totalCount === 1 ? 'event' : 'events'}
-      </Text>
-
-      {/* Stacked Avatars - upper left (immediately right of badge) */}
-      <View style={styles.avatarsContainer}>
-        {avatars.slice(0, 3).map((avatar, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.avatarWrapper,
-              { zIndex: avatars.length - idx },
-              idx > 0 && { marginLeft: -12 },
-            ]}
-          >
-            <Avatar uri={avatar} size={32} />
-          </View>
-        ))}
-        {avatars.length > 3 && (
-          <View
-            style={[
-              styles.avatarWrapper,
-              styles.avatarOverlay,
-              { marginLeft: -12, zIndex: 0 },
-            ]}
-          >
-            <View style={styles.overlayBadge}>
-              <Text style={styles.overlayBadgeText}>+{avatars.length - 3}</Text>
+        {/* Upper left: stacked DPs first, then +N badge on rightmost */}
+        <View style={styles.topRow}>
+          <View style={styles.avatarsRow}>
+            {displayAvatars.slice(0, 3).map((avatar, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.avatarWrapper,
+                  { zIndex: 3 - idx },
+                  idx > 0 && { marginLeft: -12 },
+                ]}
+              >
+                <Avatar uri={avatar} size={32} />
+              </View>
+            ))}
+            {displayAvatars.length === 0 && (
+              <View style={[styles.avatarWrapper, { marginLeft: 0 }]}>
+                <Avatar uri={null} size={32} />
+              </View>
+            )}
+            <View style={styles.badgeOnEdge}>
+              <Text style={styles.badgeText}>{showCount}</Text>
             </View>
-            <Avatar uri={null} size={32} />
           </View>
-        )}
-      </View>
-    </TouchableOpacity>
+        </View>
+
+        {/* Description then "vybeme!" on next line (no title in first state) */}
+        <Text style={styles.description} numberOfLines={4}>
+          {eventDescription?.trim().replace(/\s*vybeme!?\s*$/i, '').trim() || ''}
+        </Text>
+        <Text style={styles.vybemeLine}>vybeme!</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerWrapper: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  backCard: {
+    position: 'absolute',
+    left: 8,
+    top: 22,
+    right: 8,
+    height: 80,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
+  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -99,71 +96,46 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
     position: 'relative',
-    marginBottom: 12,
   },
-  badgeContainer: {
-    position: 'absolute',
-    left: 16,
-    top: 16,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 20,
-    minWidth: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    zIndex: 10,
-  },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  expandButton: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    zIndex: 10,
-  },
-  rightAvatarContainer: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    zIndex: 10,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: 'rgba(0, 122, 255, 0.3)',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginTop: 8,
-    marginBottom: 12,
-    paddingRight: 40, // Space for expand button
-  },
-  avatarsContainer: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 4,
+    marginBottom: 10,
+  },
+  avatarsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatarWrapper: {
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#FFFFFF',
   },
-  avatarOverlay: {
-    backgroundColor: '#F2F2F7',
+  badgeOnEdge: {
+    marginLeft: -4,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 14,
+    minWidth: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 6,
+    zIndex: 10,
   },
-  overlayBadge: {
-    position: 'absolute',
-    zIndex: 1,
-  },
-  overlayBadgeText: {
-    fontSize: 10,
+  badgeText: {
+    fontSize: 12,
     fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  description: {
+    fontSize: 13,
+    color: '#1C1C1E',
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  vybemeLine: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#1C1C1E',
   },
 });

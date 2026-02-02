@@ -133,6 +133,8 @@ export default function GroupedPlanCard({
   };
 
   const getInteractionIcon = (type: string) => {
+    // Level 3: always chat icon (user can make group and chat with users)
+    if (showInteractions) return 'chatbubble-outline';
     switch (type) {
       case 'comment':
         return 'chatbubble-outline';
@@ -157,23 +159,10 @@ export default function GroupedPlanCard({
         onPress={handleToggleExpand}
         activeOpacity={0.9}
       >
-        {/* Numeric Badge */}
+        {/* Numeric Badge - on edge of card, slightly overlapping */}
         <View style={styles.badgeContainer}>
           <Text style={styles.badgeText}>{interactionCount}</Text>
         </View>
-
-        {/* Expand/Collapse Icon */}
-        <TouchableOpacity
-          style={styles.expandButton}
-          onPress={handleToggleExpand}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons
-            name={expanded ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#8E8E93"
-          />
-        </TouchableOpacity>
 
         {/* Plan Title + Date row (Level 3: date on right); extra right padding when avatars shown (Level 2) */}
         <View style={[styles.titleRow, !showInteractions && styles.titleRowWithAvatars]}>
@@ -244,7 +233,8 @@ export default function GroupedPlanCard({
               const user = cachedUser || interaction.user;
               const userName = user?.name || 'Unknown';
               const userAvatar = user?.profile_image || null;
-              const iconName = getInteractionIcon(interaction.type);
+              // Card interaction list: always use text/chat icon for all rows (commented, reacted, joined, etc.)
+              const iconName = 'chatbubble-outline';
               
               return (
                 <View key={interaction.notification_id} style={styles.interactionRow}>
@@ -258,14 +248,12 @@ export default function GroupedPlanCard({
                       </Text>
                     </Text>
                   </View>
-                  {iconName && (
-                    <Ionicons
-                      name={iconName as any}
-                      size={18}
-                      color="#8E8E93"
-                      style={styles.interactionIcon}
-                    />
-                  )}
+                  <Ionicons
+                    name={iconName as any}
+                    size={18}
+                    color="#8E8E93"
+                    style={styles.interactionIcon}
+                  />
                 </View>
               );
             })}
@@ -290,6 +278,8 @@ export default function GroupedPlanCard({
 const styles = StyleSheet.create({
   cardContainer: {
     marginBottom: 12,
+    marginTop: 8,
+    overflow: 'visible',
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -310,10 +300,10 @@ const styles = StyleSheet.create({
   },
   badgeContainer: {
     position: 'absolute',
-    left: 16,
-    top: 16,
+    left: -6,
+    top: -6,
     backgroundColor: '#1C1C1E',
-    borderRadius: 20,
+    borderRadius: 18,
     minWidth: 32,
     height: 32,
     justifyContent: 'center',
@@ -326,26 +316,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  expandButton: {
-    position: 'absolute',
-    right: 16,
-    top: 16,
-    zIndex: 10,
-  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 8,
     marginBottom: 8,
-    paddingRight: 40, // Space for expand button
+    paddingRight: 16,
     gap: 8,
   },
   titleRowWithAvatars: {
-    paddingRight: 116, // Space for stacked avatars (3×32 - overlap) + expand button
+    paddingRight: 100, // Space for stacked avatars (3×32 - overlap)
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
     flex: 1,
@@ -364,7 +348,7 @@ const styles = StyleSheet.create({
   avatarsContainerTopRight: {
     position: 'absolute',
     top: 16,
-    right: 44, // Left of expand chevron
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 5,
@@ -406,6 +390,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     paddingVertical: 4,
+    paddingLeft: 0,
   },
   interactionContent: {
     flex: 1,

@@ -504,30 +504,18 @@ export default function NotificationsScreen() {
             {groupedPlanCards.length > 0 && (
               <View style={styles.groupedCardsContainer}>
                 {/* Level 1: Summary Card */}
-                {viewMode === 'summary' && (
+                {viewMode === 'summary' && groupedPlanCards.length > 0 && (
                   <SummaryCard
                     totalCount={groupedPlanCards.length}
                     avatars={getAllAvatars()}
-                    rightAvatarUrl={getAllAvatars()[0] ?? undefined}
+                    eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
                     onPress={handleSummaryCardPress}
-                    isExpanded={false}
                   />
                 )}
 
-                {/* Level 2 & 3: Events List / Event Detail */}
+                {/* Level 2 & 3: Events List / Event Detail — no "X events" header above cards */}
                 {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
                   <>
-                    {/* Collapse header: tap to return to summary */}
-                    <TouchableOpacity
-                      style={styles.collapseEventsHeader}
-                      onPress={handleSummaryCardPress}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.collapseEventsHeaderText}>
-                        {groupedPlanCards.length} {groupedPlanCards.length === 1 ? 'event' : 'events'}
-                      </Text>
-                      <Ionicons name="chevron-up" size={20} color="#8E8E93" />
-                    </TouchableOpacity>
                     {groupedPlanCards.map((group, index) => {
                       // In Level 2, all cards are collapsed. In Level 3, only selected card is expanded
                       const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
@@ -777,7 +765,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
   },
   header: {
     flexDirection: 'row',
@@ -786,9 +774,9 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 12,
     paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: '#E5E5EA',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -833,7 +821,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
   },
   scrollContent: {
     paddingBottom: 120,
@@ -848,29 +836,16 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     backgroundColor: '#F2F2F7',
   },
-  collapseEventsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    marginBottom: 4,
-  },
-  collapseEventsHeaderText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
   listContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     paddingTop: 8,
   },
   sectionHeader: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     borderTopWidth: 1,
-    borderTopColor: '#F2F2F7',
+    borderTopColor: '#E5E5EA',
   },
   sectionHeaderText: {
     fontSize: 13,

@@ -12,20 +12,31 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
+
+const REACTION_EMOJIS = [
+  { type: 'laugh', emoji: '😂' },
+  { type: 'heart', emoji: '❤️' },
+  { type: 'thumbsup', emoji: '👍' },
+  { type: 'wow', emoji: '😮' },
+  { type: 'sad', emoji: '😢' },
+];
 
 interface Message {
   message_id: string;
   user_id: string;
-  type: 'text' | 'image' | 'poll';
+  type: 'text' | 'image' | 'poll' | 'plan';
   content: any;
   timestamp: Date | string;
-  reactions: Array<{
+  reactions?: Array<{
     reaction_id: string;
     user_id: string;
     emoji_type: string;
@@ -34,6 +45,15 @@ interface Message {
     user_id: string;
     name: string;
     profile_image: string;
+  };
+  shared_plan?: {
+    plan_id: string;
+    title: string;
+    description: string;
+    media?: any[];
+    tags?: string[];
+    category_main?: string;
+    category_sub?: string[];
   };
 }
 
@@ -58,6 +78,10 @@ export default function IndividualChatScreen() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
+  const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -115,6 +139,92 @@ export default function IndividualChatScreen() {
     }
   };
 
+  const handlePickImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant camera roll permissions');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0] && user?.user_id && groupId) {
+        setSending(true);
+        try {
+          const asset = result.assets[0];
+          const formData = new FormData();
+          // @ts-ignore
+          formData.append('file', {
+            uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+            name: 'image.jpg',
+            type: 'image/jpeg',
+          });
+          const uploadResponse = await apiService.uploadImage(formData, user.access_token);
+          if (uploadResponse.data?.url) {
+            await apiService.sendMessage(groupId, user.user_id, 'image', { url: uploadResponse.data.url });
+            await loadMessages();
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+          }
+        } catch (e: any) {
+          Alert.alert('Error', 'Failed to send image.');
+        } finally {
+          setSending(false);
+        }
+      }
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handleAddReaction = async (messageId: string, emojiType: string) => {
+    if (!user?.user_id) return;
+    setReactionMessageId(null);
+    try {
+      await apiService.addMessageReaction(messageId, user.user_id, emojiType);
+      await loadMessages();
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleOpenShareModal = async () => {
+    if (!user?.user_id) return;
+    setShowShareModal(true);
+    setLoadingPlans(true);
+    try {
+      const response = await apiService.getUserPlans(user.user_id, 50, 0);
+      if (response.data) setAvailablePlans(response.data);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to load plans');
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  const handleSharePlan = async (plan: any) => {
+    if (!groupId || !user?.user_id) return;
+    try {
+      setSending(true);
+      await apiService.sendMessage(groupId, user.user_id, 'plan', {
+        plan_id: plan.plan_id || plan.post_id,
+        title: plan.title,
+        description: plan.description,
+        media: plan.media || [],
+        tags: plan.category_sub || plan.tags || [],
+      });
+      setShowShareModal(false);
+      await loadMessages();
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (e: any) {
+      Alert.alert('Error', 'Failed to share plan.');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const formatTimeHeader = (timestamp: Date | string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -135,54 +245,85 @@ export default function IndividualChatScreen() {
   };
 
   const renderHeader = () => {
-    // Get the other user from group details (for individual chats)
     const otherUser = groupDetails?.members?.find(m => m.user_id !== user?.user_id);
     const chatImage = otherUser?.profile_image;
     const chatName = otherUser?.name || 'Chat';
     const otherUserId = otherUser?.user_id;
 
-    const handleProfilePress = () => {
-      if (otherUserId) {
-        router.push(`/profile/${otherUserId}` as any);
-      }
-    };
-
     return (
-      <View style={styles.headerContainer}>
-        <View style={styles.headerLeftGroup}>
+      <>
+        <View style={styles.titleBar}>
+          <Text style={styles.titleBarText}>Individual Chat</Text>
+        </View>
+        <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#000" />
           </TouchableOpacity>
-
-          {/* Pill Shaped User Header - Left Aligned - Clickable to go to profile */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.headerPill}
-            onPress={handleProfilePress}
+            onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as any)}
             disabled={!otherUserId}
             activeOpacity={0.7}
           >
-            <Image
-              source={{ uri: chatImage || 'https://via.placeholder.com/40' }}
-              style={styles.headerAvatar}
-            />
-            <Text style={styles.headerName} numberOfLines={1}>
-              {chatName}
-            </Text>
+            <Image source={{ uri: chatImage || 'https://via.placeholder.com/40' }} style={styles.headerAvatar} />
+            <Text style={styles.headerName} numberOfLines={1}>{chatName}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerRightIcon} onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as any)}>
+            <Image source={{ uri: chatImage || 'https://via.placeholder.com/24' }} style={styles.headerRightAvatar} />
           </TouchableOpacity>
         </View>
+      </>
+    );
+  };
 
-        {/* Right side placeholder (optional, keeps layout balanced if needed) */}
-        <View style={styles.headerRightPlaceholder} />
+  const renderSharedPlanCard = (plan: Message['shared_plan']) => {
+    if (!plan) return null;
+    const mediaItem = plan.media?.[0];
+    const mediaUri = mediaItem ? (typeof mediaItem === 'string' ? mediaItem : mediaItem?.url) : null;
+    const tags = plan.tags || plan.category_sub || (plan.category_main ? [plan.category_main] : []);
+
+    return (
+      <View style={styles.sharedPlanCard}>
+        <Text style={styles.sharedPlanTitle}>{plan.title}</Text>
+        <Text style={styles.sharedPlanDescription} numberOfLines={3}>{plan.description}</Text>
+        {tags.length > 0 && (
+          <View style={styles.sharedPlanTags}>
+            {tags.slice(0, 3).map((tag: string, i: number) => (
+              <View key={i} style={styles.sharedPlanTag}>
+                <Ionicons name={tag === 'Hitchhiking' ? 'walk' : tag === 'Weekend' ? 'calendar-outline' : 'pricetag-outline'} size={12} color="#555" style={{ marginRight: 4 }} />
+                <Text style={styles.sharedPlanTagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {mediaUri && mediaUri.trim() !== '' && (
+          <Image source={{ uri: mediaUri }} style={styles.sharedPlanImage} resizeMode="cover" />
+        )}
+        <View style={styles.sharedPlanFooter}>
+          <TouchableOpacity style={styles.sharedPlanIconBtn}>
+            <Ionicons name="repeat-outline" size={20} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sharedPlanIconBtn}>
+            <Ionicons name="paper-plane-outline" size={20} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sharedPlanJoinBtn} onPress={() => plan.plan_id && router.push(`/plan/${plan.plan_id}` as any)}>
+            <Text style={styles.sharedPlanJoinText}>Join</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
+  };
+
+  const getEmojiForType = (type: string) => {
+    const r = REACTION_EMOJIS.find((e) => e.type === type);
+    return r ? r.emoji : '👍';
   };
 
   const renderMessage = ({ item, index }: { item: Message; index: number }) => {
     const isMe = item.user_id === user?.user_id;
     const previousMessage = index > 0 ? messages[index - 1] : null;
-    
-    const showTimeHeader = !previousMessage || 
-      (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
+    const showTimeHeader = !previousMessage || (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
+    const showReactionPicker = reactionMessageId === item.message_id;
 
     return (
       <View style={{ paddingHorizontal: 16 }}>
@@ -192,37 +333,45 @@ export default function IndividualChatScreen() {
           </View>
         )}
 
-        <View
-          style={[
-            styles.messageRow,
-            isMe ? styles.rowRight : styles.rowLeft,
-          ]}
-        >
+        <View style={[styles.messageRow, isMe ? styles.rowRight : styles.rowLeft]}>
           {!isMe && (
-            <Image
-              source={{ uri: item.user?.profile_image || 'https://via.placeholder.com/30' }}
-              style={styles.messageAvatar}
-            />
+            <Image source={{ uri: item.user?.profile_image || 'https://via.placeholder.com/30' }} style={styles.messageAvatar} />
           )}
 
-          <View
-            style={[
-              styles.messageBubble,
-              isMe ? styles.bubbleRight : styles.bubbleLeft,
-            ]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onLongPress={() => setReactionMessageId(item.message_id)}
+            delayLongPress={400}
+            style={[styles.messageBubbleWrap, isMe && { alignItems: 'flex-end' }]}
           >
-            {item.type === 'text' && (
-              <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
-                {typeof item.content === 'string' ? item.content : ''}
-              </Text>
+            <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+              {item.type === 'text' && (
+                <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                  {typeof item.content === 'string' ? item.content : ''}
+                </Text>
+              )}
+              {item.type === 'image' && (
+                <Image source={{ uri: item.content?.url || item.content }} style={styles.messageImage} resizeMode="cover" />
+              )}
+              {item.type === 'plan' && item.shared_plan && renderSharedPlanCard(item.shared_plan)}
+            </View>
+            {item.reactions && item.reactions.length > 0 && (
+              <View style={[styles.reactionsRow, isMe ? styles.reactionsRight : styles.reactionsLeft]}>
+                {item.reactions.map((r) => (
+                  <Text key={r.reaction_id} style={styles.reactionEmoji}>{getEmojiForType(r.emoji_type)}</Text>
+                ))}
+              </View>
             )}
-            {item.type === 'image' && (
-              <Image
-                source={{ uri: item.content?.url || item.content }}
-                style={styles.messageImage}
-              />
+            {showReactionPicker && (
+              <View style={styles.reactionPicker}>
+                {REACTION_EMOJIS.map(({ type, emoji }) => (
+                  <TouchableOpacity key={type} onPress={() => handleAddReaction(item.message_id, type)} style={styles.reactionPickerBtn}>
+                    <Text style={styles.reactionPickerEmoji}>{emoji}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -258,10 +407,8 @@ export default function IndividualChatScreen() {
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
-        {/* Input Area */}
+        {/* Input Area: input, image upload, microphone, send */}
         <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          
-          {/* Input Pill: Text + Camera Icon */}
           <View style={styles.inputPill}>
             <TextInput
               style={styles.input}
@@ -269,26 +416,76 @@ export default function IndividualChatScreen() {
               placeholderTextColor="#999"
               value={inputText}
               onChangeText={setInputText}
-              multiline={false} // Keeping single line usually looks cleaner for "pill" inputs
+              multiline={false}
             />
-            
-            {/* Gallery/Camera Icon INSIDE the pill */}
-            <TouchableOpacity style={styles.iconButton}>
-               <Ionicons name="image-outline" size={24} color="#555" />
+            <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
+              <Ionicons name="image-outline" size={24} color="#555" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={handleOpenShareModal} disabled={sending}>
+              <Ionicons name="paper-plane-outline" size={24} color="#555" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} disabled={sending}>
+              <Ionicons name="mic-outline" size={24} color="#555" />
             </TouchableOpacity>
           </View>
-
-          {/* Send Button OUTSIDE the pill */}
-          <TouchableOpacity 
-            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+          <TouchableOpacity
+            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
             onPress={handleSend}
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || sending}
           >
             <Ionicons name="arrow-up" size={20} color="#FFF" />
           </TouchableOpacity>
-
         </View>
       </KeyboardAvoidingView>
+
+      {/* Share Plan Modal */}
+      <Modal visible={showShareModal} transparent animationType="slide" onRequestClose={() => setShowShareModal(false)}>
+        <View style={styles.shareModalOverlay}>
+          <View style={styles.shareModalContent}>
+            <View style={styles.shareModalHeader}>
+              <Text style={styles.shareModalTitle}>Share post</Text>
+              <TouchableOpacity onPress={() => setShowShareModal(false)}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+            {loadingPlans ? (
+              <View style={styles.shareModalLoading}>
+                <ActivityIndicator size="large" color="#1C1C1E" />
+              </View>
+            ) : (
+              <ScrollView style={styles.shareModalList}>
+                {availablePlans.length === 0 ? (
+                  <View style={styles.shareModalEmpty}>
+                    <Text style={styles.shareModalEmptyText}>No plans to share</Text>
+                  </View>
+                ) : (
+                  availablePlans.map((plan) => {
+                    const mediaItem = plan.media?.[0];
+                    const mediaUri = mediaItem ? (typeof mediaItem === 'string' ? mediaItem : mediaItem?.url) : null;
+                    return (
+                      <TouchableOpacity
+                        key={plan.plan_id || plan.post_id}
+                        style={styles.sharePlanItem}
+                        onPress={() => handleSharePlan(plan)}
+                        activeOpacity={0.7}
+                      >
+                        {mediaUri && mediaUri.trim() !== '' && (
+                          <Image source={{ uri: mediaUri }} style={styles.sharePlanItemImage} resizeMode="cover" />
+                        )}
+                        <View style={styles.sharePlanItemInfo}>
+                          <Text style={styles.sharePlanItemTitle} numberOfLines={1}>{plan.title}</Text>
+                          <Text style={styles.sharePlanItemDesc} numberOfLines={2}>{plan.description}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -296,45 +493,48 @@ export default function IndividualChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F7',
   },
-  
-  // --- Header Styles ---
+  titleBar: {
+    backgroundColor: '#2C2C2E',
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleBarText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
+  },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6', // Subtle separator
-  },
-  headerLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    borderBottomColor: '#E5E5EA',
   },
   backButton: {
     padding: 4,
     marginRight: 8,
   },
   headerPill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
     paddingVertical: 6,
     paddingHorizontal: 8,
     paddingRight: 16,
     borderRadius: 30,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    // Soft shadow
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -352,15 +552,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1F2937',
-    maxWidth: 150, // prevent overly long names from breaking layout
+    flex: 1,
+    maxWidth: 180,
   },
-  headerRightPlaceholder: {
-    width: 40, 
+  headerRightIcon: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  headerRightAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E5EA',
   },
 
-  // --- List Styles ---
   listContent: {
     paddingTop: 10,
+    backgroundColor: '#F2F2F7',
+  },
+  messageBubbleWrap: {
+    maxWidth: '75%',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
   },
   timeHeaderContainer: {
     alignItems: 'center',
@@ -420,6 +633,159 @@ const styles = StyleSheet.create({
     width: 220,
     height: 160,
     borderRadius: 16,
+  },
+  sharedPlanCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    minWidth: 260,
+    maxWidth: 280,
+  },
+  sharedPlanTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 6,
+  },
+  sharedPlanDescription: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  sharedPlanTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  sharedPlanTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  sharedPlanTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
+  sharedPlanImage: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  sharedPlanFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sharedPlanIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F2F2F7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sharedPlanJoinBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sharedPlanJoinText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  reactionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  reactionsLeft: { alignSelf: 'flex-start' },
+  reactionsRight: { alignSelf: 'flex-end' },
+  reactionEmoji: { fontSize: 15 },
+  reactionPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  reactionPickerBtn: { padding: 4 },
+  reactionPickerEmoji: { fontSize: 20 },
+  shareModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  shareModalContent: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingTop: 12,
+  },
+  shareModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  shareModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  shareModalLoading: { padding: 40, alignItems: 'center' },
+  shareModalList: { maxHeight: 400 },
+  shareModalEmpty: { padding: 40, alignItems: 'center' },
+  shareModalEmptyText: { fontSize: 14, color: '#8E8E93' },
+  sharePlanItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  sharePlanItemImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#F2F2F7',
+  },
+  sharePlanItemInfo: { flex: 1, marginRight: 8 },
+  sharePlanItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  sharePlanItemDesc: {
+    fontSize: 13,
+    color: '#8E8E93',
+    lineHeight: 18,
   },
 
   // --- Input Bar Styles ---

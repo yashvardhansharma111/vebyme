@@ -55,6 +55,9 @@ export default function NotificationListItem({
   };
 
   const getInteractionIcon = () => {
+    const text = (interaction.payload?.notification_text || '').toLowerCase();
+    if (text.includes('booking')) return 'document-text-outline';
+    if (text.includes('shared') || text.includes('invited')) return 'paper-plane-outline';
     switch (interaction.type) {
       case 'comment':
         return 'chatbubble-outline';
@@ -67,7 +70,7 @@ export default function NotificationListItem({
       case 'message':
         return 'mail-outline';
       default:
-        return null;
+        return 'document-text-outline';
     }
   };
 
@@ -78,8 +81,10 @@ export default function NotificationListItem({
       activeOpacity={0.7}
     >
       <View style={styles.row}>
-        {/* Left: Avatar */}
-        <Avatar uri={userAvatar} size={44} />
+        {/* Left: Avatar - ensure DP is visible */}
+        <View style={styles.avatarWrap}>
+          <Avatar uri={userAvatar} size={44} />
+        </View>
 
         {/* Center: Text */}
         <View style={styles.textContainer}>
@@ -109,13 +114,19 @@ export default function NotificationListItem({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 20,
+  },
+  avatarWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    overflow: 'hidden',
   },
   textContainer: {
     flex: 1,
@@ -138,8 +149,8 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#EEEEEE',
-    marginLeft: 76, // Avatar width (44) + marginLeft (12) + some padding
+    backgroundColor: '#E5E5EA',
+    marginLeft: 76,
     marginRight: 20,
   },
 });

@@ -93,6 +93,8 @@ export default function GroupChatScreen() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -142,6 +144,7 @@ export default function GroupChatScreen() {
       const content = inputText.trim();
       await apiService.sendMessage(groupId, user.user_id, 'text', content);
       setInputText('');
+      setTypingLabel(null);
       await loadMessages();
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -262,6 +265,13 @@ export default function GroupChatScreen() {
     }
   };
 
+  const handleTyping = (text: string) => {
+    setInputText(text);
+    setTypingLabel('Typing...');
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => setTypingLabel(null), 2000);
+  };
+
   const handleSharePlan = async (plan: any) => {
     if (!groupId || !user?.user_id) return;
     
@@ -306,33 +316,34 @@ export default function GroupChatScreen() {
   const renderHeader = () => {
     return (
       <View style={styles.headerContainer}>
-        <View style={styles.headerLeftGroup}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-             <Ionicons name="chevron-back" size={24} color="#000" />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#000" />
+        </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.headerPill}
-            onPress={() => router.push(`/chat/group/details/${groupId}` as any)}
-          >
-            {groupDetails?.members && groupDetails.members.length > 0 && (
-              <View style={styles.avatarStack}>
-                {groupDetails.members.slice(0, 3).map((member, idx) => (
-                  <Image
-                    key={member.user_id}
-                    source={{ uri: member.profile_image || 'https://via.placeholder.com/30' }}
-                    style={[styles.headerAvatar, { marginLeft: idx > 0 ? -12 : 0, zIndex: 3 - idx }]}
-                  />
-                ))}
-              </View>
-            )}
-            <Text style={styles.headerName} numberOfLines={1}>
-              {groupDetails?.group_name || 'Group'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity onPress={() => router.push(`/chat/group/details/${groupId}` as any)}>
-           <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+        <TouchableOpacity
+          style={styles.headerCenter}
+          onPress={() => router.push(`/chat/group/details/${groupId}` as any)}
+          activeOpacity={0.8}
+        >
+          {groupDetails?.members && groupDetails.members.length > 0 && (
+            <View style={styles.avatarStack}>
+              {groupDetails.members.slice(0, 3).map((member, idx) => (
+                <View
+                  key={member.user_id}
+                  style={[styles.headerAvatarWrap, { marginLeft: idx > 0 ? -10 : 0, zIndex: 3 - idx }]}
+                >
+                  <Avatar uri={member.profile_image || null} size={32} />
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.headerName} numberOfLines={1}>
+            {groupDetails?.group_name || 'Group'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push(`/chat/group/details/${groupId}` as any)} style={styles.headerRightBtn}>
+          <Ionicons name="ellipsis-vertical" size={24} color="#000" />
         </TouchableOpacity>
       </View>
     );
@@ -453,16 +464,51 @@ export default function GroupChatScreen() {
                 </Text>
               )}
               {item.type === 'image' && (() => {
-                const imageUri = typeof item.content === 'string' 
-                  ? item.content 
-                  : item.content?.url || null;
-                return imageUri && imageUri.trim() !== '' ? (
-                  <Image 
-                    source={{ uri: imageUri }} 
-                    style={styles.messageImage} 
-                    resizeMode="cover"
-                  />
-                ) : null;
+                const urls: string[] = [];
+                if (typeof item.content === 'string' && item.content.trim() !== '') urls.push(item.content);
+                else if (item.content?.url && String(item.content.url).trim() !== '') urls.push(item.content.url);
+                else if (Array.isArray(item.content?.urls)) urls.push(...item.content.urls.filter((u: string) => u?.trim()));
+                if (urls.length === 0) return null;
+                if (urls.length === 1) {
+                  return (
+                    <View>
+                      <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="cover" />
+                      {item.reactions && item.reactions.length > 0 && (
+                        <View style={styles.reactionsRow}>
+                          {item.reactions.map((r) => (
+                            <Text key={r.reaction_id} style={styles.reactionEmoji}>
+                              {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                }
+                return (
+                  <View style={styles.multiImageCard}>
+                    {urls.slice(0, 3).map((uri, i) => (
+                      <Image
+                        key={i}
+                        source={{ uri }}
+                        style={[
+                          styles.messageImageStacked,
+                          { top: i * 8, left: i * 10, zIndex: urls.length - i },
+                        ]}
+                        resizeMode="cover"
+                      />
+                    ))}
+                    {item.reactions && item.reactions.length > 0 && (
+                      <View style={styles.reactionsRow}>
+                        {item.reactions.map((r) => (
+                          <Text key={r.reaction_id} style={styles.reactionEmoji}>
+                            {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
               })()}
               {item.type === 'plan' && item.shared_plan && (
                 <View style={styles.sharedPlanCard}>
@@ -486,6 +532,15 @@ export default function GroupChatScreen() {
                 </View>
               )}
             </View>
+            {(item.type === 'text' && item.reactions && item.reactions.length > 0) && (
+              <View style={[styles.reactionsRow, isMe ? styles.reactionsRowRight : styles.reactionsRowLeft]}>
+                {item.reactions.map((r) => (
+                  <Text key={r.reaction_id} style={styles.reactionEmoji}>
+                    {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
+                  </Text>
+                ))}
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -515,14 +570,21 @@ export default function GroupChatScreen() {
           ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
-          ListHeaderComponent={renderPlanCard} // This puts the Plan at the top
+          ListHeaderComponent={renderPlanCard}
           keyExtractor={(item) => item.message_id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
-        {/* Input Area */}
+        {/* Typing indicator */}
+        {typingLabel && (
+          <View style={styles.typingBar}>
+            <Text style={styles.typingText}>{typingLabel}</Text>
+          </View>
+        )}
+
+        {/* Input Area: input, image upload, microphone, send (paper plane in circle) */}
         {!groupDetails?.is_closed ? (
            <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
              <View style={styles.inputPill}>
@@ -531,37 +593,22 @@ export default function GroupChatScreen() {
                  placeholder="Send a message"
                  placeholderTextColor="#999"
                  value={inputText}
-                 onChangeText={setInputText}
+                 onChangeText={handleTyping}
                  multiline={false}
                />
-               <TouchableOpacity 
-                 style={styles.iconButton}
-                 onPress={handlePickImage}
-                 disabled={sending}
-               >
-                  <Ionicons name="image-outline" size={24} color="#999" />
+               <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
+                 <Ionicons name="image-outline" size={24} color="#8E8E93" />
                </TouchableOpacity>
-               <TouchableOpacity 
-                 style={styles.iconButton}
-                 onPress={handleOpenShareModal}
-                 disabled={sending}
-               >
-                  <Ionicons name="share-outline" size={24} color="#999" />
-               </TouchableOpacity>
-               <TouchableOpacity 
-                 style={styles.iconButton}
-                 onPress={handleCreatePoll}
-                 disabled={sending}
-               >
-                  <Ionicons name="bar-chart-outline" size={24} color="#999" />
+               <TouchableOpacity style={styles.iconButton} disabled={sending}>
+                 <Ionicons name="mic-outline" size={24} color="#8E8E93" />
                </TouchableOpacity>
              </View>
-             <TouchableOpacity 
-               style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+             <TouchableOpacity
+               style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
                onPress={handleSend}
                disabled={!inputText.trim() || sending}
              >
-               <Ionicons name="arrow-up" size={20} color="#FFF" />
+               <Ionicons name="send" size={20} color="#FFF" />
              </TouchableOpacity>
            </View>
         ) : (
@@ -650,54 +697,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // --- Header Styles ---
+  // --- Header Styles (back | stacked avatars | group name) ---
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-  },
-  headerLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
   },
   backButton: {
     padding: 4,
-    marginRight: 8,
+    marginRight: 12,
   },
-  headerPill: {
+  headerCenter: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    paddingRight: 16,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   avatarStack: {
     flexDirection: 'row',
-    marginRight: 8,
+    alignItems: 'center',
+    marginRight: 10,
   },
-  headerAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  headerAvatarWrap: {
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: '#FFF',
+    overflow: 'hidden',
   },
   headerName: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#1C1C1E',
+    flex: 1,
+  },
+  headerRightBtn: {
+    padding: 4,
   },
 
   // --- Plan Card Styles (The "Spontaneous Trip" box) ---
@@ -882,6 +918,42 @@ const styles = StyleSheet.create({
     width: 220,
     height: 160,
     borderRadius: 16,
+  },
+  multiImageCard: {
+    width: 220,
+    height: 160,
+    position: 'relative',
+  },
+  messageImageStacked: {
+    position: 'absolute',
+    width: 200,
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FFF',
+  },
+  reactionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  reactionsRowLeft: { alignSelf: 'flex-start' },
+  reactionsRowRight: { alignSelf: 'flex-end' },
+  reactionEmoji: {
+    fontSize: 16,
+  },
+  typingBar: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  typingText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 
   // --- Input ---
