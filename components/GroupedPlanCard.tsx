@@ -175,45 +175,52 @@ export default function GroupedPlanCard({
           />
         </TouchableOpacity>
 
-        {/* Plan Title */}
-        <Text style={styles.title} numberOfLines={1}>
-          {postTitle}
-        </Text>
+        {/* Plan Title + Date row (Level 3: date on right); extra right padding when avatars shown (Level 2) */}
+        <View style={[styles.titleRow, !showInteractions && styles.titleRowWithAvatars]}>
+          <Text style={styles.title} numberOfLines={1}>
+            {postTitle}
+          </Text>
+          {expanded && showInteractions && (
+            <Text style={styles.dateInline}>{formatDate(created_at)}</Text>
+          )}
+        </View>
 
         {/* Description - Show in Level 2 (collapsed) and Level 3 (expanded) */}
         <Text style={styles.description} numberOfLines={expanded && showInteractions ? undefined : 2}>
           {postText}
         </Text>
 
-        {/* Stacked Avatars */}
-        <View style={styles.avatarsContainer}>
-          {avatars.map((avatar, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.avatarWrapper,
-                { zIndex: avatars.length - idx },
-                idx > 0 && { marginLeft: -12 },
-              ]}
-            >
-              <Avatar uri={avatar} size={32} />
-            </View>
-          ))}
-          {remainingCount > 0 && (
-            <View
-              style={[
-                styles.avatarWrapper,
-                styles.avatarOverlay,
-                { marginLeft: -12, zIndex: 0 },
-              ]}
-            >
-              <View style={styles.overlayBadge}>
-                <Text style={styles.overlayBadgeText}>+{remainingCount}</Text>
+        {/* Stacked Avatars - Level 2 only (top-right); do NOT show in Level 3 */}
+        {!showInteractions && (
+          <View style={styles.avatarsContainerTopRight}>
+            {avatars.map((avatar, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.avatarWrapper,
+                  { zIndex: avatars.length - idx },
+                  idx > 0 && { marginLeft: -12 },
+                ]}
+              >
+                <Avatar uri={avatar} size={32} />
               </View>
-              <Avatar uri={null} size={32} />
-            </View>
-          )}
-        </View>
+            ))}
+            {remainingCount > 0 && (
+              <View
+                style={[
+                  styles.avatarWrapper,
+                  styles.avatarOverlay,
+                  { marginLeft: -12, zIndex: 0 },
+                ]}
+              >
+                <View style={styles.overlayBadge}>
+                  <Text style={styles.overlayBadgeText}>+{remainingCount}</Text>
+                </View>
+                <Avatar uri={null} size={32} />
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Tags - Show in Level 2 (collapsed) and Level 3 (expanded) */}
         {(post?.category_main || post?.category_sub?.length) && (
@@ -225,11 +232,6 @@ export default function GroupedPlanCard({
               <Tag key={idx} label={tag} />
             ))}
           </View>
-        )}
-
-        {/* Date (shown when expanded in Level 3) */}
-        {expanded && showInteractions && (
-          <Text style={styles.date}>{formatDate(created_at)}</Text>
         )}
 
         {/* Expanded Content: Individual Interactions (Level 3 only) */}
@@ -330,13 +332,28 @@ const styles = StyleSheet.create({
     top: 16,
     zIndex: 10,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingRight: 40, // Space for expand button
+    gap: 8,
+  },
+  titleRowWithAvatars: {
+    paddingRight: 116, // Space for stacked avatars (3×32 - overlap) + expand button
+  },
   title: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1C1C1E',
-    marginTop: 8,
-    marginBottom: 8,
-    paddingRight: 40, // Space for expand button
+    flex: 1,
+  },
+  dateInline: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '400',
   },
   description: {
     fontSize: 13,
@@ -344,11 +361,13 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
-  avatarsContainer: {
+  avatarsContainerTopRight: {
+    position: 'absolute',
+    top: 16,
+    right: 44, // Left of expand chevron
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingLeft: 4,
+    zIndex: 5,
   },
   avatarWrapper: {
     borderRadius: 16,
@@ -374,12 +393,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     marginBottom: 12,
     gap: 6,
-  },
-  date: {
-    fontSize: 11,
-    color: '#8E8E93',
-    fontWeight: '400',
-    marginBottom: 12,
   },
   expandedContent: {
     marginTop: 8,

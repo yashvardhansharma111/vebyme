@@ -508,6 +508,7 @@ export default function NotificationsScreen() {
                   <SummaryCard
                     totalCount={groupedPlanCards.length}
                     avatars={getAllAvatars()}
+                    rightAvatarUrl={getAllAvatars()[0] ?? undefined}
                     onPress={handleSummaryCardPress}
                     isExpanded={false}
                   />
@@ -516,6 +517,17 @@ export default function NotificationsScreen() {
                 {/* Level 2 & 3: Events List / Event Detail */}
                 {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
                   <>
+                    {/* Collapse header: tap to return to summary */}
+                    <TouchableOpacity
+                      style={styles.collapseEventsHeader}
+                      onPress={handleSummaryCardPress}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.collapseEventsHeaderText}>
+                        {groupedPlanCards.length} {groupedPlanCards.length === 1 ? 'event' : 'events'}
+                      </Text>
+                      <Ionicons name="chevron-up" size={20} color="#8E8E93" />
+                    </TouchableOpacity>
                     {groupedPlanCards.map((group, index) => {
                       // In Level 2, all cards are collapsed. In Level 3, only selected card is expanded
                       const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
@@ -835,6 +847,19 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 20,
     backgroundColor: '#F2F2F7',
+  },
+  collapseEventsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  collapseEventsHeaderText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   listContainer: {
     backgroundColor: '#FFFFFF',

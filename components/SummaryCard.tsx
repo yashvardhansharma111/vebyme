@@ -6,6 +6,8 @@ import Avatar from './Avatar';
 interface SummaryCardProps {
   totalCount: number;
   avatars: (string | null)[];
+  /** Single avatar shown at top-right (reference design) */
+  rightAvatarUrl?: string | null;
   onPress: () => void;
   isExpanded: boolean;
 }
@@ -13,6 +15,7 @@ interface SummaryCardProps {
 export default function SummaryCard({
   totalCount,
   avatars,
+  rightAvatarUrl,
   onPress,
   isExpanded,
 }: SummaryCardProps) {
@@ -22,14 +25,21 @@ export default function SummaryCard({
       onPress={onPress}
       activeOpacity={0.9}
     >
-      {/* Count Badge */}
+      {/* Count Badge - top left */}
       <View style={styles.badgeContainer}>
         <Text style={styles.badgeText}>{totalCount}</Text>
       </View>
 
-      {/* Expand/Collapse Icon */}
+      {/* Single avatar - top right (reference design) */}
+      {rightAvatarUrl != null && (
+        <View style={styles.rightAvatarContainer}>
+          <Avatar uri={rightAvatarUrl} size={36} />
+        </View>
+      )}
+
+      {/* Expand/Collapse Icon - left of right avatar when present */}
       <TouchableOpacity
-        style={styles.expandButton}
+        style={[styles.expandButton, rightAvatarUrl != null && { right: 56 }]}
         onPress={onPress}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
       >
@@ -45,7 +55,7 @@ export default function SummaryCard({
         {totalCount} {totalCount === 1 ? 'event' : 'events'}
       </Text>
 
-      {/* Stacked Avatars */}
+      {/* Stacked Avatars - upper left (immediately right of badge) */}
       <View style={styles.avatarsContainer}>
         {avatars.slice(0, 3).map((avatar, idx) => (
           <View
@@ -114,6 +124,15 @@ const styles = StyleSheet.create({
     right: 16,
     top: 16,
     zIndex: 10,
+  },
+  rightAvatarContainer: {
+    position: 'absolute',
+    right: 16,
+    top: 16,
+    zIndex: 10,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 122, 255, 0.3)',
   },
   title: {
     fontSize: 16,
