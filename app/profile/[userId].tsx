@@ -8,14 +8,24 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchUserProfile, fetchUserStats } from '@/store/slices/profileSlice';
 import { apiService } from '@/services/api';
+
+const CARD_SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.05,
+  shadowRadius: 10,
+  elevation: 3,
+};
 
 const INTEREST_ICONS: { [key: string]: string } = {
   Rooftop: 'business',
@@ -57,11 +67,14 @@ const TAG_ICONS: { [key: string]: string } = {
 export default function OtherUserProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { height: screenHeight } = useWindowDimensions();
   const dispatch = useAppDispatch();
   const { viewedUser, stats, isLoading } = useAppSelector((state) => state.profile);
-  const { user: currentUser } = useAppSelector((state) => state.auth);
   const [recentPlans, setRecentPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
+
+  const topSectionHeight = screenHeight * 0.6;
+  const blurHeight = topSectionHeight * 0.4;
 
   useEffect(() => {
     if (userId) {
@@ -86,14 +99,6 @@ export default function OtherUserProfileScreen() {
     }
   };
 
-  const handleChat = () => {
-    if (!currentUser?.user_id || !userId) {
-      Alert.alert('Error', 'Please login to start a chat');
-      return;
-    }
-    Alert.alert('Coming Soon', 'Chat feature will be available soon');
-  };
-
   const handleReport = () => {
     Alert.alert(
       'Report User',
@@ -113,203 +118,202 @@ export default function OtherUserProfileScreen() {
 
   if (isLoading && !viewedUser) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#1C1C1E" />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   const socialMedia = (viewedUser as any)?.social_media || {};
   const interests = viewedUser?.interests || [];
   const hasProfileImage = viewedUser?.profile_image;
+  const socialEntries = [
+    socialMedia.instagram && { key: 'instagram', icon: 'logo-instagram', handle: socialMedia.instagram },
+    socialMedia.twitter && { key: 'twitter', icon: 'logo-twitter', handle: socialMedia.twitter },
+    socialMedia.facebook && { key: 'facebook', icon: 'logo-facebook', handle: socialMedia.facebook },
+  ].filter(Boolean) as { key: string; icon: string; handle: string }[];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header with back button */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <View style={styles.backButtonInner}>
-              <Ionicons name="arrow-back" size={20} color="#FFF" />
-              <Ionicons name="close" size={16} color="#FFF" style={styles.closeIcon} />
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Profile Picture Section */}
-        {hasProfileImage ? (
-          <View style={styles.profileImageContainer}>
+        {/* 1. Top section: profile image, blur on bottom 40% fading to background color */}
+        <View style={[styles.topSection, { height: topSectionHeight }]}>
+          {hasProfileImage ? (
             <Image
-              source={{ uri: viewedUser.profile_image! }}
-              style={styles.profileImageBackground}
+              source={{ uri: viewedUser!.profile_image! }}
+              style={styles.profileBackgroundImage}
               resizeMode="cover"
             />
-            <View style={styles.profileContent}>
-              <View style={styles.profileImageWrapper}>
-                <Image
-                  source={{ uri: viewedUser.profile_image! }}
-                  style={styles.profileImageCircle}
-                  resizeMode="cover"
-                />
-              </View>
-              <BlurView intensity={40} tint="dark" style={styles.profileInfoBlur}>
-                <View style={styles.profileInfo}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.userName}>{viewedUser?.name || 'User'}</Text>
-                    <Ionicons name="checkmark-circle" size={20} color="#FFF" style={styles.verifiedIcon} />
-                  </View>
-                  {viewedUser?.bio && (
-                    <Text style={styles.bio} numberOfLines={2}>
-                      {viewedUser.bio}
-                    </Text>
-                  )}
-                </View>
-              </BlurView>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.profileImageContainerNoImage}>
-            <View style={styles.profileInfoNoImage}>
-              <View style={styles.nameRow}>
-                <Text style={styles.userNameNoImage}>{viewedUser?.name || 'User'}</Text>
-                <Ionicons name="checkmark-circle" size={20} color="#1C1C1E" style={styles.verifiedIcon} />
-              </View>
-              {viewedUser?.bio && (
-                <Text style={styles.bioNoImage} numberOfLines={2}>
-                  {viewedUser.bio}
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
+          ) : (
+            <View style={styles.profileBackgroundPlaceholder} />
+          )}
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats?.plans_count || 0}</Text>
-            <Text style={styles.statLabel}>#plans</Text>
+          {/* Transition Layer: Blur + Gradient */}
+          <View style={[styles.blurOverlay, { height: blurHeight }]}>
+            {/* Layer 1: The Blur - Intensity 90+ gives that thick glass look */}
+            <BlurView
+              intensity={95}
+              tint="light"
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Layer 2: The Grain/Texture Overlay (Optional)
+                If you have a small noise/grain png, you'd place it here with 0.05 opacity
+            */}
+            {/* Layer 3: The "Melt" Gradient - 4-step to control where grainy photo turns into solid background */}
+            <LinearGradient
+              colors={[
+                'rgba(242, 242, 242, 0)',
+                'rgba(242, 242, 242, 0.2)',
+                'rgba(242, 242, 242, 0.7)',
+                '#F2F2F2',
+              ]}
+              locations={[0, 0.3, 0.7, 1]}
+              style={StyleSheet.absoluteFill}
+            />
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{stats?.interactions_count || 0}</Text>
-            <Text style={styles.statLabel}>#interactions</Text>
+
+          {/* UI Elements on top of the transition */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+          </TouchableOpacity>
+
+          <View style={styles.profileOverlay}>
+            <View style={styles.nameRow}>
+              <Text style={styles.userName}>{viewedUser?.name || 'User'}</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#FFF" style={styles.verifiedIcon} />
+            </View>
+            {viewedUser?.bio ? (
+              <Text style={styles.statusTagline} numberOfLines={2}>
+                {viewedUser.bio}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats?.plans_count ?? 0}</Text>
+              <Text style={styles.statLabel}>#plans</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>{stats?.interactions_count ?? 0}</Text>
+              <Text style={styles.statLabel}>#interactions</Text>
+            </View>
           </View>
         </View>
 
-        {/* Social Media Card */}
-        {(socialMedia.instagram || socialMedia.twitter) && (
-          <View style={styles.sectionCard}>
-            {socialMedia.instagram && (
-              <View style={styles.socialRow}>
-                <View style={styles.socialIconContainer}>
-                  <Ionicons name="logo-instagram" size={20} color="#1C1C1E" />
-                </View>
-                <Text style={styles.socialText}>{socialMedia.instagram}</Text>
-              </View>
-            )}
-            {socialMedia.twitter && (
-              <View style={styles.socialRow}>
-                <View style={styles.socialIconContainer}>
-                  <Ionicons name="logo-twitter" size={20} color="#1C1C1E" />
-                </View>
-                <Text style={styles.socialText}>{socialMedia.twitter}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Interests Card - CENTERED */}
-        {interests.length > 0 && (
-          <View style={styles.sectionCard}>
-            <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>#interests</Text>
-            <View style={[styles.interestsGrid, { justifyContent: 'center' }]}>
-              {interests.map((interest, index) => (
-                <View key={index} style={styles.interestChip}>
-                  <Ionicons
-                    name={(INTEREST_ICONS[interest] || 'ellipse') as any}
-                    size={14}
-                    color="#1C1C1E"
-                    style={styles.interestIcon}
-                  />
-                  <Text style={styles.interestText}>{interest}</Text>
-                </View>
+        {/* 2. Bottom section: solid #F2F2F2, content cards */}
+        <View style={styles.bottomSection}>
+          {/* Social links card */}
+          {socialEntries.length > 0 && (
+            <View style={[styles.sectionCard, { marginBottom: 15 }]}>
+              {socialEntries.map((entry, index) => (
+                <React.Fragment key={entry.key}>
+                  {index > 0 && <View style={styles.hairlineDivider} />}
+                  <View style={styles.socialRow}>
+                    <Ionicons name={entry.icon as any} size={22} color="#1C1C1E" />
+                    <Text style={styles.socialHandle}>{entry.handle}</Text>
+                  </View>
+                </React.Fragment>
               ))}
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Recent Plans - SEPARATE HEADER & CARDS */}
-        <Text style={styles.sectionHeaderTitle}>Recent Plans</Text>
-
-        {loadingPlans ? (
-          <ActivityIndicator size="small" color="#1C1C1E" style={styles.loading} />
-        ) : recentPlans.length === 0 ? (
-          <Text style={styles.emptyText}>No plans yet</Text>
-        ) : (
-          recentPlans.map((plan) => {
-            const allTags = [
-              ...(plan.temporal_tags || []),
-              ...(plan.category_sub || []),
-            ].slice(0, 3);
-
-            return (
-              <View key={plan.plan_id} style={styles.standalonePlanCard}>
-                <View style={styles.planRow}>
-                  {/* Left Content */}
-                  <View style={styles.planContent}>
-                    <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-                    <Text style={styles.planDescription} numberOfLines={3}>
-                      {plan.description || 'No description'}
-                    </Text>
-                    
-                    {allTags.length > 0 && (
-                      <View style={styles.planTags}>
-                        {allTags.map((tag: string, idx: number) => (
-                          <View key={idx} style={styles.planTag}>
-                            <Ionicons
-                              name={(TAG_ICONS[tag] || 'ellipse') as any}
-                              size={12}
-                              color="#1C1C1E"
-                              style={styles.tagIcon}
-                            />
-                            <Text style={styles.planTagText}>{tag}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                    
-                    {/* "vybeme!" text check - if available in data */}
-                    <Text style={styles.vybemeText}>vybeme!</Text>
-                  </View>
-
-                  {/* Right Image (if exists) */}
-                  {plan.media && plan.media.length > 0 && (
-                    <Image
-                      source={{ uri: plan.media[0].url }}
-                      style={styles.planImage}
-                      resizeMode="cover"
+          {/* Interests card */}
+          {interests.length > 0 && (
+            <View style={[styles.sectionCard, { marginBottom: 15 }]}>
+              <Text style={styles.interestsLabel}>#interests</Text>
+              <View style={styles.interestsWrap}>
+                {interests.map((interest, index) => (
+                  <View key={index} style={styles.interestTag}>
+                    <Ionicons
+                      name={(INTEREST_ICONS[interest] || 'ellipse') as any}
+                      size={14}
+                      color="#1C1C1E"
+                      style={styles.interestTagIcon}
                     />
-                  )}
+                    <Text style={styles.interestTagText}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Recent Plans: pill stuck on first card's top-left + list */}
+          {loadingPlans ? (
+            <ActivityIndicator size="small" color="#1C1C1E" style={{ paddingVertical: 20 }} />
+          ) : recentPlans.length === 0 ? (
+            <>
+              <View style={styles.recentPlansHeader}>
+                <View style={styles.recentPlansPill}>
+                  <Text style={styles.recentPlansPillText}>Recent Plans</Text>
                 </View>
               </View>
-            );
-          })
-        )}
+              <Text style={styles.emptyText}>No plans yet</Text>
+            </>
+          ) : (
+            <View style={styles.recentPlansListWrapper}>
+              <View style={styles.recentPlansPillStuck}>
+                <Text style={styles.recentPlansPillText}>Recent Plans</Text>
+              </View>
+            {recentPlans.map((plan, planIndex) => {
+              const allTags = [
+                ...(plan.temporal_tags || []),
+                ...(plan.category_sub || []),
+              ].slice(0, 3);
+              const hasImage = plan.media && plan.media.length > 0;
+              const isFirstCard = planIndex === 0;
 
-        {/* Report User */}
-        <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
-          <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
-          <Text style={styles.reportText}>Report User</Text>
-        </TouchableOpacity>
+              return (
+                <View key={plan.plan_id} style={[styles.planCard, isFirstCard && styles.planCardFirst]}>
+                  <View style={styles.planCardInner}>
+                    <View style={styles.planTextBlock}>
+                      <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
+                      <Text style={styles.planDescription} numberOfLines={4}>
+                        {plan.description || 'No description'}
+                      </Text>
+                      {allTags.length > 0 && (
+                        <View style={styles.planTagsRow}>
+                          {allTags.map((tag: string, idx: number) => (
+                            <View key={idx} style={styles.planTagChip}>
+                              <Ionicons
+                                name={(TAG_ICONS[tag] || 'ellipse') as any}
+                                size={12}
+                                color="#222"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text style={styles.planTagChipText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                    {hasImage && (
+                      <Image
+                        source={{ uri: plan.media[0].url }}
+                        style={styles.planThumbnail}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+            </View>
+          )}
 
-        {/* Chat Button */}
-        <TouchableOpacity style={styles.chatButton} onPress={handleChat}>
-          <Text style={styles.chatButtonText}>Chat</Text>
-        </TouchableOpacity>
-        
-        {/* Bottom padding for scroll */}
-        <View style={{ height: 20 }} />
+          {/* Report */}
+          <TouchableOpacity style={styles.reportButton} onPress={handleReport}>
+            <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
+            <Text style={styles.reportText}>Report User</Text>
+          </TouchableOpacity>
+          <View style={{ height: 40 }} />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -318,7 +322,7 @@ export default function OtherUserProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F2F2F2',
   },
   scrollView: {
     flex: 1,
@@ -327,295 +331,247 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F2F2F2',
   },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-    position: 'absolute',
-    zIndex: 10,
-    top: 40,
-    left: 0,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeIcon: {
-    marginLeft: -4,
-  },
-  profileImageContainer: {
+  topSection: {
     width: '100%',
-    height: 400, // Slightly taller based on UI
     position: 'relative',
-    marginBottom: 20,
+    backgroundColor: '#F2F2F2',
   },
-  profileImageBackground: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
+  profileBackgroundImage: {
+    ...StyleSheet.absoluteFillObject,
   },
-  profileContent: {
+  profileBackgroundPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#4A3B69',
+  },
+  blurOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    alignItems: 'center',
-    paddingBottom: 20,
-  },
-  profileImageWrapper: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    bottom: 0,
     overflow: 'hidden',
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  profileImageCircle: {
-    width: '100%',
-    height: '100%',
-  },
-  profileInfoBlur: {
-    width: '100%',
-    borderRadius: 0,
-    overflow: 'hidden',
-  },
-  profileInfo: {
-    width: '100%',
-    padding: 20,
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)', // Fallback/Overlay
+    zIndex: 10,
   },
-  profileImageContainerNoImage: {
-    width: '100%',
-    paddingHorizontal: 20,
-    paddingTop: 80, // Space for header
-    paddingBottom: 20,
-    marginBottom: 20,
-  },
-  profileInfoNoImage: {
-    width: '100%',
-    alignItems: 'center',
+  profileOverlay: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 135,
+    zIndex: 5,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   userName: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#FFF',
     marginRight: 8,
-  },
-  userNameNoImage: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    marginRight: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   verifiedIcon: {
     marginLeft: 4,
   },
-  bio: {
+  statusTagline: {
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
+    fontWeight: '500',
     lineHeight: 20,
   },
-  bioNoImage: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  statsContainer: {
+  statsRow: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    gap: 20,
+    zIndex: 5,
   },
   statCard: {
     flex: 1,
+    height: 100,
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 30,
+    justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...CARD_SHADOW,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#1C1C1E',
+    color: '#222',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#666',
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  bottomSection: {
+    flex: 1,
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 20,
+    paddingTop: 15,
   },
   sectionCard: {
     backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 30,
+    padding: 22,
+    ...CARD_SHADOW,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: 16,
-  },
-  sectionHeaderTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginTop: 10,
-    marginBottom: 16,
-    textAlign: 'center', // Centered title outside cards
+  hairlineDivider: {
+    height: 0.5,
+    backgroundColor: '#E5E5EA',
+    marginVertical: 0,
   },
   socialRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    paddingVertical: 14,
   },
-  socialIconContainer: {
-    width: 24,
-    alignItems: 'center',
-  },
-  socialText: {
-    fontSize: 14,
+  socialHandle: {
+    fontSize: 15,
     color: '#1C1C1E',
-    marginLeft: 12,
+    marginLeft: 14,
     fontWeight: '500',
   },
-  interestsGrid: {
+  interestsLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  interestsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
   },
-  interestChip: {
+  interestTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#EFEFEF',
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
+    borderRadius: 25,
   },
-  interestIcon: {
-    marginRight: 2,
+  interestTagIcon: {
+    marginRight: 6,
   },
-  interestText: {
-    fontSize: 12,
+  interestTagText: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#1C1C1E',
   },
-  loading: {
-    padding: 20,
+  recentPlansHeader: {
+    marginBottom: 8,
+  },
+  recentPlansPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+  },
+  recentPlansListWrapper: {
+    position: 'relative',
+    marginBottom: 0,
+  },
+  recentPlansPillStuck: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+  },
+  recentPlansPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  planCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 35,
+    padding: 22,
+    marginBottom: 15,
+    ...CARD_SHADOW,
+  },
+  planCardFirst: {
+    marginTop: 26,
+  },
+  planCardInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  planTextBlock: {
+    flex: 1,
+    marginRight: 12,
+  },
+  planTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#222222',
+    marginBottom: 8,
+  },
+  planDescription: {
+    fontSize: 14,
+    color: '#555555',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  planTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  planTagChipIcon: {
+    marginRight: 4,
+  },
+  planTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFEFEF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+  },
+  planTagChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#222',
+  },
+  planThumbnail: {
+    width: 75,
+    height: 75,
+    borderRadius: 15,
   },
   emptyText: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    padding: 20,
-  },
-  // New Styles for Separate Cards
-  standalonePlanCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  planRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  planContent: {
-    flex: 1,
-    marginRight: 12,
-  },
-  planTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
-  planDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  planTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  planTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  tagIcon: {
-    marginRight: 2,
-  },
-  planTagText: {
-    fontSize: 12,
-    color: '#1C1C1E',
-    fontWeight: '600',
-  },
-  vybemeText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginTop: 4,
-  },
-  planImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-    marginTop: 4,
+    paddingVertical: 20,
   },
   reportButton: {
     flexDirection: 'row',
@@ -623,38 +579,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     padding: 18,
-    marginHorizontal: 20,
+    marginTop: 8,
     marginBottom: 12,
     backgroundColor: '#FFF',
     borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    ...CARD_SHADOW,
   },
   reportText: {
     fontSize: 14,
     color: '#FF3B30',
     fontWeight: '600',
-  },
-  chatButton: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 30,
-    padding: 18,
-    marginHorizontal: 20,
-    marginBottom: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  chatButtonText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });

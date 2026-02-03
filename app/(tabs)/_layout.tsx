@@ -21,7 +21,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       {/* 1. The White Pill Navigation (Matches Image 1) */}
       <BlurView intensity={80} tint="light" style={styles.pillContainer}>
         {state.routes
-          .filter((route: any) => route.name !== 'createPost') // Filter out createPost from pill navigation
+          .filter((route: any) => route.name !== 'createPost' && route.name !== 'createBusinessPost') // Filter out create screens from pill
           .map((route: any, index: number) => {
             const { options } = descriptors[route.key];
             // Find the actual index in the full routes array

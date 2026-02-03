@@ -7,6 +7,7 @@ export default function ProfileLayout() {
       <Stack.Screen name="edit" />
       <Stack.Screen name="your-plans" />
       <Stack.Screen name="saved-plans" />
+      <Stack.Screen name="tickets-passes" />
       <Stack.Screen name="location-preference" />
       <Stack.Screen name="manage-socials" />
       <Stack.Screen name="manage-interests" />

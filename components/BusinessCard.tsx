@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -6,6 +8,14 @@ import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 import RepostModal from './RepostModal';
+
+function getCategoryIcon(tag: string): string {
+  const t = tag.toLowerCase();
+  if (t.includes('weekend')) return 'checkbox-outline';
+  if (t.includes('evening')) return 'cloud-outline';
+  if (t.includes('hitchhik') || t.includes('travel')) return 'leaf-outline';
+  return 'pricetag-outline';
+}
 
 interface BusinessCardProps {
   plan: {
@@ -87,9 +97,18 @@ function BusinessCardBase({
       onPress={onPress}
       activeOpacity={0.95}
     >
-      {/* Main Image */}
-      <Image source={{ uri: mainImage }} style={styles.mainImage} resizeMode="cover" />
-      
+      {/* Media as full background */}
+      <Image source={{ uri: mainImage }} style={styles.backgroundMedia} resizeMode="cover" />
+      {/* Blur lower 30% of image */}
+      <View style={styles.lowerBlurOverlay} pointerEvents="none">
+        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+      </View>
+      <LinearGradient
+        colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']}
+        style={styles.backgroundFade}
+        pointerEvents="none"
+      />
+
       {/* Organizer Info Overlay (Top Left) */}
       <View style={styles.organizerPill}>
         <Avatar uri={organizerAvatar} size={32} />
@@ -113,26 +132,26 @@ function BusinessCardBase({
         </View>
       )}
 
-      {/* Content Panel (Bottom Overlay) */}
-      <View style={styles.contentPanel}>
+      {/* Text section – larger overlay above background */}
+      <View style={styles.textSection}>
         <Text style={styles.title}>{plan.title}</Text>
-        <Text style={styles.description} numberOfLines={3}>
+        <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
           {plan.description}
         </Text>
 
-        {/* Tags */}
+        {/* Category pills */}
         {plan.category_sub && plan.category_sub.length > 0 && (
           <View style={styles.tagsContainer}>
             {plan.category_sub.slice(0, 3).map((tag: string, index: number) => (
               <View key={index} style={styles.tag}>
-                <Ionicons name="checkbox" size={12} color="#555" style={{ marginRight: 4 }} />
+                <Ionicons name={getCategoryIcon(tag) as any} size={12} color="#333" style={styles.tagIcon} />
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Action Buttons */}
+        {/* Action: Book Event + Repost + Share */}
         <View style={styles.footer}>
           <TouchableOpacity 
             style={styles.registerButton}
@@ -144,13 +163,13 @@ function BusinessCardBase({
             style={styles.iconButton}
             onPress={onRepostPress}
           >
-            <Ionicons name="repeat-outline" size={20} color="#000" />
+            <Ionicons name="repeat-outline" size={20} color="#1C1C1E" />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.iconButton}
             onPress={handleShare}
           >
-            <Ionicons name="paper-plane-outline" size={20} color="#000" />
+            <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
           </TouchableOpacity>
         </View>
       </View>
@@ -317,18 +336,32 @@ const styles = StyleSheet.create({
   cardContainer: {
     marginHorizontal: 16,
     marginBottom: 16,
+    height: 420,
     borderRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 4,
   },
-  mainImage: {
-    width: '100%',
-    height: 300,
+  backgroundMedia: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  lowerBlurOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 126,
+    overflow: 'hidden',
+  },
+  backgroundFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 200,
   },
   organizerPill: {
     position: 'absolute',
@@ -381,15 +414,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
-  contentPanel: {
+  textSection: {
+    position: 'absolute',
+    bottom: 14,
+    left: 10,
+    right: 10,
     backgroundColor: '#FFF',
-    padding: 20,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -20,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
   },
   title: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '800',
     color: '#1C1C1E',
     marginBottom: 8,
@@ -397,22 +436,27 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     color: '#444',
-    lineHeight: 20,
-    marginBottom: 16,
+    lineHeight: 21,
+    marginBottom: 14,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+  },
+  tagIcon: {
+    marginRight: 4,
   },
   tagText: {
     fontSize: 12,
@@ -422,7 +466,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   registerButton: {
     flex: 1,

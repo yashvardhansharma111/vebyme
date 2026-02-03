@@ -13,17 +13,18 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { Colors, borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { updateProfile, fetchCurrentUser } from '@/store/slices/profileSlice';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 
 export default function EditProfileScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const insets = useSafeAreaInsets();
   const { user } = useAppSelector((state) => state.auth);
   const { currentUser, isLoading } = useAppSelector((state) => state.profile);
 
@@ -206,90 +207,63 @@ export default function EditProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Header: back + Edit Profile (top left) */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
+          <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
-        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* Profile Photo Section - Card Style */}
-        <View style={styles.photoCard}>
-          <Image
-            source={{ uri: profileImage || 'https://via.placeholder.com/100' }}
-            style={styles.profileImage}
-          />
-          <View style={styles.photoButtons}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.contentInner}>
+        {/* Centered: avatar + inputs */}
+        <View style={styles.centerBlock}>
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatarCircle}>
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <Ionicons name="person" size={64} color="#9CA3AF" />
+              )}
+            </View>
             <TouchableOpacity
-              style={styles.editPhotoButton}
+              style={styles.cameraButton}
               onPress={() => setShowPhotoModal(true)}
               disabled={uploading}
             >
               {uploading ? (
                 <ActivityIndicator size="small" color="#1C1C1E" />
               ) : (
-                <Text style={styles.editPhotoText}>Edit Photo</Text>
+                <Ionicons name="camera" size={22} color="#1C1C1E" />
               )}
             </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={styles.removePhotoButton}
-              onPress={handleRemovePhoto}
-            >
-              <Text style={styles.removePhotoText}>Remove</Text>
-            </TouchableOpacity>
           </View>
+
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Your Name"
+            placeholderTextColor="#9CA3AF"
+            maxLength={30}
+          />
+
+          <TextInput
+            style={[styles.input, styles.bioInput]}
+            value={bio}
+            onChangeText={setBio}
+            placeholder="Status"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={3}
+            maxLength={90}
+            textAlignVertical="top"
+          />
         </View>
-
-        {/* Input Fields Section - Card Style */}
-        <View style={styles.formCard}>
-          {/* Username Input */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputHeader}>
-              <Text style={styles.label}>Username</Text>
-              <Text style={styles.charCount}>{name.length}/30</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter username"
-              placeholderTextColor="#9CA3AF"
-              maxLength={30}
-            />
-          </View>
-
-          {/* Divider */}
-          <View style={styles.divider} />
-
-          {/* Bio Input */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputHeader}>
-              <Text style={styles.label}>Bio</Text>
-              <Text style={styles.charCount}>{bio.length}/90</Text>
-            </View>
-            <TextInput
-              style={[styles.input, styles.bioInput]}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Tell us about yourself"
-              placeholderTextColor="#9CA3AF"
-              multiline
-              numberOfLines={4}
-              maxLength={90}
-              textAlignVertical="top"
-            />
-          </View>
-        </View>
-
       </ScrollView>
 
       {/* Save Button */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity
           style={[styles.saveButton, saving && styles.saveButtonDisabled]}
           onPress={handleSave}
@@ -303,39 +277,52 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Photo Selection Modal */}
+      {/* Profile Photo Modal - bottom sheet with Camera & Gallery pills */}
       <Modal
         visible={showPhotoModal}
         transparent
         animationType="slide"
         onRequestClose={() => setShowPhotoModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Photo Source</Text>
-              <TouchableOpacity onPress={() => setShowPhotoModal(false)}>
-                <Ionicons name="close" size={24} color="#1C1C1E" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => pickImage('camera')}
-              >
-                <IconSymbol name="camera.fill" size={32} color="#1C1C1E" />
-                <Text style={styles.modalButtonText}>Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => pickImage('gallery')}
-              >
-                <IconSymbol name="photo.fill" size={32} color="#1C1C1E" />
-                <Text style={styles.modalButtonText}>Gallery</Text>
-              </TouchableOpacity>
-            </View>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowPhotoModal(false)}
+        >
+          <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.modalContent} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.modalContentInner}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={styles.modalHeader}>
+                <TouchableOpacity onPress={() => setShowPhotoModal(false)} style={styles.modalClose}>
+                  <Ionicons name="close" size={24} color="#1C1C1E" />
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Profile Photo</Text>
+              </View>
+              <View style={styles.modalPills}>
+                <TouchableOpacity
+                  style={[styles.modalPill, styles.modalPillFirst]}
+                  onPress={() => pickImage('camera')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="camera-outline" size={22} color="#1C1C1E" style={styles.modalPillIcon} />
+                  <Text style={styles.modalPillText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalPill}
+                  onPress={() => pickImage('gallery')}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="images-outline" size={22} color="#1C1C1E" style={styles.modalPillIcon} />
+                  <Text style={styles.modalPillText}>Gallery</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -344,22 +331,21 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F2',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#F2F2F2',
   },
   backButton: {
     padding: 4,
+    marginRight: 12,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
   },
@@ -367,112 +353,77 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  
-  // Photo Section Styles
-  photoCard: {
-    flexDirection: 'row',
+  contentInner: {
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 24,
+  },
+  centerBlock: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  avatarWrapper: {
+    alignSelf: 'center',
+    marginBottom: 28,
+    position: 'relative',
+  },
+  avatarCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cameraButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    padding: 12, // Reduced padding to fit buttons better
-    marginBottom: 20,
+    backgroundColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F2F2F2',
-  },
-  profileImage: {
-    width: 70, // Slightly reduced from 80
-    height: 70,
-    borderRadius: 35,
-    marginRight: 12, // Reduced margin
-    backgroundColor: '#F2F2F2',
-  },
-  photoButtons: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8, // Reduced gap
-  },
-  editPhotoButton: {
-    flex: 1,
-    backgroundColor: '#F2F2F2',
-    paddingVertical: 10, // Adjusted padding
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editPhotoText: {
-    fontSize: 13, // Slightly smaller text if needed
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  removePhotoButton: {
-    flex: 1,
-    backgroundColor: '#1C1C1E',
-    paddingVertical: 10,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removePhotoText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-
-  // Form Section Styles
-  formCard: {
-    backgroundColor: '#F5F5F5', // Darker gray for better visibility against white
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
-  },
-  inputContainer: {
-    marginBottom: 4,
-  },
-  inputHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600', // Made bold
-    color: '#555555', // Darker gray label
-  },
-  charCount: {
-    fontSize: 12,
-    color: '#888',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   input: {
-    fontSize: 16,
-    color: '#000000', // Solid black text
-    paddingVertical: 8,
-    fontWeight: '600', // Semi-bold text
+    fontSize: 17,
+    color: '#1C1C1E',
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    marginBottom: 16,
+    alignSelf: 'stretch',
+    width: '100%',
+    minWidth: 0,
+    minHeight: 52,
   },
   bioInput: {
-    height: 80,
+    minHeight: 120,
+    paddingTop: 18,
     textAlignVertical: 'top',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#E0E0E0', // Darker divider
-    marginVertical: 16,
-  },
-
-  // Footer Styles
   footer: {
-    padding: 20,
-    paddingBottom: 40,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    backgroundColor: '#F2F2F2',
   },
   saveButton: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 30,
-    paddingVertical: 18,
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -480,48 +431,64 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   saveButtonText: {
-    color: '#FFFFFF',
+    color: '#FFF',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-
-  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    justifyContent: 'flex-end',
+  },
+  modalContentInner: {
+    backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    paddingTop: 20,
+    paddingHorizontal: 20,
     paddingBottom: 40,
+    alignItems: 'center',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 24,
+    alignSelf: 'stretch',
+  },
+  modalClose: {
+    padding: 4,
+    marginRight: 12,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 20,
-  },
-  modalButton: {
+  modalPills: {
+    alignSelf: 'stretch',
     alignItems: 'center',
-    gap: 8,
-    padding: 16,
   },
-  modalButtonText: {
-    fontSize: 14,
+  modalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    width: '100%',
+  },
+  modalPillFirst: {
+    marginBottom: 12,
+  },
+  modalPillIcon: {
+    marginRight: 12,
+  },
+  modalPillText: {
+    fontSize: 16,
+    fontWeight: '500',
     color: '#1C1C1E',
-    fontWeight: '600',
   },
 });
