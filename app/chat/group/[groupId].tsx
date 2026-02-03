@@ -191,6 +191,7 @@ export default function GroupChatScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
+        allowsMultipleSelection: false,
         quality: 0.8,
       });
 

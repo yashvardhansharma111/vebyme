@@ -14,6 +14,7 @@ import {
   StatusBar,
   Modal,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -54,8 +55,12 @@ interface Message {
     tags?: string[];
     category_main?: string;
     category_sub?: string[];
+    is_business?: boolean;
   };
 }
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const MAX_BUBBLE_WIDTH = SCREEN_WIDTH - 32 - 40;
 
 interface GroupDetails {
   group_id: string;
@@ -82,6 +87,8 @@ export default function IndividualChatScreen() {
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
+  const [sharedPlanImageErrors, setSharedPlanImageErrors] = useState<Set<string>>(new Set());
+  const [messageImageErrors, setMessageImageErrors] = useState<Set<string>>(new Set());
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -149,6 +156,7 @@ export default function IndividualChatScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
+        allowsMultipleSelection: false,
         quality: 0.8,
       });
       if (!result.canceled && result.assets[0] && user?.user_id && groupId) {
@@ -214,6 +222,7 @@ export default function IndividualChatScreen() {
         description: plan.description,
         media: plan.media || [],
         tags: plan.category_sub || plan.tags || [],
+        is_business: plan.is_business === true,
       });
       setShowShareModal(false);
       await loadMessages();
@@ -281,24 +290,37 @@ export default function IndividualChatScreen() {
     const mediaItem = plan.media?.[0];
     const mediaUri = mediaItem ? (typeof mediaItem === 'string' ? mediaItem : mediaItem?.url) : null;
     const tags = plan.tags || plan.category_sub || (plan.category_main ? [plan.category_main] : []);
+    const isBusiness = plan.is_business === true;
+    const actionLabel = isBusiness ? 'Register' : 'Join';
+    const imageFailed = mediaUri && sharedPlanImageErrors.has(mediaUri);
 
     return (
       <View style={styles.sharedPlanCard}>
-        <Text style={styles.sharedPlanTitle}>{plan.title}</Text>
+        <Text style={styles.sharedPlanTitle} numberOfLines={1}>{plan.title}</Text>
         <Text style={styles.sharedPlanDescription} numberOfLines={3}>{plan.description}</Text>
-        {tags.length > 0 && (
+        <View style={styles.sharedPlanMiddleRow}>
           <View style={styles.sharedPlanTags}>
             {tags.slice(0, 3).map((tag: string, i: number) => (
               <View key={i} style={styles.sharedPlanTag}>
-                <Ionicons name={tag === 'Hitchhiking' ? 'walk' : tag === 'Weekend' ? 'calendar-outline' : 'pricetag-outline'} size={12} color="#555" style={{ marginRight: 4 }} />
-                <Text style={styles.sharedPlanTagText}>{tag}</Text>
+                <Ionicons name={tag === 'Hitchhiking' ? 'walk' : tag === 'Weekend' ? 'calendar-outline' : 'checkbox'} size={12} color="#555" style={{ marginRight: 4 }} />
+                <Text style={styles.sharedPlanTagText} numberOfLines={1}>{tag}</Text>
               </View>
             ))}
           </View>
-        )}
-        {mediaUri && mediaUri.trim() !== '' && (
-          <Image source={{ uri: mediaUri }} style={styles.sharedPlanImage} resizeMode="cover" />
-        )}
+          {mediaUri && mediaUri.trim() !== '' && !imageFailed && (
+            <Image
+              source={{ uri: mediaUri }}
+              style={styles.sharedPlanImage}
+              resizeMode="cover"
+              onError={() => setSharedPlanImageErrors((prev) => new Set(prev).add(mediaUri))}
+            />
+          )}
+          {mediaUri && imageFailed && (
+            <View style={styles.sharedPlanImagePlaceholder}>
+              <Ionicons name="image-outline" size={24} color="#8E8E93" />
+            </View>
+          )}
+        </View>
         <View style={styles.sharedPlanFooter}>
           <TouchableOpacity style={styles.sharedPlanIconBtn}>
             <Ionicons name="repeat-outline" size={20} color="#000" />
@@ -306,8 +328,11 @@ export default function IndividualChatScreen() {
           <TouchableOpacity style={styles.sharedPlanIconBtn}>
             <Ionicons name="paper-plane-outline" size={20} color="#000" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.sharedPlanJoinBtn} onPress={() => plan.plan_id && router.push(`/plan/${plan.plan_id}` as any)}>
-            <Text style={styles.sharedPlanJoinText}>Join</Text>
+          <TouchableOpacity
+            style={styles.sharedPlanActionBtn}
+            onPress={() => plan.plan_id && router.push(isBusiness ? `/business-plan/${plan.plan_id}` as any : `/plan/${plan.plan_id}` as any)}
+          >
+            <Text style={styles.sharedPlanActionText}>{actionLabel}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -342,17 +367,46 @@ export default function IndividualChatScreen() {
             activeOpacity={1}
             onLongPress={() => setReactionMessageId(item.message_id)}
             delayLongPress={400}
-            style={[styles.messageBubbleWrap, isMe && { alignItems: 'flex-end' }]}
+            style={[styles.messageBubbleWrap, isMe && { alignItems: 'flex-end' }, { maxWidth: MAX_BUBBLE_WIDTH }]}
           >
-            <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+            <View
+              style={[
+                styles.messageBubble,
+                isMe ? styles.bubbleRight : styles.bubbleLeft,
+                styles.messageBubbleConstrain,
+                { maxWidth: MAX_BUBBLE_WIDTH - 32 },
+              ]}
+            >
               {item.type === 'text' && (
-                <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                <Text
+                  style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}
+                  numberOfLines={0}
+                >
                   {typeof item.content === 'string' ? item.content : ''}
                 </Text>
               )}
-              {item.type === 'image' && (
-                <Image source={{ uri: item.content?.url || item.content }} style={styles.messageImage} resizeMode="cover" />
-              )}
+              {item.type === 'image' && (() => {
+                const imgUri = item.content?.url || item.content;
+                const uriStr = typeof imgUri === 'string' ? imgUri : '';
+                const imgFailed = uriStr && messageImageErrors.has(uriStr);
+                if (!uriStr || uriStr.trim() === '') return null;
+                if (imgFailed) {
+                  return (
+                    <View style={styles.messageImagePlaceholder}>
+                      <Ionicons name="image-outline" size={40} color="#8E8E93" />
+                      <Text style={styles.messageImagePlaceholderText}>Image</Text>
+                    </View>
+                  );
+                }
+                return (
+                  <Image
+                    source={{ uri: uriStr }}
+                    style={styles.messageImage}
+                    resizeMode="cover"
+                    onError={() => setMessageImageErrors((prev) => new Set(prev).add(uriStr))}
+                  />
+                );
+              })()}
               {item.type === 'plan' && item.shared_plan && renderSharedPlanCard(item.shared_plan)}
             </View>
             {item.reactions && item.reactions.length > 0 && (
@@ -606,10 +660,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   messageBubble: {
-    maxWidth: '75%',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 24, // Fully curvy
+    borderRadius: 24,
+    alignSelf: 'flex-start',
+    minWidth: 48,
+  },
+  messageBubbleConstrain: {
+    overflow: 'hidden',
   },
   bubbleLeft: {
     backgroundColor: '#F3F4F6',
@@ -630,16 +688,32 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   messageImage: {
-    width: 220,
-    height: 160,
+    width: '100%',
+    maxWidth: MAX_BUBBLE_WIDTH - 32,
+    aspectRatio: 4 / 3,
     borderRadius: 16,
+    backgroundColor: '#E5E5EA',
+  },
+  messageImagePlaceholder: {
+    width: '100%',
+    maxWidth: MAX_BUBBLE_WIDTH - 32,
+    aspectRatio: 4 / 3,
+    borderRadius: 16,
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messageImagePlaceholderText: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 6,
   },
   sharedPlanCard: {
     backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
-    minWidth: 260,
-    maxWidth: 280,
+    width: '100%',
+    maxWidth: '100%',
   },
   sharedPlanTitle: {
     fontSize: 17,
@@ -653,11 +727,18 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 12,
   },
+  sharedPlanMiddleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
   sharedPlanTags: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginRight: 8,
   },
   sharedPlanTag: {
     flexDirection: 'row',
@@ -666,6 +747,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
+    maxWidth: 120,
   },
   sharedPlanTagText: {
     fontSize: 12,
@@ -673,10 +755,20 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   sharedPlanImage: {
-    width: '100%',
-    height: 100,
+    width: 80,
+    height: 60,
     borderRadius: 12,
-    marginBottom: 12,
+    marginLeft: 10,
+    backgroundColor: '#E5E5EA',
+  },
+  sharedPlanImagePlaceholder: {
+    width: 80,
+    height: 60,
+    borderRadius: 12,
+    marginLeft: 10,
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sharedPlanFooter: {
     flexDirection: 'row',
@@ -691,7 +783,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sharedPlanJoinBtn: {
+  sharedPlanActionBtn: {
     flex: 1,
     height: 44,
     backgroundColor: '#1C1C1E',
@@ -699,7 +791,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sharedPlanJoinText: {
+  sharedPlanActionText: {
     color: '#FFF',
     fontWeight: '600',
     fontSize: 15,
