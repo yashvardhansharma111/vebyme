@@ -58,25 +58,18 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
           </View>
         </View>
 
-        <View style={styles.footer}>
-          {!isRepost && (
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={onRepostPress}
-            >
-              <Ionicons name="repeat-outline" size={20} color="#000" />
+        <View style={styles.footerPill}>
+          <View style={styles.footerIcons}>
+            {!isRepost && (
+              <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
+                <Ionicons name="repeat-outline" size={22} color="#000" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
+              <Ionicons name="paper-plane-outline" size={22} color="#000" />
             </TouchableOpacity>
-          )}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={onSharePress}
-          >
-            <Ionicons name="paper-plane-outline" size={20} color="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.joinButton}
-            onPress={onJoinPress}
-          >
+          </View>
+          <TouchableOpacity style={styles.joinPill} onPress={onJoinPress}>
             <Text style={styles.joinButtonText}>Join</Text>
           </TouchableOpacity>
         </View>
@@ -457,8 +450,38 @@ const styles = StyleSheet.create({
   tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   tagText: { fontSize: 12, fontWeight: '600', color: '#333' },
   eventImage: { width: 80, height: 60, borderRadius: 12, marginLeft: 10 },
-  footer: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  iconButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
-  joinButton: { flex: 1, height: 44, backgroundColor: '#1C1C1E', borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  footerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 24,
+    minHeight: 54,
+    paddingVertical: 10,
+    paddingLeft: 14,
+    paddingRight: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  footerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  footerIconBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  joinPill: {
+    flex: 1,
+    maxWidth: '50%',
+    marginLeft: 8,
+    height: 34,
+    backgroundColor: '#1C1C1E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 17,
+  },
   joinButtonText: { color: '#FFF', fontWeight: '600', fontSize: 16 },
 });

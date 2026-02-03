@@ -387,7 +387,7 @@ export default function HomeScreen() {
             {businessEvents.length > 0 && (
               <View style={styles.businessSection}>
                 <View style={styles.businessSectionHeader}>
-                  <Text style={styles.businessSectionTitle}>Business Plans</Text>
+                  <Text style={styles.businessSectionTitle}>Happening near me</Text>
                   <TouchableOpacity
                     style={styles.businessSectionArrow}
                     onPress={() => router.push('/business-posts')}
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   businessSectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#000000',
   },
   businessSectionArrow: {
     width: 32,

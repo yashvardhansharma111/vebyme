@@ -116,8 +116,13 @@ export default function MyProfileScreen() {
         {/* --- MENU SECTIONS --- */}
         <View style={styles.menuContainer}>
           
-          {/* Group 1: Plans */}
+          {/* Group 1: Plans, Saved, Tickets & Passes */}
           <View style={styles.menuGroup}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/tickets-passes')}>
+              <Ionicons name="ticket-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
+              <Text style={styles.menuText}>Tickets and Passes</Text>
+            </TouchableOpacity>
+            <View style={styles.divider} />
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/your-plans')}>
               <Ionicons name="calendar-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
               <Text style={styles.menuText}>Your Plans</Text>
