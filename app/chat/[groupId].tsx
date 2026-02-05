@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -63,6 +63,46 @@ interface Message {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const MAX_BUBBLE_WIDTH = SCREEN_WIDTH - 32 - 40;
+
+type DisplayItem = Message | (Message & { merged?: boolean; mergedUrls?: string[] });
+
+function mergeConsecutiveImageMessages(msgs: Message[]): DisplayItem[] {
+  const out: DisplayItem[] = [];
+  const getUrls = (m: Message): string[] => {
+    const c = m.content;
+    if (typeof c === 'string' && c.trim()) return [c];
+    if (c?.url && String(c.url).trim()) return [c.url];
+    if (Array.isArray(c?.urls)) return (c.urls as string[]).filter((u: string) => u?.trim());
+    return [];
+  };
+  let i = 0;
+  while (i < msgs.length) {
+    const msg = msgs[i];
+    if (msg.type !== 'image') {
+      out.push(msg);
+      i++;
+      continue;
+    }
+    const urls = [...getUrls(msg)];
+    let j = i + 1;
+    while (j < msgs.length && msgs[j].type === 'image' && msgs[j].user_id === msg.user_id) {
+      urls.push(...getUrls(msgs[j]));
+      j++;
+    }
+    if (j === i + 1) {
+      out.push(msg);
+    } else {
+      out.push({
+        ...msg,
+        content: { urls },
+        merged: true,
+        mergedUrls: urls,
+      });
+    }
+    i = j;
+  }
+  return out;
+}
 
 interface GroupDetails {
   group_id: string;
@@ -168,28 +208,31 @@ export default function IndividualChatScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
         quality: 0.8,
       });
-      if (!result.canceled && result.assets[0] && user?.user_id && groupId) {
+      if (!result.canceled && result.assets?.length > 0 && user?.user_id && groupId) {
         setSending(true);
         try {
-          const asset = result.assets[0];
-          const formData = new FormData();
-          // @ts-ignore
-          formData.append('file', {
-            uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
-            name: 'image.jpg',
-            type: 'image/jpeg',
-          });
-          const uploadResponse = await apiService.uploadImage(formData, user.access_token);
-          if (uploadResponse.data?.url) {
-            await apiService.sendMessage(groupId, user.user_id, 'image', { url: uploadResponse.data.url });
+          const urls: string[] = [];
+          for (const asset of result.assets) {
+            const formData = new FormData();
+            // @ts-ignore
+            formData.append('file', {
+              uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+              name: 'image.jpg',
+              type: 'image/jpeg',
+            });
+            const uploadResponse = await apiService.uploadImage(formData, user.access_token);
+            if (uploadResponse.data?.url) urls.push(uploadResponse.data.url);
+          }
+          if (urls.length > 0) {
+            await apiService.sendMessage(groupId, user.user_id, 'image', urls.length === 1 ? { url: urls[0] } : { urls });
             await loadMessages();
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
           }
         } catch (e: any) {
-          Alert.alert('Error', 'Failed to send image.');
+          Alert.alert('Error', 'Failed to send image(s).');
         } finally {
           setSending(false);
         }
@@ -273,9 +316,6 @@ export default function IndividualChatScreen() {
 
     return (
       <>
-        <View style={styles.titleBar}>
-          <Text style={styles.titleBarText}>Individual Chat</Text>
-        </View>
         <View style={styles.headerContainer}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="chevron-back" size={24} color="#000" />
@@ -325,14 +365,16 @@ export default function IndividualChatScreen() {
     );
   };
 
+  const displayMessages = useMemo(() => mergeConsecutiveImageMessages(messages), [messages]);
+
   const getEmojiForType = (type: string) => {
     const r = REACTION_EMOJIS.find((e) => e.type === type);
     return r ? r.emoji : '👍';
   };
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+  const renderMessage = ({ item, index }: { item: DisplayItem; index: number }) => {
     const isMe = item.user_id === user?.user_id;
-    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const previousMessage = index > 0 ? displayMessages[index - 1] : null;
     const showTimeHeader = !previousMessage || (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showReactionPicker = reactionMessageId === item.message_id;
 
@@ -346,7 +388,7 @@ export default function IndividualChatScreen() {
 
         <View style={[styles.messageRow, isMe ? styles.rowRight : styles.rowLeft]}>
           {!isMe && (
-            <Avatar uri={item.user?.profile_image || null} size={30} style={styles.messageAvatar} />
+            <Avatar uri={item.user?.profile_image || null} size={36} style={styles.messageAvatarLeft} />
           )}
 
           <TouchableOpacity
@@ -355,10 +397,62 @@ export default function IndividualChatScreen() {
             delayLongPress={400}
             style={[styles.messageBubbleWrap, isMe && { alignItems: 'flex-end' }, { maxWidth: MAX_BUBBLE_WIDTH }]}
           >
-            {/* Plan messages: render card alone (no bubble) so it looks like feed */}
+            {/* Plan: card alone (no bubble). Image: direct (no bubble). Text: bubble. */}
             {item.type === 'plan' && item.shared_plan ? (
               <View style={styles.planCardWrap}>
                 {renderSharedPlanCard(item.shared_plan, item)}
+              </View>
+            ) : item.type === 'image' ? (
+              <View style={styles.imageMessageWrap}>
+                {(() => {
+                  const urls: string[] = [];
+                  const c = item.content;
+                  if (typeof c === 'string' && c.trim() !== '') urls.push(c);
+                  else if (c?.url && String(c.url).trim() !== '') urls.push(c.url);
+                  else if (Array.isArray(c?.urls)) urls.push(...(c.urls as string[]).filter((u: string) => u?.trim()));
+                  if (urls.length === 0) return null;
+                  const imgFailed = (u: string) => messageImageErrors.has(u);
+                  if (urls.length === 1) {
+                    const uriStr = urls[0];
+                    if (imgFailed(uriStr)) {
+                      return (
+                        <View style={styles.messageImagePlaceholder}>
+                          <Ionicons name="image-outline" size={40} color="#8E8E93" />
+                          <Text style={styles.messageImagePlaceholderText}>Image</Text>
+                        </View>
+                      );
+                    }
+                    return (
+                      <Image
+                        source={{ uri: uriStr }}
+                        style={styles.messageImage}
+                        resizeMode="contain"
+                        onError={() => setMessageImageErrors((prev) => new Set(prev).add(uriStr))}
+                      />
+                    );
+                  }
+                  return (
+                    <View style={styles.multiImageCard}>
+                      {urls.slice(0, 4).map((uri, i) => (
+                        <Image
+                          key={i}
+                          source={{ uri }}
+                          style={[
+                            styles.messageImageStacked,
+                            {
+                              top: i * 14,
+                              left: i * 16,
+                              zIndex: urls.length - i,
+                              transform: [{ rotate: `${(i - 1) * 4}deg` }],
+                            },
+                          ]}
+                          resizeMode="contain"
+                          onError={() => setMessageImageErrors((prev) => new Set(prev).add(uri))}
+                        />
+                      ))}
+                    </View>
+                  );
+                })()}
               </View>
             ) : (
             <View
@@ -377,28 +471,6 @@ export default function IndividualChatScreen() {
                   {typeof item.content === 'string' ? item.content : ''}
                 </Text>
               )}
-              {item.type === 'image' && (() => {
-                const imgUri = item.content?.url || item.content;
-                const uriStr = typeof imgUri === 'string' ? imgUri : '';
-                const imgFailed = uriStr && messageImageErrors.has(uriStr);
-                if (!uriStr || uriStr.trim() === '') return null;
-                if (imgFailed) {
-                  return (
-                    <View style={styles.messageImagePlaceholder}>
-                      <Ionicons name="image-outline" size={40} color="#8E8E93" />
-                      <Text style={styles.messageImagePlaceholderText}>Image</Text>
-                    </View>
-                  );
-                }
-                return (
-                  <Image
-                    source={{ uri: uriStr }}
-                    style={styles.messageImage}
-                    resizeMode="cover"
-                    onError={() => setMessageImageErrors((prev) => new Set(prev).add(uriStr))}
-                  />
-                );
-              })()}
             </View>
             )}
             {item.reactions && item.reactions.length > 0 && (
@@ -418,6 +490,10 @@ export default function IndividualChatScreen() {
               </View>
             )}
           </TouchableOpacity>
+
+          {isMe && (
+            <Avatar uri={user?.profile_image || null} size={36} style={styles.messageAvatarRight} />
+          )}
         </View>
       </View>
     );
@@ -445,9 +521,9 @@ export default function IndividualChatScreen() {
       >
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayMessages}
           renderItem={renderMessage}
-          keyExtractor={(item) => item.message_id}
+          keyExtractor={(item) => (item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 10 }]}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
@@ -547,17 +623,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
   },
-  titleBar: {
-    backgroundColor: '#2C2C2E',
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleBarText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFF',
-  },
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -651,11 +716,18 @@ const styles = StyleSheet.create({
   rowRight: {
     justifyContent: 'flex-end',
   },
-  messageAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
+  messageAvatarLeft: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginRight: 10,
+    marginBottom: 4,
+  },
+  messageAvatarRight: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    marginLeft: 10,
     marginBottom: 4,
   },
   messageBubble: {
@@ -686,18 +758,20 @@ const styles = StyleSheet.create({
   textRight: {
     color: '#FFFFFF',
   },
+  imageMessageWrap: {
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
   messageImage: {
-    width: '100%',
-    maxWidth: MAX_BUBBLE_WIDTH - 32,
-    aspectRatio: 4 / 3,
-    borderRadius: 16,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.6,
+    borderRadius: 20,
     backgroundColor: '#E5E5EA',
   },
   messageImagePlaceholder: {
-    width: '100%',
-    maxWidth: MAX_BUBBLE_WIDTH - 32,
-    aspectRatio: 4 / 3,
-    borderRadius: 16,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.6,
+    borderRadius: 20,
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
@@ -706,6 +780,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
     marginTop: 6,
+  },
+  multiImageCard: {
+    width: SCREEN_WIDTH * 0.45,
+    height: SCREEN_WIDTH * 0.65,
+    position: 'relative' as const,
+  },
+  messageImageStacked: {
+    position: 'absolute' as const,
+    width: SCREEN_WIDTH * 0.38,
+    height: SCREEN_WIDTH * 0.55,
+    borderRadius: 20,
   },
   reactionsRow: {
     flexDirection: 'row',

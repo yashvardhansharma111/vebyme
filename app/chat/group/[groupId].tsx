@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   StatusBar,
   Modal,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -82,6 +83,48 @@ interface GroupDetails {
     profile_image: string;
   }>;
   is_closed: boolean;
+}
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+type DisplayItem = Message | (Message & { merged?: boolean; mergedUrls?: string[] });
+
+function mergeConsecutiveImageMessages(msgs: Message[]): DisplayItem[] {
+  const out: DisplayItem[] = [];
+  const getUrls = (m: Message): string[] => {
+    const c = m.content;
+    if (typeof c === 'string' && c.trim()) return [c];
+    if (c?.url && String(c.url).trim()) return [c.url];
+    if (Array.isArray(c?.urls)) return (c.urls as string[]).filter((u: string) => u?.trim());
+    return [];
+  };
+  let i = 0;
+  while (i < msgs.length) {
+    const msg = msgs[i];
+    if (msg.type !== 'image') {
+      out.push(msg);
+      i++;
+      continue;
+    }
+    const urls = [...getUrls(msg)];
+    let j = i + 1;
+    while (j < msgs.length && msgs[j].type === 'image' && msgs[j].user_id === msg.user_id) {
+      urls.push(...getUrls(msgs[j]));
+      j++;
+    }
+    if (j === i + 1) {
+      out.push(msg);
+    } else {
+      out.push({
+        ...msg,
+        content: { urls },
+        merged: true,
+        mergedUrls: urls,
+      });
+    }
+    i = j;
+  }
+  return out;
 }
 
 export default function GroupChatScreen() {
@@ -207,37 +250,32 @@ export default function GroupChatScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets[0] && user?.user_id && groupId) {
+      if (!result.canceled && result.assets?.length > 0 && user?.user_id && groupId) {
         try {
           setSending(true);
-          const asset = result.assets[0];
-          
-          // Upload image first
-          const formData = new FormData();
-          // @ts-ignore
-          formData.append('file', {
-            uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
-            name: 'image.jpg',
-            type: 'image/jpeg',
-          });
-
-          const uploadResponse = await apiService.uploadImage(formData, user.access_token);
-          if (uploadResponse.data?.url) {
-            // Send image as message
-            await apiService.sendMessage(groupId, user.user_id, 'image', {
-              url: uploadResponse.data.url,
+          const urls: string[] = [];
+          for (const asset of result.assets) {
+            const formData = new FormData();
+            // @ts-ignore
+            formData.append('file', {
+              uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+              name: 'image.jpg',
+              type: 'image/jpeg',
             });
+            const uploadResponse = await apiService.uploadImage(formData, user.access_token);
+            if (uploadResponse.data?.url) urls.push(uploadResponse.data.url);
+          }
+          if (urls.length > 0) {
+            await apiService.sendMessage(groupId, user.user_id, 'image', urls.length === 1 ? { url: urls[0] } : { urls });
             await loadMessages();
-            setTimeout(() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
           }
         } catch (error: any) {
-          Alert.alert('Error', 'Failed to send image.');
+          Alert.alert('Error', 'Failed to send image(s).');
           console.error('Error sending image:', error);
         } finally {
           setSending(false);
@@ -349,6 +387,33 @@ export default function GroupChatScreen() {
           {(() => {
             const eventMedia = groupDetails?.plan?.media?.[0];
             const eventImageUrl = eventMedia ? (typeof eventMedia === 'string' ? eventMedia : eventMedia?.url) : null;
+            const members = groupDetails?.members ?? [];
+            const displayCount = 3;
+            const showStack = !eventImageUrl || (eventImageUrl && eventImageUrl.trim() === '');
+            if (showStack && members.length > 0) {
+              const toShow = members.slice(0, displayCount);
+              const extra = members.length > displayCount ? members.length - displayCount : 0;
+              return (
+                <View style={styles.headerMemberStack}>
+                  {toShow.map((m, idx) => (
+                    <View
+                      key={m.user_id}
+                      style={[
+                        styles.headerMemberAvatarWrap,
+                        { marginLeft: idx === 0 ? 0 : -10, zIndex: displayCount - idx },
+                      ]}
+                    >
+                      <Avatar uri={m.profile_image || null} size={36} />
+                    </View>
+                  ))}
+                  {extra > 0 && (
+                    <View style={[styles.headerMemberMoreWrap, { marginLeft: -10, zIndex: 0 }]}>
+                      <Text style={styles.headerMemberMoreText}>+{extra}</Text>
+                    </View>
+                  )}
+                </View>
+              );
+            }
             return (
               <View style={styles.headerAvatarWrap}>
                 {eventImageUrl && eventImageUrl.trim() !== '' ? (
@@ -452,9 +517,11 @@ export default function GroupChatScreen() {
     );
   };
 
-  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+  const displayMessages = useMemo(() => mergeConsecutiveImageMessages(messages), [messages]);
+
+  const renderMessage = ({ item, index }: { item: DisplayItem; index: number }) => {
     const isMe = item.user_id === user?.user_id;
-    const previousMessage = index > 0 ? messages[index - 1] : null;
+    const previousMessage = index > 0 ? displayMessages[index - 1] : null;
     const showTimeHeader = !previousMessage || 
       (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showAvatar = !isMe && (!previousMessage || previousMessage.user_id !== item.user_id);
@@ -507,14 +574,9 @@ export default function GroupChatScreen() {
                   compact
                 />
             </View>
-          ) : (
-          <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
-              {item.type === 'text' && (
-                <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
-                  {item.content}
-                </Text>
-              )}
-              {item.type === 'image' && (() => {
+          ) : item.type === 'image' ? (
+            <View style={styles.imageMessageWrap}>
+              {(() => {
                 const urls: string[] = [];
                 if (typeof item.content === 'string' && item.content.trim() !== '') urls.push(item.content);
                 else if (item.content?.url && String(item.content.url).trim() !== '') urls.push(item.content.url);
@@ -522,45 +584,33 @@ export default function GroupChatScreen() {
                 if (urls.length === 0) return null;
                 if (urls.length === 1) {
                   return (
-                    <View>
-                      <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="cover" />
-                      {item.reactions && item.reactions.length > 0 && (
-                        <View style={styles.reactionsRow}>
-                          {item.reactions.map((r) => (
-                            <Text key={r.reaction_id} style={styles.reactionEmoji}>
-                              {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
-                    </View>
+                    <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="contain" />
                   );
                 }
                 return (
                   <View style={styles.multiImageCard}>
-                    {urls.slice(0, 3).map((uri, i) => (
+                    {urls.slice(0, 4).map((uri, i) => (
                       <Image
                         key={i}
                         source={{ uri }}
                         style={[
                           styles.messageImageStacked,
-                          { top: i * 8, left: i * 10, zIndex: urls.length - i },
+                          { top: i * 14, left: i * 16, zIndex: urls.length - i, transform: [{ rotate: `${(i - 1) * 4}deg` }] },
                         ]}
-                        resizeMode="cover"
+                        resizeMode="contain"
                       />
                     ))}
-                    {item.reactions && item.reactions.length > 0 && (
-                      <View style={styles.reactionsRow}>
-                        {item.reactions.map((r) => (
-                          <Text key={r.reaction_id} style={styles.reactionEmoji}>
-                            {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 );
               })()}
+            </View>
+          ) : (
+          <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+              {item.type === 'text' && (
+                <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                  {item.content}
+                </Text>
+              )}
             </View>
           )}
             {(item.reactions && item.reactions.length > 0) && (
@@ -599,10 +649,10 @@ export default function GroupChatScreen() {
       >
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={displayMessages}
           renderItem={renderMessage}
           ListHeaderComponent={renderPlanCard}
-          keyExtractor={(item) => item.message_id}
+          keyExtractor={(item) => (item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
@@ -764,6 +814,34 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  headerMemberStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  headerMemberAvatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#FFF',
+    overflow: 'hidden',
+  },
+  headerMemberMoreWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E5E5EA',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerMemberMoreText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3A3A3C',
   },
   headerName: {
     fontSize: 17,
@@ -960,23 +1038,26 @@ const styles = StyleSheet.create({
   },
   textLeft: { color: '#1F2937' },
   textRight: { color: '#FFF' },
+  imageMessageWrap: {
+    overflow: 'hidden',
+    marginBottom: 2,
+  },
   messageImage: {
-    width: 220,
-    height: 160,
-    borderRadius: 16,
+    width: SCREEN_WIDTH * 0.4,
+    height: SCREEN_WIDTH * 0.6,
+    borderRadius: 20,
+    backgroundColor: '#E5E5EA',
   },
   multiImageCard: {
-    width: 220,
-    height: 160,
+    width: SCREEN_WIDTH * 0.45,
+    height: SCREEN_WIDTH * 0.65,
     position: 'relative',
   },
   messageImageStacked: {
     position: 'absolute',
-    width: 200,
-    height: 140,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#FFF',
+    width: SCREEN_WIDTH * 0.38,
+    height: SCREEN_WIDTH * 0.55,
+    borderRadius: 20,
   },
   reactionsRow: {
     flexDirection: 'row',
