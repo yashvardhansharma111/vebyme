@@ -9,8 +9,21 @@ import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 
+// Merge tags + category_sub so all selected tags are visible (same as post creation)
+function getAllEventTags(event: any): string[] {
+  const from = (v: any) => (Array.isArray(v) ? v : v ? [String(v)] : []);
+  const seen = new Set<string>();
+  [...from(event.tags), ...from(event.category_sub)].forEach((t) => {
+    const s = (t || '').trim();
+    if (s) seen.add(s);
+  });
+  return Array.from(seen);
+}
+
 // --- The Base Event Card ---
 function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
+  const allTags = getAllEventTags(event);
+  const hasEventImage = event?.image && String(event.image).trim();
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
@@ -47,14 +60,20 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
 
           <View style={styles.middleRow}>
             <View style={styles.tagsContainer}>
-              {event.tags.map((tag: string, index: number) => (
+              {allTags.map((tag: string, index: number) => (
                 <View key={index} style={styles.tag}>
                    <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'checkbox'} size={12} color="#555" style={{marginRight: 4}}/>
                    <Text style={styles.tagText}>{tag}</Text>
                 </View>
               ))}
             </View>
-            <Image source={{ uri: event.image }} style={styles.eventImage} />
+            {hasEventImage ? (
+              <Image source={{ uri: event.image }} style={styles.eventImage} />
+            ) : (
+              <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+                <Ionicons name="image-outline" size={28} color="#8E8E93" />
+              </View>
+            )}
           </View>
         </View>
 
@@ -319,6 +338,8 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           postTitle={originalPostTitle || event?.title || 'Untitled Post'}
           postDescription={originalPostDescription || event?.description || ''}
           postMedia={event?.image ? [{ url: event.image, type: 'image' }] : []}
+          postTags={event?.tags}
+          postCategorySub={event?.tags}
           userId={authUser.user_id}
           onShareSuccess={() => {
             // Optionally refresh feed or show success message
@@ -450,6 +471,11 @@ const styles = StyleSheet.create({
   tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   tagText: { fontSize: 12, fontWeight: '600', color: '#333' },
   eventImage: { width: 80, height: 60, borderRadius: 12, marginLeft: 10 },
+  eventImagePlaceholder: {
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   footerPill: {
     flexDirection: 'row',
     alignItems: 'center',

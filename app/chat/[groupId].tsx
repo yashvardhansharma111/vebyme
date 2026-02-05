@@ -22,6 +22,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
+import Avatar from '@/components/Avatar';
+import SharedPlanCard from '@/components/SharedPlanCard';
 
 const REACTION_EMOJIS = [
   { type: 'laugh', emoji: '😂' },
@@ -87,7 +89,6 @@ export default function IndividualChatScreen() {
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
-  const [sharedPlanImageErrors, setSharedPlanImageErrors] = useState<Set<string>>(new Set());
   const [messageImageErrors, setMessageImageErrors] = useState<Set<string>>(new Set());
   const flatListRef = useRef<FlatList>(null);
 
@@ -118,7 +119,18 @@ export default function IndividualChatScreen() {
     try {
       const response = await apiService.getMessages(groupId);
       if (response.data) {
-        setMessages(response.data);
+        const list = Array.isArray(response.data) ? response.data : [];
+        setMessages(list.map((m: any) => {
+          const content = m.content;
+          const isPlanContent = typeof content === 'object' && content && (content.title != null || content.plan_id != null);
+          if (m.type === 'plan' && !m.shared_plan && content) {
+            return { ...m, shared_plan: typeof content === 'object' ? content : null };
+          }
+          if ((m.type === 'image' || m.type === 'text') && isPlanContent) {
+            return { ...m, type: 'plan', shared_plan: content };
+          }
+          return m;
+        }));
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -274,68 +286,42 @@ export default function IndividualChatScreen() {
             disabled={!otherUserId}
             activeOpacity={0.7}
           >
-            <Image source={{ uri: chatImage || 'https://via.placeholder.com/40' }} style={styles.headerAvatar} />
+            <Avatar uri={chatImage || null} size={40} style={styles.headerAvatar} />
             <Text style={styles.headerName} numberOfLines={1}>{chatName}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerRightIcon} onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as any)}>
-            <Image source={{ uri: chatImage || 'https://via.placeholder.com/24' }} style={styles.headerRightAvatar} />
+            <Avatar uri={chatImage || null} size={24} style={styles.headerRightAvatar} />
           </TouchableOpacity>
         </View>
       </>
     );
   };
 
-  const renderSharedPlanCard = (plan: Message['shared_plan']) => {
+  const renderSharedPlanCard = (plan: Message['shared_plan'], item: Message) => {
     if (!plan) return null;
-    const mediaItem = plan.media?.[0];
-    const mediaUri = mediaItem ? (typeof mediaItem === 'string' ? mediaItem : mediaItem?.url) : null;
-    const tags = plan.tags || plan.category_sub || (plan.category_main ? [plan.category_main] : []);
-    const isBusiness = plan.is_business === true;
-    const actionLabel = isBusiness ? 'Register' : 'Join';
-    const imageFailed = mediaUri && sharedPlanImageErrors.has(mediaUri);
-
+    const isMe = item.user_id === user?.user_id;
     return (
-      <View style={styles.sharedPlanCard}>
-        <Text style={styles.sharedPlanTitle} numberOfLines={1}>{plan.title}</Text>
-        <Text style={styles.sharedPlanDescription} numberOfLines={3}>{plan.description}</Text>
-        <View style={styles.sharedPlanMiddleRow}>
-          <View style={styles.sharedPlanTags}>
-            {tags.slice(0, 3).map((tag: string, i: number) => (
-              <View key={i} style={styles.sharedPlanTag}>
-                <Ionicons name={tag === 'Hitchhiking' ? 'walk' : tag === 'Weekend' ? 'calendar-outline' : 'checkbox'} size={12} color="#555" style={{ marginRight: 4 }} />
-                <Text style={styles.sharedPlanTagText} numberOfLines={1}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-          {mediaUri && mediaUri.trim() !== '' && !imageFailed && (
-            <Image
-              source={{ uri: mediaUri }}
-              style={styles.sharedPlanImage}
-              resizeMode="cover"
-              onError={() => setSharedPlanImageErrors((prev) => new Set(prev).add(mediaUri))}
-            />
-          )}
-          {mediaUri && imageFailed && (
-            <View style={styles.sharedPlanImagePlaceholder}>
-              <Ionicons name="image-outline" size={24} color="#8E8E93" />
-            </View>
-          )}
-        </View>
-        <View style={styles.sharedPlanFooter}>
-          <TouchableOpacity style={styles.sharedPlanIconBtn}>
-            <Ionicons name="repeat-outline" size={20} color="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.sharedPlanIconBtn}>
-            <Ionicons name="paper-plane-outline" size={20} color="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sharedPlanActionBtn}
-            onPress={() => plan.plan_id && router.push(isBusiness ? `/business-plan/${plan.plan_id}` as any : `/plan/${plan.plan_id}` as any)}
-          >
-            <Text style={styles.sharedPlanActionText}>{actionLabel}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <SharedPlanCard
+        plan={{
+          plan_id: plan.plan_id,
+          title: plan.title,
+          description: plan.description,
+          media: plan.media,
+          tags: plan.tags,
+          category_main: plan.category_main,
+          category_sub: plan.category_sub,
+          is_business: plan.is_business,
+        }}
+        onJoinPress={() =>
+          plan.plan_id &&
+          router.push((plan.is_business ? `/business-plan/${plan.plan_id}` : `/plan/${plan.plan_id}`) as any)
+        }
+        senderName={isMe ? 'You' : item.user?.name}
+        senderTime={formatTimeHeader(item.timestamp)}
+        senderAvatar={isMe ? undefined : item.user?.profile_image}
+        pillPosition="left"
+        compact
+      />
     );
   };
 
@@ -360,7 +346,7 @@ export default function IndividualChatScreen() {
 
         <View style={[styles.messageRow, isMe ? styles.rowRight : styles.rowLeft]}>
           {!isMe && (
-            <Image source={{ uri: item.user?.profile_image || 'https://via.placeholder.com/30' }} style={styles.messageAvatar} />
+            <Avatar uri={item.user?.profile_image || null} size={30} style={styles.messageAvatar} />
           )}
 
           <TouchableOpacity
@@ -369,6 +355,12 @@ export default function IndividualChatScreen() {
             delayLongPress={400}
             style={[styles.messageBubbleWrap, isMe && { alignItems: 'flex-end' }, { maxWidth: MAX_BUBBLE_WIDTH }]}
           >
+            {/* Plan messages: render card alone (no bubble) so it looks like feed */}
+            {item.type === 'plan' && item.shared_plan ? (
+              <View style={styles.planCardWrap}>
+                {renderSharedPlanCard(item.shared_plan, item)}
+              </View>
+            ) : (
             <View
               style={[
                 styles.messageBubble,
@@ -407,8 +399,8 @@ export default function IndividualChatScreen() {
                   />
                 );
               })()}
-              {item.type === 'plan' && item.shared_plan && renderSharedPlanCard(item.shared_plan)}
             </View>
+            )}
             {item.reactions && item.reactions.length > 0 && (
               <View style={[styles.reactionsRow, isMe ? styles.reactionsRight : styles.reactionsLeft]}>
                 {item.reactions.map((r) => (
@@ -624,6 +616,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     backgroundColor: '#F2F2F7',
   },
+  planCardWrap: {
+    maxWidth: 280,
+    backgroundColor: 'transparent',
+    overflow: 'visible',
+    marginTop: 14,
+    marginBottom: 20,
+  },
   messageBubbleWrap: {
     maxWidth: '75%',
     flexDirection: 'column',
@@ -707,94 +706,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#8E8E93',
     marginTop: 6,
-  },
-  sharedPlanCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
-    width: '100%',
-    maxWidth: '100%',
-  },
-  sharedPlanTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    marginBottom: 6,
-  },
-  sharedPlanDescription: {
-    fontSize: 14,
-    color: '#444',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  sharedPlanMiddleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  sharedPlanTags: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginRight: 8,
-  },
-  sharedPlanTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    maxWidth: 120,
-  },
-  sharedPlanTagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  sharedPlanImage: {
-    width: 80,
-    height: 60,
-    borderRadius: 12,
-    marginLeft: 10,
-    backgroundColor: '#E5E5EA',
-  },
-  sharedPlanImagePlaceholder: {
-    width: 80,
-    height: 60,
-    borderRadius: 12,
-    marginLeft: 10,
-    backgroundColor: '#E5E5EA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sharedPlanFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  sharedPlanIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F7',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sharedPlanActionBtn: {
-    flex: 1,
-    height: 44,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sharedPlanActionText: {
-    color: '#FFF',
-    fontWeight: '600',
-    fontSize: 15,
   },
   reactionsRow: {
     flexDirection: 'row',

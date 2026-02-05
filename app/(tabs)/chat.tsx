@@ -15,6 +15,7 @@ import { Colors, borderRadius } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import LoginModal from '@/components/LoginModal';
+import Avatar from '@/components/Avatar';
 
 type TabType = 'their_plans' | 'my_plans' | 'groups';
 
@@ -149,9 +150,14 @@ export default function ChatScreen() {
     const displayName = item.is_group 
       ? item.group_name 
       : (item.other_user?.name || item.author_name);
-    
-    const displayImage = item.is_group 
-      ? (item.plan_media?.[0]?.url || item.author_image)
+
+    // Groups from post/event: use that event's image as group DP
+    const planMediaFirst = item.plan_media?.[0];
+    const eventImageUrl = planMediaFirst
+      ? (typeof planMediaFirst === 'string' ? planMediaFirst : planMediaFirst?.url)
+      : null;
+    const displayImage = item.is_group
+      ? (eventImageUrl || item.author_image)
       : (item.other_user?.profile_image || item.author_image);
 
     return (
@@ -160,8 +166,9 @@ export default function ChatScreen() {
         onPress={() => handleChatPress(item)}
         activeOpacity={0.7}
       >
-        <Image
-          source={{ uri: displayImage || 'https://via.placeholder.com/50' }}
+        <Avatar
+          uri={displayImage || null}
+          size={52}
           style={styles.avatar}
         />
         <View style={styles.chatInfo}>

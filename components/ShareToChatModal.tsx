@@ -21,6 +21,11 @@ interface ShareToChatModalProps {
   postTitle: string;
   postDescription: string;
   postMedia: any[];
+  /** Tags or category labels (e.g. Weekend, Hitchhiking) so shared card matches home */
+  postTags?: string[];
+  postCategorySub?: string[];
+  postCategoryMain?: string;
+  postIsBusiness?: boolean;
   userId: string;
   onShareSuccess?: () => void;
 }
@@ -57,6 +62,10 @@ export default function ShareToChatModal({
   postTitle,
   postDescription,
   postMedia,
+  postTags,
+  postCategorySub,
+  postCategoryMain,
+  postIsBusiness,
   userId,
   onShareSuccess,
 }: ShareToChatModalProps) {
@@ -99,6 +108,10 @@ export default function ShareToChatModal({
         title: postTitle,
         description: postDescription,
         media: postMedia || [],
+        tags: postTags || postCategorySub || [],
+        category_sub: postCategorySub || postTags || [],
+        category_main: postCategoryMain,
+        is_business: postIsBusiness === true,
       });
       Alert.alert('Success', 'Post shared to chat!', [
         {

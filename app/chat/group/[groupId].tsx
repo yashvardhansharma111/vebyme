@@ -22,6 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import Avatar from '@/components/Avatar';
+import SharedPlanCard from '@/components/SharedPlanCard';
 
 // --- Interfaces ---
 interface Message {
@@ -59,6 +60,10 @@ interface Message {
     title: string;
     description: string;
     media: any[];
+    tags?: string[];
+    category_main?: string;
+    category_sub?: string[];
+    is_business?: boolean;
   };
 }
 
@@ -123,7 +128,18 @@ export default function GroupChatScreen() {
     try {
       const response = await apiService.getMessages(groupId);
       if (response.data) {
-        setMessages(response.data);
+        const list = Array.isArray(response.data) ? response.data : [];
+        setMessages(list.map((m: any) => {
+          const content = m.content;
+          const isPlanContent = typeof content === 'object' && content && (content.title != null || content.plan_id != null);
+          if (m.type === 'plan' && !m.shared_plan && content) {
+            return { ...m, shared_plan: typeof content === 'object' ? content : null };
+          }
+          if ((m.type === 'image' || m.type === 'text') && isPlanContent) {
+            return { ...m, type: 'plan', shared_plan: content };
+          }
+          return m;
+        }));
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -283,6 +299,10 @@ export default function GroupChatScreen() {
         title: plan.title,
         description: plan.description,
         media: plan.media || [],
+        tags: plan.tags || plan.category_sub || [],
+        category_sub: plan.category_sub || plan.tags || [],
+        category_main: plan.category_main,
+        is_business: plan.is_business === true,
       });
       setShowShareModal(false);
       await loadMessages();
@@ -326,18 +346,19 @@ export default function GroupChatScreen() {
           onPress={() => router.push(`/chat/group/details/${groupId}` as any)}
           activeOpacity={0.8}
         >
-          {groupDetails?.members && groupDetails.members.length > 0 && (
-            <View style={styles.avatarStack}>
-              {groupDetails.members.slice(0, 3).map((member, idx) => (
-                <View
-                  key={member.user_id}
-                  style={[styles.headerAvatarWrap, { marginLeft: idx > 0 ? -10 : 0, zIndex: 3 - idx }]}
-                >
-                  <Avatar uri={member.profile_image || null} size={32} />
-                </View>
-              ))}
-            </View>
-          )}
+          {(() => {
+            const eventMedia = groupDetails?.plan?.media?.[0];
+            const eventImageUrl = eventMedia ? (typeof eventMedia === 'string' ? eventMedia : eventMedia?.url) : null;
+            return (
+              <View style={styles.headerAvatarWrap}>
+                {eventImageUrl && eventImageUrl.trim() !== '' ? (
+                  <Image source={{ uri: eventImageUrl }} style={styles.headerGroupImage} resizeMode="cover" />
+                ) : (
+                  <Avatar uri={null} size={40} />
+                )}
+              </View>
+            );
+          })()}
           <Text style={styles.headerName} numberOfLines={1}>
             {groupDetails?.group_name || 'Group'}
           </Text>
@@ -458,7 +479,36 @@ export default function GroupChatScreen() {
                />
             )}
             
-            <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+            {item.type === 'plan' && item.shared_plan ? (
+            <View style={styles.planCardWrap}>
+              <SharedPlanCard
+                plan={{
+                  plan_id: item.shared_plan.plan_id,
+                  title: item.shared_plan.title,
+                  description: item.shared_plan.description,
+                  media: item.shared_plan.media,
+                  tags: item.shared_plan.tags,
+                  category_main: item.shared_plan.category_main,
+                  category_sub: item.shared_plan.category_sub,
+                  is_business: item.shared_plan.is_business,
+                }}
+                onJoinPress={() =>
+                  item.shared_plan?.plan_id &&
+                  router.push(
+                    (item.shared_plan.is_business
+                      ? `/business-plan/${item.shared_plan.plan_id}`
+                      : `/plan/${item.shared_plan.plan_id}`) as any
+                  )
+                }
+                  senderName={isMe ? 'You' : item.user?.name}
+                  senderTime={formatTimeHeader(item.timestamp)}
+                  senderAvatar={isMe ? undefined : item.user?.profile_image}
+                  pillPosition="left"
+                  compact
+                />
+            </View>
+          ) : (
+          <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
               {item.type === 'text' && (
                 <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
                   {item.content}
@@ -511,29 +561,9 @@ export default function GroupChatScreen() {
                   </View>
                 );
               })()}
-              {item.type === 'plan' && item.shared_plan && (
-                <View style={styles.sharedPlanCard}>
-                  <Text style={styles.sharedPlanTitle}>{item.shared_plan.title}</Text>
-                  <Text style={styles.sharedPlanDescription} numberOfLines={2}>
-                    {item.shared_plan.description}
-                  </Text>
-                  {item.shared_plan.media && item.shared_plan.media.length > 0 && (() => {
-                    const mediaItem = item.shared_plan.media[0];
-                    const mediaUri = typeof mediaItem === 'string' 
-                      ? mediaItem 
-                      : mediaItem?.url || null;
-                    return mediaUri && mediaUri.trim() !== '' ? (
-                      <Image
-                        source={{ uri: mediaUri }}
-                        style={styles.sharedPlanImage}
-                        resizeMode="cover"
-                      />
-                    ) : null;
-                  })()}
-                </View>
-              )}
             </View>
-            {(item.type === 'text' && item.reactions && item.reactions.length > 0) && (
+          )}
+            {(item.reactions && item.reactions.length > 0) && (
               <View style={[styles.reactionsRow, isMe ? styles.reactionsRowRight : styles.reactionsRowLeft]}>
                 {item.reactions.map((r) => (
                   <Text key={r.reaction_id} style={styles.reactionEmoji}>
@@ -722,10 +752,18 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   headerAvatarWrap: {
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: '#FFF',
     overflow: 'hidden',
+    marginRight: 10,
+  },
+  headerGroupImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   headerName: {
     fontSize: 17,
@@ -894,6 +932,13 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginRight: 8,
     marginBottom: 4,
+  },
+  planCardWrap: {
+    maxWidth: 280,
+    backgroundColor: 'transparent',
+    overflow: 'visible',
+    marginTop: 14,
+    marginBottom: 20,
   },
   messageBubble: {
     maxWidth: '75%',
