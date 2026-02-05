@@ -193,10 +193,12 @@ export default function HomeScreen() {
         let originalPostTitle = null;
         let originalPostDescription = null;
         
+        let originalAuthorAvatar = null;
         if (post.is_repost && post.repost_data) {
           const originalAuthorData = await fetchUserProfile(post.repost_data.original_author_id);
           originalAuthorName = originalAuthorData.name;
-          
+          originalAuthorAvatar = originalAuthorData.profile_image || null;
+
           // Get original post details
           try {
             const originalPost = await apiService.getPost(post.repost_data.original_plan_id);
@@ -208,6 +210,14 @@ export default function HomeScreen() {
             // Silently handle errors
           }
         }
+
+        // Interacted users: backend may send interacted_users or recent_interactor_ids
+        const rawInteracted = post.interacted_users || post.recent_interactors || [];
+        const interactedUsers = rawInteracted.slice(0, 3).map((u: any) => ({
+          id: u.user_id || u.id,
+          name: u.name || 'User',
+          avatar: u.profile_image || u.avatar || null,
+        }));
 
         return {
           id: post.post_id,
@@ -222,11 +232,17 @@ export default function HomeScreen() {
             description: post.description || 'No description',
             tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
             image: imageUrl,
-            is_repost: post.is_repost || false,
+            is_repost: post.is_repost || !!(post.repost_data),
             repost_data: post.repost_data || null,
+            // Reposter's title/description (prefer repost_data; avoid falling back to original)
+            repost_title: post.repost_data?.repost_title ?? post.repost_title ?? (post.is_repost || post.repost_data ? '' : post.title),
+            repost_description: post.repost_data?.repost_description ?? post.repost_description ?? (post.is_repost || post.repost_data ? '' : post.description),
             original_author_name: originalAuthorName,
+            original_author_avatar: originalAuthorAvatar,
             original_post_title: originalPostTitle || post.title,
             original_post_description: originalPostDescription || post.description,
+            interaction_count: post.interaction_count ?? 0,
+            interacted_users: interactedUsers,
           },
         };
       })

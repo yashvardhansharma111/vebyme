@@ -88,16 +88,23 @@ export default function BusinessPlanDetailScreen() {
   const formatDate = (date: string | Date | undefined): string => {
     if (!date) return '';
     const d = typeof date === 'string' ? new Date(date) : date;
-    return d.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
+    const day = d.getDate();
+    const ord = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
+    return `${day}${ord} ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
   };
 
-  const formatTime = (time: string | undefined): string => {
-    if (!time) return '';
-    return time;
+  const formatDayAndTime = (date: string | Date | undefined, time: string | undefined): string => {
+    if (!date) return time || '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+    const timePart = time ? ` | ${time} onwards` : '';
+    return `${formatDate(date)}${timePart}`;
+  };
+
+  const formatOrganizerTime = (date: string | Date | undefined): string => {
+    if (!date) return '';
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
   const { user } = useAppSelector((state) => state.auth);
@@ -168,93 +175,84 @@ export default function BusinessPlanDetailScreen() {
   }
 
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
+  const mediaCount = plan.media?.length ?? 0;
+  const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
+  const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header Image */}
+        {/* Hero Image */}
         <View style={styles.headerImageContainer}>
           <Image source={{ uri: mainImage }} style={styles.headerImage} resizeMode="cover" />
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <View style={styles.backButtonCircle}>
               <Ionicons name="arrow-back" size={24} color="#000" />
             </View>
           </TouchableOpacity>
+          {/* Organizer pill – top left over hero */}
+          <View style={styles.organizerPill}>
+            <Avatar uri={organizerAvatar} size={32} />
+            <View style={styles.organizerInfo}>
+              <Text style={styles.organizerName}>{organizerName}</Text>
+              <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
+            </View>
+          </View>
+          {/* Carousel dots */}
+          {mediaCount > 1 && (
+            <View style={styles.carouselDots}>
+              {plan.media!.slice(0, 3).map((_, i) => (
+                <View key={i} style={[styles.carouselDot, i === 0 && styles.carouselDotActive]} />
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Content Panel */}
+        {/* White content card – overlaps bottom of hero */}
         <View style={styles.contentPanel}>
-          {/* Title */}
           <Text style={styles.title}>{plan.title}</Text>
-
-          {/* Description */}
           <Text style={styles.description}>{plan.description}</Text>
 
-          {/* Key Details */}
-          <View style={styles.detailsCard}>
+          {/* Location + Date side by side */}
+          <View style={styles.keyInfoRow}>
             {plan.location_text && (
-              <View style={styles.detailRow}>
+              <View style={styles.keyInfoBlock}>
                 <Ionicons name="location" size={20} color="#666" />
-                <View style={styles.detailTextContainer}>
-                  <Text style={styles.detailTitle}>{plan.location_text}</Text>
-                  {plan.location_coordinates && (
-                    <Text style={styles.detailSubtitle}>3 Km away</Text>
-                  )}
-                </View>
+                <Text style={styles.keyInfoTitle}>{plan.location_text}</Text>
+                <Text style={styles.keyInfoSubtitle}>{plan.location_coordinates ? '3 Km away' : ' '}</Text>
               </View>
             )}
-
             {plan.date && (
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar" size={20} color="#666" />
-                <View style={styles.detailTextContainer}>
-                  <Text style={styles.detailTitle}>{formatDate(plan.date)}</Text>
-                  {plan.time && (
-                    <Text style={styles.detailSubtitle}>{formatTime(plan.time)} onwards</Text>
-                  )}
-                </View>
+              <View style={styles.keyInfoBlock}>
+                <Ionicons name="calendar-outline" size={20} color="#666" />
+                <Text style={styles.keyInfoTitle} numberOfLines={2}>{formatDayAndTime(plan.date, plan.time)}</Text>
               </View>
             )}
           </View>
 
-          {/* Tags */}
-          {plan.category_sub && plan.category_sub.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {plan.category_sub.map((tag, index) => (
-                <View key={index} style={styles.tag}>
-                  <Ionicons name="checkbox" size={12} color="#555" style={{ marginRight: 4 }} />
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Additional Details */}
+          {/* Detail pills – Distance, Starting Point, Dress Code, F&B */}
           {plan.add_details && plan.add_details.length > 0 && (
-            <View style={styles.additionalDetailsSection}>
-              {plan.add_details.map((detail, index) => (
-                <View key={index} style={styles.additionalDetailChip}>
-                  <Text style={styles.additionalDetailTitle}>{detail.title}</Text>
-                  {detail.description && (
-                    <Text style={styles.additionalDetailDescription}>{detail.description}</Text>
-                  )}
+            <View style={styles.detailPillsWrap}>
+              {plan.add_details.slice(0, 4).map((detail, index) => (
+                <View key={index} style={styles.detailPill}>
+                  <Text style={styles.detailPillLabel}>{detail.title}</Text>
+                  {detail.description ? (
+                    <Text style={styles.detailPillValue} numberOfLines={1}>{detail.description}</Text>
+                  ) : null}
                 </View>
               ))}
             </View>
           )}
 
-          {/* See who's coming */}
+          {/* See who's coming – dark block, text left, avatars right */}
           <View style={styles.attendeesCard}>
-            <View style={styles.attendeesHeader}>
+            <View style={styles.attendeesTextBlock}>
               <Text style={styles.attendeesTitle}>See who's coming</Text>
-              <Text style={styles.attendeesSubtitle}>Join event to view</Text>
+              <Text style={styles.attendeesSubtitle}>Join event to view.</Text>
             </View>
             <View style={styles.attendeesAvatars}>
-              {[1, 2, 3, 4, 5].map((i) => (
-                <View key={i} style={[styles.avatarStack, { marginLeft: i === 1 ? 0 : -12 }]}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={[styles.avatarStack, { marginLeft: i === 1 ? 0 : -10 }]}>
                   <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={32} />
                 </View>
               ))}
@@ -267,18 +265,18 @@ export default function BusinessPlanDetailScreen() {
               <Text style={styles.ticketsTitle}>Select Tickets</Text>
               {plan.passes.map((pass, index) => {
                 const isSelected = selectedPass === pass.pass_id;
-                const gradientColors = [
-                  ['#8B5CF6', '#6366F1'],
-                  ['#10B981', '#059669'],
-                  ['#F59E0B', '#D97706'],
+                const gradientColors: [string, string][] = [
+                  ['#7C3AED', '#6366F1'],
+                  ['#059669', '#10B981'],
+                  ['#047857', '#059669'],
                 ];
                 const colors = gradientColors[index % gradientColors.length];
-
                 return (
                   <TouchableOpacity
                     key={pass.pass_id}
                     style={styles.passCard}
                     onPress={() => setSelectedPass(pass.pass_id)}
+                    activeOpacity={0.9}
                   >
                     <LinearGradient
                       colors={colors}
@@ -288,16 +286,16 @@ export default function BusinessPlanDetailScreen() {
                     >
                       <View style={styles.passContent}>
                         <Text style={styles.passName}>{pass.name}</Text>
-                        {pass.description && (
-                          <Text style={styles.passDescription}>{pass.description}</Text>
-                        )}
-                        <Text style={styles.passPrice}>₹{pass.price}</Text>
+                        {pass.description ? (
+                          <Text style={styles.passDescription} numberOfLines={2}>{pass.description}</Text>
+                        ) : null}
                       </View>
-                      {isSelected && (
-                        <View style={styles.selectedIndicator}>
-                          <Ionicons name="checkmark-circle" size={24} color="#FFF" />
-                        </View>
-                      )}
+                      <View style={styles.passPriceBlock}>
+                        <Text style={styles.passPrice}>₹{pass.price}</Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={22} color="#FFF" style={styles.passCheck} />
+                        )}
+                      </View>
                     </LinearGradient>
                   </TouchableOpacity>
                 );
@@ -305,11 +303,7 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {/* Register Button */}
-          <TouchableOpacity
-            style={styles.registerButton}
-            onPress={handleRegister}
-          >
+          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
             <Text style={styles.registerButtonText}>Register</Text>
           </TouchableOpacity>
         </View>
@@ -349,7 +343,7 @@ const styles = StyleSheet.create({
   },
   headerImageContainer: {
     width: '100%',
-    height: 300,
+    height: 280,
     position: 'relative',
   },
   headerImage: {
@@ -370,97 +364,132 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  organizerPill: {
+    position: 'absolute',
+    top: 56,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    gap: 8,
+    zIndex: 2,
+  },
+  organizerInfo: {
+    flex: 1,
+  },
+  organizerName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  organizerTime: {
+    fontSize: 11,
+    color: '#8E8E93',
+    marginTop: 2,
+  },
+  carouselDots: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    zIndex: 2,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  carouselDotActive: {
+    backgroundColor: '#FFF',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
   contentPanel: {
     backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    marginTop: -20,
-    padding: 20,
+    marginTop: -24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 40,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
     color: '#1C1C1E',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   description: {
     fontSize: 14,
     color: '#444',
-    lineHeight: 20,
-    marginBottom: 20,
+    lineHeight: 21,
+    marginBottom: 18,
   },
-  detailsCard: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  detailRow: {
+  keyInfoRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    gap: 12,
     marginBottom: 16,
   },
-  detailTextContainer: {
-    marginLeft: 12,
+  keyInfoBlock: {
     flex: 1,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    padding: 14,
   },
-  detailTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  detailSubtitle: {
+  keyInfoTitle: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginTop: 8,
   },
-  tagsContainer: {
+  keyInfoSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  detailPillsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 10,
+    marginBottom: 18,
   },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  additionalDetailsSection: {
-    marginBottom: 20,
-  },
-  additionalDetailChip: {
+  detailPill: {
     backgroundColor: '#F2F2F7',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: '47%',
   },
-  additionalDetailTitle: {
-    fontSize: 14,
+  detailPillLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#000',
+    color: '#8E8E93',
     marginBottom: 4,
   },
-  additionalDetailDescription: {
-    fontSize: 12,
-    color: '#666',
+  detailPillValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   attendeesCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#1C1C1E',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
   },
-  attendeesHeader: {
-    marginBottom: 12,
+  attendeesTextBlock: {
+    flex: 1,
   },
   attendeesTitle: {
     fontSize: 16,
@@ -469,8 +498,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   attendeesSubtitle: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
   },
   attendeesAvatars: {
     flexDirection: 'row',
@@ -485,10 +514,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   ticketsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#1C1C1E',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   passCard: {
     marginBottom: 12,
@@ -496,32 +525,36 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   passGradient: {
-    padding: 16,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
   },
   passContent: {
     flex: 1,
+    marginRight: 12,
   },
   passName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFF',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   passDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 8,
+    lineHeight: 18,
+  },
+  passPriceBlock: {
+    alignItems: 'flex-end',
   },
   passPrice: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: '#FFF',
   },
-  selectedIndicator: {
-    marginLeft: 12,
+  passCheck: {
+    marginTop: 6,
   },
   registerButton: {
     backgroundColor: '#1C1C1E',

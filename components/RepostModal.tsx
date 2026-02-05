@@ -16,7 +16,9 @@ import { Colors } from '@/constants/theme';
 interface RepostModalProps {
   visible: boolean;
   onClose: () => void;
-  postId: string;
+  /** Plan id to send to the API (must be the original plan id, not a repost post id) */
+  originalPlanId: string;
+  postId?: string;
   originalPostTitle?: string;
   originalPostDescription?: string;
   originalAuthorName?: string;
@@ -26,20 +28,23 @@ interface RepostModalProps {
 export default function RepostModal({
   visible,
   onClose,
+  originalPlanId,
   postId,
   originalPostTitle,
   originalPostDescription,
   originalAuthorName,
   onSuccess,
 }: RepostModalProps) {
-  const [thoughts, setThoughts] = useState('');
+  const [repostTitle, setRepostTitle] = useState('');
+  const [repostDescription, setRepostDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const { useAppSelector } = require('@/store/hooks');
   const { apiService } = require('@/services/api');
   const { user } = useAppSelector((state: any) => state.auth);
 
   const handleClose = () => {
-    setThoughts('');
+    setRepostTitle('');
+    setRepostDescription('');
     onClose();
   };
 
@@ -48,10 +53,18 @@ export default function RepostModal({
       Alert.alert('Error', 'Please login to repost');
       return;
     }
+    const title = repostTitle.trim();
+    if (!title) {
+      Alert.alert('Required', 'Please add a title for your repost');
+      return;
+    }
 
     setLoading(true);
     try {
-      await apiService.createRepost(postId, user.user_id, thoughts.trim() || undefined);
+      await apiService.createRepost(originalPlanId, user.user_id, {
+        repost_title: title,
+        repost_description: repostDescription.trim() || undefined,
+      });
       Alert.alert('Success', 'Post reposted!');
       onSuccess?.();
       handleClose();
@@ -102,20 +115,34 @@ export default function RepostModal({
             </View>
           </View>
 
-          {/* Thoughts Input */}
+          {/* Repost Title (required) */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Add your thoughts (optional)</Text>
+            <Text style={styles.inputLabel}>Title</Text>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="e.g. Spontaneous ooty trip?"
+              placeholderTextColor="#999"
+              value={repostTitle}
+              onChangeText={setRepostTitle}
+              maxLength={120}
+            />
+            <Text style={styles.charCount}>{repostTitle.length}/120</Text>
+          </View>
+
+          {/* Repost Description */}
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Description</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="What are your thoughts?"
+              placeholder="Add a description or your thoughts..."
               placeholderTextColor="#999"
               multiline
               numberOfLines={4}
-              value={thoughts}
-              onChangeText={setThoughts}
+              value={repostDescription}
+              onChangeText={setRepostDescription}
               maxLength={500}
             />
-            <Text style={styles.charCount}>{thoughts.length}/500</Text>
+            <Text style={styles.charCount}>{repostDescription.length}/500</Text>
           </View>
 
           {/* Actions */}
@@ -213,6 +240,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     marginBottom: 8,
+  },
+  titleInput: {
+    backgroundColor: '#F8F8F8',
+    borderRadius: 16,
+    padding: 16,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   textInput: {
     backgroundColor: '#F8F8F8',

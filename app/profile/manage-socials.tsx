@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,15 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchCurrentUser } from '@/store/slices/profileSlice';
+import { updateProfile } from '@/store/slices/profileSlice';
+import { extractInstagramIdFromUrl } from '@/utils/social';
 
 // Define the structure for our social links
 interface SocialPlatform {
@@ -23,33 +29,43 @@ interface SocialPlatform {
   isCustomIcon?: boolean; // Flag for X logo
 }
 
+const INITIAL_SOCIALS: SocialPlatform[] = [
+  { id: 'instagram', baseUrl: 'instagram.com/', value: '', enabled: true, iconName: 'logo-instagram' },
+  { id: 'x', baseUrl: 'x.com/', value: '', enabled: true, iconName: '', isCustomIcon: true },
+  { id: 'snapchat', baseUrl: 'snapchat.com/', value: '', enabled: true, iconName: 'logo-snapchat' },
+];
+
 export default function ManageSocialsScreen() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { user } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
 
-  const [socials, setSocials] = useState<SocialPlatform[]>([
-    {
-      id: 'instagram',
-      baseUrl: 'instagram.com/',
-      value: '',
-      enabled: true,
-      iconName: 'logo-instagram',
-    },
-    {
-      id: 'x',
-      baseUrl: 'x.com/',
-      value: '',
-      enabled: true,
-      iconName: '', 
-      isCustomIcon: true,
-    },
-    {
-      id: 'snapchat',
-      baseUrl: 'snapchat.com/',
-      value: '',
-      enabled: true,
-      iconName: 'logo-snapchat',
-    },
-  ]);
+  const [socials, setSocials] = useState<SocialPlatform[]>(INITIAL_SOCIALS);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user?.session_id) {
+      dispatch(fetchCurrentUser(user.session_id));
+    } else {
+      setLoading(false);
+    }
+  }, [user?.session_id, dispatch]);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setLoading(false);
+      return;
+    }
+    const sm = (currentUser as any).social_media || {};
+    setSocials([
+      { ...INITIAL_SOCIALS[0], value: sm.instagram || '', enabled: !!sm.instagram },
+      { ...INITIAL_SOCIALS[1], value: sm.x || sm.twitter || '', enabled: !!(sm.x || sm.twitter) },
+      { ...INITIAL_SOCIALS[2], value: sm.snapchat || '', enabled: !!sm.snapchat },
+    ]);
+    setLoading(false);
+  }, [currentUser]);
 
   const handleTextChange = (id: string, text: string) => {
     setSocials((prev) =>
@@ -63,10 +79,39 @@ export default function ManageSocialsScreen() {
     );
   };
 
-  const handleSave = () => {
-    // TODO: Save logic here
-    router.back();
+  const handleSave = async () => {
+    if (!user?.session_id) {
+      Alert.alert('Error', 'You must be logged in to save.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const social_media: { instagram?: string; x?: string; snapchat?: string } = {};
+      socials.forEach((s) => {
+        const v = s.value?.trim();
+        if (s.enabled && v) {
+          if (s.id === 'instagram') social_media.instagram = extractInstagramIdFromUrl(v) || v.replace(/^@/, '');
+          if (s.id === 'x') social_media.x = v.replace(/^@/, '');
+          if (s.id === 'snapchat') social_media.snapchat = v.replace(/^@/, '');
+        }
+      });
+      await dispatch(updateProfile({ session_id: user.session_id, data: { social_media } })).unwrap();
+      Alert.alert('Saved', 'Your social links have been updated.');
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save socials.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#1C1C1E" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -134,8 +179,16 @@ export default function ManageSocialsScreen() {
 
       {/* Footer Save Button */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Save</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -251,5 +304,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  saveButtonDisabled: {
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

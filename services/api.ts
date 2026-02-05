@@ -428,7 +428,14 @@ class ApiService {
     });
   }
 
-  async updateProfile(session_id: string, data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string }) {
+  async updateProfile(session_id: string, data: {
+    name?: string;
+    bio?: string;
+    profile_image?: string;
+    interests?: string[];
+    gender?: string;
+    social_media?: { instagram?: string; twitter?: string; x?: string; facebook?: string; snapchat?: string };
+  }) {
     return this.request<any>('/user/update', {
       method: 'POST',
       body: JSON.stringify({ session_id, ...data }),
@@ -810,10 +817,20 @@ class ApiService {
   }
 
   // Repost APIs
-  async createRepost(original_plan_id: string, repost_author_id: string, added_content?: string) {
+  async createRepost(
+    original_plan_id: string,
+    repost_author_id: string,
+    options?: { added_content?: string; repost_title?: string; repost_description?: string }
+  ) {
     return this.request<{ repost_id: string }>('/repost/create', {
       method: 'POST',
-      body: JSON.stringify({ original_plan_id, repost_author_id, added_content }),
+      body: JSON.stringify({
+        original_plan_id,
+        repost_author_id,
+        added_content: options?.added_content,
+        repost_title: options?.repost_title,
+        repost_description: options?.repost_description,
+      }),
     });
   }
 

@@ -467,18 +467,6 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          {currentUser?.profile_image && (
-            <View style={styles.headerAvatarContainer}>
-              <Avatar uri={currentUser.profile_image} size={40} />
-              {notifications.length > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>
-                    {notifications.length > 99 ? '99+' : notifications.length}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
           <Text style={styles.headerText}>Notifications</Text>
         </View>
         <TouchableOpacity style={styles.editButton}>
@@ -781,30 +769,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-  },
-  headerAvatarContainer: {
-    position: 'relative',
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#FF3B30',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2,
-    borderColor: '#F2F2F7',
-    zIndex: 10,
-  },
-  notificationBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
   headerText: {
     fontSize: 28,

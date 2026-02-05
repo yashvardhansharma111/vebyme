@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Avatar from './Avatar';
 
 interface NotificationListItemProps {
   interaction: {
@@ -30,7 +29,6 @@ export default function NotificationListItem({
   const cachedUser = userCache[interaction.source_user_id];
   const user = cachedUser || interaction.user;
   const userName = user?.name || 'Unknown';
-  const userAvatar = user?.profile_image || null;
 
   const getInteractionText = () => {
     // Check if payload has custom notification text
@@ -81,12 +79,7 @@ export default function NotificationListItem({
       activeOpacity={0.7}
     >
       <View style={styles.row}>
-        {/* Left: Avatar - ensure DP is visible */}
-        <View style={styles.avatarWrap}>
-          <Avatar uri={userAvatar} size={44} />
-        </View>
-
-        {/* Center: Text */}
+        {/* Text */}
         <View style={styles.textContainer}>
           <Text style={styles.text}>
             <Text style={styles.userName}>{userName}</Text>
@@ -99,7 +92,7 @@ export default function NotificationListItem({
         {getInteractionIcon() && (
           <Ionicons
             name={getInteractionIcon() as any}
-            size={18}
+            size={20}
             color="#8E8E93"
             style={styles.icon}
           />
@@ -119,23 +112,16 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-  },
-  avatarWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: 'hidden',
   },
   textContainer: {
     flex: 1,
-    marginLeft: 12,
   },
   text: {
-    fontSize: 15,
+    fontSize: 18,
     color: '#1C1C1E',
-    lineHeight: 20,
+    lineHeight: 24,
   },
   userName: {
     fontWeight: '600',
@@ -150,7 +136,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#E5E5EA',
-    marginLeft: 76,
+    marginLeft: 20,
     marginRight: 20,
   },
 });

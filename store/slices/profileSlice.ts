@@ -15,7 +15,9 @@ interface UserProfile {
   social_media?: {
     instagram?: string;
     twitter?: string;
+    x?: string;
     facebook?: string;
+    snapchat?: string;
   };
 }
 
@@ -96,7 +98,7 @@ export const fetchUserStats = createAsyncThunk(
 export const updateProfile = createAsyncThunk(
   'profile/updateProfile',
   async (
-    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string } },
+    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string; social_media?: { instagram?: string; twitter?: string; x?: string; facebook?: string; snapchat?: string } } },
     { rejectWithValue }
   ) => {
     try {

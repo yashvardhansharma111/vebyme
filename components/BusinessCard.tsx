@@ -1,6 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -8,14 +6,6 @@ import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 import RepostModal from './RepostModal';
-
-function getCategoryIcon(tag: string): string {
-  const t = tag.toLowerCase();
-  if (t.includes('weekend')) return 'checkbox-outline';
-  if (t.includes('evening')) return 'cloud-outline';
-  if (t.includes('hitchhik') || t.includes('travel')) return 'leaf-outline';
-  return 'pricetag-outline';
-}
 
 interface BusinessCardProps {
   plan: {
@@ -55,21 +45,26 @@ interface BusinessCardProps {
   onRequireAuth?: () => void;
 }
 
-// Base Business Card Component
+// Base Business Card Component – layout per reference: white card, author pill (left), interacted pill (right), image block, title/description/tags, Register + icons
 function BusinessCardBase({
   plan,
   user,
   attendeesCount = 0,
+  interactedUsers = [],
   containerStyle,
   onPress,
   onRegisterPress,
   onRequireAuth,
   onRepostPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void }) {
-  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
+  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
+  const tags = plan.category_sub || [];
+  const showInteracted = attendeesCount > 0 || (interactedUsers && interactedUsers.length > 0);
+  const displayUsers = interactedUsers?.slice(0, 3) || [];
+  const extraCount = Math.max(0, (attendeesCount || 0) - displayUsers.length) || (displayUsers.length === 0 ? attendeesCount : 0);
 
   const handleShare = async () => {
     try {
@@ -77,100 +72,94 @@ function BusinessCardBase({
         Alert.alert('Error', 'Plan ID not found');
         return;
       }
-
       const planUrl = `https://vybeme.com/plan/${plan.plan_id}`;
       const shareMessage = `Check out this event: ${plan.title}\n\n${planUrl}`;
-
-      await Share.share({
-        message: shareMessage,
-        url: planUrl,
-        title: plan.title,
-      });
+      await Share.share({ message: shareMessage, url: planUrl, title: plan.title });
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to share plan');
     }
   };
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.cardContainer, containerStyle]}
       onPress={onPress}
-      activeOpacity={0.95}
+      activeOpacity={0.98}
     >
-      {/* Media as full background */}
-      <Image source={{ uri: mainImage }} style={styles.backgroundMedia} resizeMode="cover" />
-      {/* Blur lower 30% of image */}
-      <View style={styles.lowerBlurOverlay} pointerEvents="none">
-        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
-      </View>
-      <LinearGradient
-        colors={['transparent', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.92)']}
-        style={styles.backgroundFade}
-        pointerEvents="none"
-      />
-
-      {/* Organizer Info Overlay (Top Left) */}
-      <View style={styles.organizerPill}>
-        <Avatar uri={organizerAvatar} size={32} />
-        <View style={styles.organizerInfo}>
-          <Text style={styles.organizerName}>{organizerName}</Text>
-          <Text style={styles.organizerTime}>{timeText}</Text>
-        </View>
-      </View>
-
-      {/* Attendees Count (Top Right) */}
-      {attendeesCount > 0 && (
-        <View style={styles.attendeesPill}>
-          <View style={styles.avatarStack}>
-            {[1, 2, 3].map((i) => (
-              <View key={i} style={[styles.stackedAvatar, { marginLeft: i === 1 ? 0 : -8 }]}>
-                <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={24} />
-              </View>
-            ))}
+      <View style={styles.card}>
+        <View style={styles.headerRow}>
+          {/* Author pill – top left (light grey) */}
+          <View style={styles.organizerPill} pointerEvents="none">
+            <Avatar uri={organizerAvatar} size={32} />
+            <View style={styles.organizerInfo}>
+              <Text style={styles.organizerName}>{organizerName}</Text>
+              <Text style={styles.organizerTime}>{timeText}</Text>
+            </View>
           </View>
-          <Text style={styles.attendeesText}>+{attendeesCount}</Text>
-        </View>
-      )}
 
-      {/* Text section – larger overlay above background */}
-      <View style={styles.textSection}>
-        <Text style={styles.title}>{plan.title}</Text>
-        <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
-          {plan.description}
-        </Text>
-
-        {/* Category pills */}
-        {plan.category_sub && plan.category_sub.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {plan.category_sub.slice(0, 3).map((tag: string, index: number) => (
-              <View key={index} style={styles.tag}>
-                <Ionicons name={getCategoryIcon(tag) as any} size={12} color="#333" style={styles.tagIcon} />
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
+          {/* Interacted users pill – top right (dark) */}
+          {showInteracted && (
+          <View style={styles.interactedPill} pointerEvents="none">
+            {displayUsers.length > 0 ? (
+              displayUsers.map((u: any, idx: number) => (
+                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
+                  <Avatar uri={u.avatar} size={24} />
+                </View>
+              ))
+            ) : (
+              [1, 2, 3].map((i) => (
+                <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -8, zIndex: 4 - i }]}>
+                  <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={24} />
+                </View>
+              ))
+            )}
+            {(extraCount > 0 || displayUsers.length === 0) && (
+              <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : attendeesCount}</Text>
+            )}
           </View>
-        )}
+          )}
+        </View>
 
-        {/* Action: Book Event + Repost + Share */}
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={styles.registerButton}
-            onPress={onRegisterPress}
-          >
-            <Text style={styles.registerButtonText}>Register</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={onRepostPress}
-          >
-            <Ionicons name="repeat-outline" size={20} color="#1C1C1E" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={handleShare}
-          >
-            <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
-          </TouchableOpacity>
+        {/* Image block – rounded bottom corners */}
+        <View style={styles.imageWrap}>
+          {mainImage ? (
+            <Image source={{ uri: mainImage }} style={styles.cardImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+              <Ionicons name="image-outline" size={40} color="#8E8E93" />
+            </View>
+          )}
+        </View>
+
+        {/* Content below image */}
+        <View style={styles.content}>
+          <Text style={styles.title}>{plan.title}</Text>
+          <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+            {plan.description}
+          </Text>
+          {tags.length > 0 && (
+            <View style={styles.tagsContainer}>
+              {tags.slice(0, 3).map((tag: string, index: number) => (
+                <View key={index} style={styles.tag}>
+                  <Ionicons name="checkbox" size={10} color="#555" style={styles.tagIcon} />
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Footer: Register (black) + repost + share (circular grey) */}
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+              <Text style={styles.registerButtonText}>Register</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -279,7 +268,7 @@ export default function BusinessCard({
         <RepostModal
           visible={showRepostModal}
           onClose={() => setShowRepostModal(false)}
-          postId={plan.plan_id}
+          originalPlanId={plan.plan_id}
           originalPostTitle={plan.title}
           originalPostDescription={plan.description}
           originalAuthorName={organizerName}
@@ -316,7 +305,7 @@ export default function BusinessCard({
       <RepostModal
         visible={showRepostModal}
         onClose={() => setShowRepostModal(false)}
-        postId={plan.plan_id}
+        originalPlanId={plan.plan_id}
         originalPostTitle={plan.title}
         originalPostDescription={plan.description}
         originalAuthorName={organizerName}
@@ -336,8 +325,7 @@ const styles = StyleSheet.create({
   cardContainer: {
     marginHorizontal: 16,
     marginBottom: 16,
-    height: 420,
-    borderRadius: 24,
+    borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -345,147 +333,140 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  backgroundMedia: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  lowerBlurOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 126,
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  backgroundFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 200,
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    position: 'relative',
   },
   organizerPill: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#E5E5EA',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 20,
-    zIndex: 10,
+    gap: 8,
   },
   organizerInfo: {
-    marginLeft: 8,
+    flex: 1,
   },
   organizerName: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   organizerTime: {
     fontSize: 11,
-    color: '#888',
+    color: '#8E8E93',
   },
-  attendeesPill: {
+  interactedPill: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 0,
+    right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 20,
-    zIndex: 10,
+    gap: 6,
   },
-  avatarStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stackedAvatar: {
+  interactedAvatarWrap: {
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: '#1C1C1E',
     borderRadius: 12,
   },
-  attendeesText: {
-    marginLeft: 8,
+  interactedPlus: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000',
+    color: '#fff',
   },
-  textSection: {
-    position: 'absolute',
-    bottom: 14,
-    left: 10,
-    right: 10,
-    backgroundColor: '#FFF',
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
+  imageWrap: {
+    width: '100%',
+    marginTop: 12,
+    overflow: 'hidden',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  cardImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+  },
+  cardImagePlaceholder: {
+    backgroundColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 19,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#1C1C1E',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   description: {
     fontSize: 14,
-    color: '#444',
-    lineHeight: 21,
-    marginBottom: 14,
+    color: '#3C3C43',
+    lineHeight: 20,
+    marginBottom: 8,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#E5E5EA',
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 12,
+    gap: 4,
   },
   tagIcon: {
-    marginRight: 4,
+    marginRight: 2,
   },
   tagText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    color: '#3C3C43',
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
   registerButton: {
     flex: 1,
     height: 44,
     backgroundColor: '#1C1C1E',
-    borderRadius: 22,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   registerButtonText: {
     color: '#FFF',
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 16,
   },
   iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
   },

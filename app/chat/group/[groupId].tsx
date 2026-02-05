@@ -1025,11 +1025,11 @@ const styles = StyleSheet.create({
     borderRadius: 24, // Curvy bubbles
   },
   bubbleLeft: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E8E8ED',
     borderBottomLeftRadius: 4,
   },
   bubbleRight: {
-    backgroundColor: '#2D2D2D',
+    backgroundColor: '#1C1C1E',
     borderBottomRightRadius: 4,
   },
   messageText: {

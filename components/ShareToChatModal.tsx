@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,21 @@ import {
   ActivityIndicator,
   Image,
   Alert,
+  TextInput,
+  Share,
+  Linking,
+  Dimensions,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
+
+const COLS = 3;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PAD = 20;
+const GAP = 16;
+const TILE_SIZE = (SCREEN_WIDTH - PAD * 2 - GAP * (COLS - 1)) / COLS;
 
 interface ShareToChatModalProps {
   visible: boolean;
@@ -21,12 +32,13 @@ interface ShareToChatModalProps {
   postTitle: string;
   postDescription: string;
   postMedia: any[];
-  /** Tags or category labels (e.g. Weekend, Hitchhiking) so shared card matches home */
   postTags?: string[];
   postCategorySub?: string[];
   postCategoryMain?: string;
   postIsBusiness?: boolean;
   userId: string;
+  /** Optional: avatar URL for "You" tile */
+  currentUserAvatar?: string;
   onShareSuccess?: () => void;
 }
 
@@ -39,21 +51,14 @@ interface ChatItem {
   author_id: string;
   author_name: string;
   author_image: string | null;
-  other_user?: {
-    user_id: string;
-    name: string;
-    profile_image: string;
-  } | null;
-  last_message?: {
-    content: string;
-    type: string;
-    timestamp: string;
-    user_id: string;
-  } | null;
+  other_user?: { user_id: string; name: string; profile_image: string } | null;
+  last_message?: { content: string; type: string; timestamp: string; user_id: string } | null;
   member_count: number;
   is_group: boolean;
   group_name: string;
 }
+
+type GridItem = { type: 'you'; id: string; name: string; avatar: string | null } | { type: 'chat'; item: ChatItem };
 
 export default function ShareToChatModal({
   visible,
@@ -67,6 +72,7 @@ export default function ShareToChatModal({
   postCategoryMain,
   postIsBusiness,
   userId,
+  currentUserAvatar,
   onShareSuccess,
 }: ShareToChatModalProps) {
   const [chatLists, setChatLists] = useState<{
@@ -76,10 +82,12 @@ export default function ShareToChatModal({
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [sharing, setSharing] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (visible && userId) {
       loadChatLists();
+      setSearch('');
     }
   }, [visible, userId]);
 
@@ -87,9 +95,7 @@ export default function ShareToChatModal({
     try {
       setLoading(true);
       const response = await apiService.getChatLists(userId);
-      if (response.data) {
-        setChatLists(response.data);
-      }
+      if (response.data) setChatLists(response.data);
     } catch (error: any) {
       console.error('Error loading chat lists:', error);
       Alert.alert('Error', 'Failed to load chats');
@@ -98,9 +104,26 @@ export default function ShareToChatModal({
     }
   };
 
-  const handleShareToChat = async (group_id: string) => {
-    if (!userId) return;
+  const allChats: ChatItem[] = useMemo(
+    () => [
+      ...(chatLists?.their_plans || []),
+      ...(chatLists?.my_plans || []),
+      ...(chatLists?.groups || []),
+    ],
+    [chatLists]
+  );
 
+  const gridItems: GridItem[] = useMemo(() => {
+    const you: GridItem = { type: 'you', id: 'you', name: 'You', avatar: currentUserAvatar || null };
+    const chats = allChats.filter((c) => {
+      const name = (c.group_name || c.plan_title || '').toLowerCase();
+      return !search.trim() || name.includes(search.toLowerCase());
+    });
+    return [you, ...chats.map((item) => ({ type: 'chat' as const, item }))];
+  }, [allChats, search, currentUserAvatar]);
+
+  const handleShareToChat = async (group_id: string) => {
+    if (!userId || group_id === 'you') return;
     try {
       setSharing(group_id);
       await apiService.sendMessage(group_id, userId, 'plan', {
@@ -114,157 +137,170 @@ export default function ShareToChatModal({
         is_business: postIsBusiness === true,
       });
       Alert.alert('Success', 'Post shared to chat!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            onShareSuccess?.();
-            onClose();
-          },
-        },
+        { text: 'OK', onPress: () => { onShareSuccess?.(); onClose(); } },
       ]);
     } catch (error: any) {
-      console.error('Error sharing to chat:', error);
       Alert.alert('Error', error.message || 'Failed to share post');
     } finally {
       setSharing(null);
     }
   };
 
-  const renderChatItem = (item: ChatItem) => {
-    const isSharing = sharing === item.group_id;
-    const displayName = item.group_name || item.plan_title || 'Chat';
-    
-    // Safely extract image URL
-    let displayImage: string | null = null;
-    if (item.is_group && item.member_count > 2) {
-      // For groups, use plan media
-      const mediaItem = item.plan_media?.[0];
-      if (mediaItem) {
-        displayImage = typeof mediaItem === 'string' ? mediaItem : mediaItem?.url || null;
-      }
-    } else {
-      // For individual chats, use user profile image
-      displayImage = item.other_user?.profile_image || item.author_image || null;
+  const planUrl = `https://vybeme.com/plan/${postId}`;
+  const shareMessage = `Check out this plan: ${postTitle}\n\n${planUrl}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await Clipboard.setStringAsync(planUrl);
+      Alert.alert('Link copied', 'Plan link copied to clipboard.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to copy link');
     }
+  };
+
+  const handleExternalShare = async () => {
+    try {
+      await Share.share({ message: shareMessage, url: planUrl, title: postTitle });
+    } catch (e: any) {
+      if (e.message?.includes('cancel') || e.code === 'E_SHARE_CANCELLED') return;
+      Alert.alert('Error', e.message || 'Failed to share');
+    }
+  };
+
+  const handleWhatsApp = () => {
+    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`).catch(() => handleExternalShare());
+  };
+
+  const getDisplayForItem = (entry: GridItem): { name: string; image: string | null; isGroup: boolean } => {
+    if (entry.type === 'you') return { name: entry.name, image: entry.avatar, isGroup: false };
+    const c = entry.item;
+    const name = c.group_name || c.plan_title || 'Chat';
+    let image: string | null = null;
+    if (c.is_group && c.member_count > 2) {
+      const m = c.plan_media?.[0];
+      image = typeof m === 'string' ? m : m?.url || null;
+    } else {
+      image = c.other_user?.profile_image || c.author_image || null;
+    }
+    return { name, image, isGroup: c.is_group && c.member_count > 2 };
+  };
+
+  const renderTile = (entry: GridItem, index: number) => {
+    const { name, image, isGroup } = getDisplayForItem(entry);
+    const id = entry.type === 'you' ? 'you' : entry.item.group_id;
+    const isSharing = id !== 'you' && sharing === id;
 
     return (
       <TouchableOpacity
-        key={item.group_id}
-        style={styles.chatItem}
-        onPress={() => handleShareToChat(item.group_id)}
-        disabled={isSharing}
+        key={id}
+        style={styles.tile}
+        onPress={() => entry.type === 'chat' && handleShareToChat(entry.item.group_id)}
+        disabled={entry.type === 'you' || isSharing}
         activeOpacity={0.7}
       >
-        <View style={styles.chatItemLeft}>
-          {item.is_group && item.member_count > 2 ? (
-            <View style={styles.groupAvatarContainer}>
-              {displayImage && typeof displayImage === 'string' && displayImage.trim() !== '' ? (
-                <Image 
-                  source={{ uri: displayImage }} 
-                  style={styles.groupAvatar}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={styles.groupAvatarPlaceholder}>
-                  <Ionicons name="people" size={20} color="#8E8E93" />
-                </View>
-              )}
-            </View>
+        <View style={styles.tileAvatarWrap}>
+          {isGroup ? (
+            image ? (
+              <Image source={{ uri: image }} style={styles.tileImage} resizeMode="cover" />
+            ) : (
+              <View style={styles.tilePlaceholder}>
+                <Ionicons name="people" size={28} color="#8E8E93" />
+              </View>
+            )
           ) : (
-            <Avatar uri={displayImage} size={50} />
+            <Avatar uri={image} size={TILE_SIZE - 8} />
           )}
-          <View style={styles.chatItemInfo}>
-            <Text style={styles.chatItemName} numberOfLines={1}>
-              {displayName}
-            </Text>
-            {item.last_message && (
-              <Text style={styles.chatItemLastMessage} numberOfLines={1}>
-                {item.last_message.type === 'text'
-                  ? item.last_message.content
-                  : item.last_message.type === 'image'
-                  ? '📷 Photo'
-                  : item.last_message.type === 'plan'
-                  ? '📋 Plan'
-                  : 'Message'}
-              </Text>
-            )}
-          </View>
         </View>
-        {isSharing ? (
-          <ActivityIndicator size="small" color="#1C1C1E" />
-        ) : (
-          <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-        )}
+        <Text style={styles.tileName} numberOfLines={1}>{name}</Text>
+        {isSharing && <ActivityIndicator size="small" color="#1C1C1E" style={styles.tileLoader} />}
       </TouchableOpacity>
     );
   };
 
-  const allChats: ChatItem[] = [
-    ...(chatLists?.their_plans || []),
-    ...(chatLists?.my_plans || []),
-    ...(chatLists?.groups || []),
-  ];
+  const rows = useMemo(() => {
+    const list: GridItem[] = gridItems;
+    const result: GridItem[][] = [];
+    for (let i = 0; i < list.length; i += COLS) result.push(list.slice(i, i + COLS));
+    return result;
+  }, [gridItems]);
 
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Ionicons name="paper-plane" size={24} color="#1C1C1E" />
-              <Text style={styles.headerTitle}>Share to Chat</Text>
-            </View>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#1C1C1E" />
-            </TouchableOpacity>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <View style={styles.sheet}>
+          <View style={styles.handleBar} />
+          <View style={styles.searchWrap}>
+            <Ionicons name="search" size={20} color="#8E8E93" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              placeholderTextColor="#8E8E93"
+              value={search}
+              onChangeText={setSearch}
+            />
           </View>
 
-          {/* Content */}
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#1C1C1E" />
             </View>
-          ) : allChats.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={48} color="#8E8E93" />
-              <Text style={styles.emptyText}>No chats available</Text>
-              <Text style={styles.emptySubtext}>Start a conversation to share posts</Text>
-            </View>
           ) : (
-            <ScrollView style={styles.chatList} showsVerticalScrollIndicator={false}>
-              {/* Their Plans Section */}
-              {chatLists?.their_plans && chatLists.their_plans.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Their Plans</Text>
-                  {chatLists.their_plans.map(renderChatItem)}
+            <ScrollView
+              style={styles.gridScroll}
+              contentContainerStyle={styles.gridContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {rows.map((row, rowIndex) => (
+                <View key={rowIndex} style={styles.row}>
+                  {row.map((entry, colIndex) => renderTile(entry, rowIndex * COLS + colIndex))}
+                  {row.length < COLS && Array.from({ length: COLS - row.length }).map((_, i) => (
+                    <View key={`empty-${i}`} style={styles.tile} />
+                  ))}
                 </View>
-              )}
-
-              {/* My Plans Section */}
-              {chatLists?.my_plans && chatLists.my_plans.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>My Plans</Text>
-                  {chatLists.my_plans.map(renderChatItem)}
-                </View>
-              )}
-
-              {/* Groups Section */}
-              {chatLists?.groups && chatLists.groups.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Groups</Text>
-                  {chatLists.groups.map(renderChatItem)}
-                </View>
-              )}
+              ))}
             </ScrollView>
           )}
+
+          <View style={styles.externalRow}>
+            <TouchableOpacity style={styles.externalIcon} onPress={handleWhatsApp}>
+              <View style={[styles.externalCircle, { backgroundColor: '#25D366' }]}>
+                <Ionicons name="logo-whatsapp" size={26} color="#FFF" />
+              </View>
+              <Text style={styles.externalLabel}>WhatsApp</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.externalIcon} onPress={handleExternalShare}>
+              <View style={[styles.externalCircle, { backgroundColor: '#000' }]}>
+                <Ionicons name="logo-twitter" size={22} color="#FFF" />
+              </View>
+              <Text style={styles.externalLabel}>X</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.externalIcon} onPress={handleExternalShare}>
+              <View style={[styles.externalCircle, { backgroundColor: '#E4405F' }]}>
+                <Ionicons name="logo-instagram" size={26} color="#FFF" />
+              </View>
+              <Text style={styles.externalLabel}>Instagram</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.externalIcon} onPress={handleExternalShare}>
+              <View style={[styles.externalCircle, { backgroundColor: '#FFFC00' }]}>
+                <Ionicons name="camera" size={24} color="#000" />
+              </View>
+              <Text style={styles.externalLabel}>Snapchat</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.externalIcon} onPress={handleExternalShare}>
+              <View style={[styles.externalCircle, { backgroundColor: '#E5E5EA' }]}>
+                <Ionicons name="share-outline" size={24} color="#1C1C1E" />
+              </View>
+              <Text style={styles.externalLabel}>Share</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.copyLinkButton} onPress={handleCopyLink}>
+            <Ionicons name="link" size={22} color="#FFF" />
+            <Text style={styles.copyLinkText}>Copy Link</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 }
@@ -272,114 +308,124 @@ export default function ShareToChatModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
+  sheet: {
+    backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '80%',
-    paddingTop: 12,
+    maxHeight: '85%',
+    paddingTop: 10,
+    paddingHorizontal: PAD,
+    paddingBottom: 34,
   },
-  header: {
+  handleBar: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#C7C7CC',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  searchWrap: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    backgroundColor: '#E5E5EA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 20,
+    gap: 10,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
     color: '#1C1C1E',
+    paddingVertical: 0,
   },
   loadingContainer: {
-    padding: 40,
+    paddingVertical: 48,
     alignItems: 'center',
   },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
+  gridScroll: {
+    maxHeight: 320,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginTop: 16,
-    marginBottom: 8,
+  gridContent: {
+    paddingBottom: 20,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-  },
-  chatList: {
-    maxHeight: 500,
-  },
-  section: {
-    paddingBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#F2F2F7',
-  },
-  chatItem: {
+  row: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F7',
+    marginBottom: GAP,
+    gap: GAP,
   },
-  chatItemLeft: {
-    flexDirection: 'row',
+  tile: {
+    width: TILE_SIZE,
     alignItems: 'center',
-    flex: 1,
   },
-  groupAvatarContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  tileAvatarWrap: {
+    width: TILE_SIZE,
+    height: TILE_SIZE,
+    borderRadius: TILE_SIZE / 2,
     overflow: 'hidden',
     backgroundColor: '#F2F2F7',
+    marginBottom: 8,
   },
-  groupAvatar: {
+  tileImage: {
     width: '100%',
     height: '100%',
   },
-  groupAvatarPlaceholder: {
+  tilePlaceholder: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chatItemInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  chatItemName: {
-    fontSize: 16,
+  tileName: {
+    fontSize: 13,
     fontWeight: '600',
     color: '#1C1C1E',
-    marginBottom: 4,
+    textAlign: 'center',
   },
-  chatItemLastMessage: {
-    fontSize: 14,
+  tileLoader: {
+    marginTop: 4,
+  },
+  externalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  externalIcon: {
+    alignItems: 'center',
+  },
+  externalCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  externalLabel: {
+    fontSize: 11,
+    fontWeight: '500',
     color: '#8E8E93',
+  },
+  copyLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3A3A3C',
+    borderRadius: 14,
+    paddingVertical: 14,
+    gap: 10,
+  },
+  copyLinkText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });

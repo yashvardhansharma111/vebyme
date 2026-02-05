@@ -1,7 +1,7 @@
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,10 +13,14 @@ import {
   View,
   Share,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import EventReviewCard, { EventReviewRating } from '@/components/EventReviewCard';
 // QR Code generation - install react-native-qrcode-svg or use alternative
 // import QRCode from 'react-native-qrcode-svg';
+
+const EVENT_REVIEWS_KEY = '@vybeme_event_reviews';
 
 interface TicketData {
   ticket_id: string;
@@ -51,6 +55,23 @@ export default function TicketScreen() {
   }>();
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reviewedPlans, setReviewedPlans] = useState<Record<string, EventReviewRating>>({});
+  const [selectedReview, setSelectedReview] = useState<EventReviewRating | null>(null);
+
+  const planId = ticket?.plan?.plan_id;
+  const eventDate = ticket?.plan?.date ? new Date(ticket.plan.date) : null;
+  const hasEventPassed = eventDate ? eventDate < new Date() : false;
+  const isReviewed = planId ? !!reviewedPlans[planId] : false;
+  const showReviewCard = !loading && !!ticket && hasEventPassed && !isReviewed;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(EVENT_REVIEWS_KEY);
+        if (raw) setReviewedPlans(JSON.parse(raw));
+      } catch (_) {}
+    })();
+  }, []);
 
   useEffect(() => {
     loadTicket();
@@ -163,6 +184,16 @@ export default function TicketScreen() {
   const formatTime = (time: string | undefined): string => {
     if (!time) return '10:00 PM';
     return time;
+  };
+
+  const handleReviewSubmit = async (rating: EventReviewRating) => {
+    if (!planId) return;
+    try {
+      const next = { ...reviewedPlans, [planId]: rating };
+      setReviewedPlans(next);
+      setSelectedReview(rating);
+      await AsyncStorage.setItem(EVENT_REVIEWS_KEY, JSON.stringify(next));
+    } catch (_) {}
   };
 
   if (loading) {
@@ -293,11 +324,10 @@ export default function TicketScreen() {
             </View>
           </LinearGradient>
 
-          {/* QR Code Section */}
+          {/* QR Code Section – backend provides qr_code (display string) and qr_code_hash (value to encode in QR; scanner sends this to /ticket/scan) */}
           <View style={styles.qrCodeSection}>
             <View style={styles.qrCodeContainer}>
-              {/* QR Code - Install react-native-qrcode-svg: npm install react-native-qrcode-svg react-native-svg */}
-              {/* For now, showing QR code data */}
+              {/* Encode ticket.qr_code_hash in the QR so the event scanner can validate and check-in. Placeholder until a QR lib is used. */}
               <View style={styles.qrCodePlaceholder}>
                 <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
                 <Text style={styles.qrCodeData} numberOfLines={3}>
@@ -317,6 +347,23 @@ export default function TicketScreen() {
             <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>
           </View>
         </View>
+
+        {/* Post-event review – show after event date has passed */}
+        {showReviewCard && (
+          <View style={styles.reviewSection}>
+            <EventReviewCard
+              question={
+                ticket.plan?.title
+                  ? `How was your last event at ${ticket.plan.title}?`
+                  : 'How was your experience?'
+              }
+              selectedRating={selectedReview}
+              onSelectRating={setSelectedReview}
+              onSubmit={handleReviewSubmit}
+              variant="standalone"
+            />
+          </View>
+        )}
 
         {/* Action Buttons at Bottom */}
         <View style={styles.bottomActions}>
@@ -393,6 +440,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#FFF',
+  },
+  reviewSection: {
+    marginTop: 20,
   },
   ticketCard: {
     backgroundColor: '#FFF',

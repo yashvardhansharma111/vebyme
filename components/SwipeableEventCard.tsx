@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share, ActionSheetIOS, Platform } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import PostInteractionModal from './PostInteractionModal';
@@ -24,78 +24,126 @@ function getAllEventTags(event: any): string[] {
 function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const allTags = getAllEventTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
+  const interactedUsers = event?.interacted_users || [];
+  const interactionCount = event?.interaction_count ?? 0;
+  const showInteracted = interactionCount > 0;
+  const displayCount = Math.min(3, interactedUsers.length);
+  const extraCount = displayCount > 0 ? Math.max(0, interactionCount - displayCount) : interactionCount;
+
   return (
     <View style={styles.cardContainer}>
       {/* Main White Card */}
       <View style={styles.card}>
-        <View style={styles.content}>
-          {/* Repost Badge - Always visible for reposts */}
-          {isRepost && (
-            <View style={styles.repostBadge}>
-              <Ionicons name="repeat" size={16} color="#8B5CF6" />
-              <Text style={styles.repostBadgeText}>Repost</Text>
-            </View>
-          )}
-          
-          {/* User's Added Content/Thoughts - Prominently displayed */}
-          {isRepost && repostData?.added_content && (
-            <View style={styles.repostThoughtsContainer}>
-              <Text style={styles.repostThoughtsLabel}>Your thoughts:</Text>
-              <Text style={styles.repostThoughts}>{repostData.added_content}</Text>
-            </View>
-          )}
-          
-          {/* Original Post Info for Reposts */}
-          {isRepost && originalAuthor && (
-            <View style={styles.originalPostInfo}>
-              <Ionicons name="person-outline" size={14} color="#666" />
-              <Text style={styles.originalPostLabel}>
-                Original by {originalAuthor}
-              </Text>
-            </View>
-          )}
-          
-          <Text style={styles.title}>{isRepost ? (originalPostTitle || event.title) : event.title}</Text>
-          <Text style={styles.description} numberOfLines={3}>{isRepost ? (originalPostDescription || event.description) : event.description}</Text>
-
-          <View style={styles.middleRow}>
-            <View style={styles.tagsContainer}>
-              {allTags.map((tag: string, index: number) => (
-                <View key={index} style={styles.tag}>
-                   <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'checkbox'} size={12} color="#555" style={{marginRight: 4}}/>
-                   <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-            {hasEventImage ? (
-              <Image source={{ uri: event.image }} style={styles.eventImage} />
-            ) : (
-              <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
-                <Ionicons name="image-outline" size={28} color="#8E8E93" />
+        {/* Interacted users: 3 DPs + "+N" on upper right (on the border) */}
+        {showInteracted && (
+          <View style={styles.interactedPill}>
+            {interactedUsers.slice(0, 3).map((u: any, idx: number) => (
+              <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
+                <Avatar uri={u.avatar} size={24} />
               </View>
+            ))}
+            {(extraCount > 0 || displayCount === 0) && (
+              <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : interactionCount}</Text>
             )}
           </View>
+        )}
+
+        <View style={styles.content}>
+          {isRepost ? (
+            <>
+              {/* Reposter's title and description only (do not fall back to original) */}
+              {(event.repost_title && event.repost_title.trim()) ? (
+                <Text style={styles.repostTitle} numberOfLines={2}>
+                  {event.repost_title}
+                </Text>
+              ) : null}
+              {(event.repost_description && event.repost_description.trim()) ? (
+                <Text style={styles.repostDescription} numberOfLines={4}>
+                  {event.repost_description}
+                </Text>
+              ) : null}
+              <View style={styles.embeddedCard}>
+              {hasEventImage ? (
+                <Image source={{ uri: event.image }} style={styles.embeddedCardBg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.embeddedCardBg, styles.embeddedCardBgPlaceholder]} />
+              )}
+              <View style={styles.embeddedCardOverlay} />
+              <View style={styles.embeddedCardContent}>
+                {originalAuthor && (
+                  <View style={styles.originalAuthorPill}>
+                    <Avatar uri={event.original_author_avatar} size={28} />
+                    <Text style={styles.originalAuthorName}>{originalAuthor}</Text>
+                  </View>
+                )}
+                <Text style={styles.embeddedTitle}>{originalPostTitle || event.title}</Text>
+                <Text style={styles.embeddedDescription} numberOfLines={3}>{originalPostDescription || event.description}</Text>
+                {allTags.length > 0 && (
+                  <View style={styles.embeddedTagsRow}>
+                    {allTags.slice(0, 3).map((tag: string, index: number) => (
+                      <View key={index} style={styles.embeddedTag}>
+                        <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'checkbox'} size={10} color="#FFF" />
+                        <Text style={styles.embeddedTagText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <View style={styles.embeddedFooter}>
+                  <TouchableOpacity style={styles.embeddedJoinBtn} onPress={onJoinPress}>
+                    <Text style={styles.embeddedJoinText}>Join</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.embeddedShareBtn} onPress={onSharePress}>
+                    <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+            </>
+          ) : (
+            /* Regular post */
+            <>
+              <Text style={styles.title}>{event.title}</Text>
+              <Text style={styles.description} numberOfLines={3}>{event.description}</Text>
+              <View style={styles.middleRow}>
+                <View style={styles.tagsContainer}>
+                  {allTags.map((tag: string, index: number) => (
+                    <View key={index} style={styles.tag}>
+                      <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'checkbox'} size={12} color="#555" style={{ marginRight: 4 }} />
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+                {hasEventImage ? (
+                  <Image source={{ uri: event.image }} style={styles.eventImage} />
+                ) : (
+                  <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+                    <Ionicons name="image-outline" size={28} color="#8E8E93" />
+                  </View>
+                )}
+              </View>
+            </>
+          )}
         </View>
 
-        <View style={styles.footerPill}>
-          <View style={styles.footerIcons}>
-            {!isRepost && (
+        {!isRepost && !event?.repost_data && (
+          <View style={styles.footerPill}>
+            <View style={styles.footerIcons}>
               <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
                 <Ionicons name="repeat-outline" size={22} color="#000" />
               </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
-              <Ionicons name="paper-plane-outline" size={22} color="#000" />
+              <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
+                <Ionicons name="paper-plane-outline" size={22} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.joinPill} onPress={onJoinPress}>
+              <Text style={styles.joinButtonText}>Join</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.joinPill} onPress={onJoinPress}>
-            <Text style={styles.joinButtonText}>Join</Text>
-          </TouchableOpacity>
-        </View>
+        )}
       </View>
 
-      {/* Floating User Pill */}
-      <TouchableOpacity 
+      {/* Floating User Pill (reposter or author) */}
+      <TouchableOpacity
         style={styles.userPill}
         onPress={() => onUserPress && user.id && onUserPress(user.id)}
         activeOpacity={0.7}
@@ -191,7 +239,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     }
 
     // Check if this is already a repost (cannot repost a repost)
-    const isRepostPost = event.is_repost || isRepost;
+    const isRepostPost = event.is_repost || isRepost || !!event?.repost_data;
     if (isRepostPost) {
       Alert.alert('Info', 'You cannot repost a repost');
       return;
@@ -205,80 +253,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
       onRequireAuth?.();
       return;
     }
-
-    if (Platform.OS === 'ios') {
-      // Show action sheet on iOS
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', 'Share to Chat', 'Share Externally'],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === 1) {
-            // Share to Chat
-            setShowShareModal(true);
-          } else if (buttonIndex === 2) {
-            // Share Externally
-            handleExternalShare();
-          }
-        }
-      );
-    } else {
-      // On Android, show a simple alert to choose
-      Alert.alert(
-        'Share',
-        'Choose how to share',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Share to Chat', onPress: () => setShowShareModal(true) },
-          { text: 'Share Externally', onPress: handleExternalShare },
-        ]
-      );
-    }
-  };
-
-  const handleExternalShare = async () => {
-    try {
-      // For reposts, use the original plan ID; otherwise use the current plan ID
-      let planId = postId || event?.id;
-      
-      // Check if this is a repost and get the original plan ID
-      if ((event?.is_repost || isRepost) && event?.repost_data?.original_plan_id) {
-        planId = event.repost_data.original_plan_id;
-      }
-      
-      if (!planId) {
-        Alert.alert('Error', 'Plan ID not found');
-        return;
-      }
-
-      // Generate plan-specific link
-      const planUrl = `https://vybeme.com/plan/${planId}`;
-      
-      // Get the plan title (use original title for reposts if available)
-      const planTitle = originalPostTitle || event?.title || 'Amazing Plan';
-      
-      // Prepare share message
-      const shareMessage = `Check out this plan: ${planTitle}\n\n${planUrl}`;
-
-      const result = await Share.share({
-        message: shareMessage,
-        url: planUrl,
-        title: planTitle,
-      });
-
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          console.log('Shared with activity type:', result.activityType);
-        } else {
-          console.log('Plan shared successfully');
-        }
-      } else if (result.action === Share.dismissedAction) {
-        console.log('Share dismissed');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to share plan');
-    }
+    setShowShareModal(true);
   };
 
   return (
@@ -322,7 +297,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
       <RepostModal
         visible={showRepostModal}
         onClose={() => setShowRepostModal(false)}
-        postId={postId || event?.id}
+        originalPlanId={event?.repost_data?.original_plan_id || event?.repost_data?.plan_id || postId || event?.id || ''}
         originalPostTitle={originalPostTitle || event?.title}
         originalPostDescription={originalPostDescription || event?.description}
         originalAuthorName={originalAuthor}
@@ -396,6 +371,146 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+  },
+  interactedPill: {
+    position: 'absolute',
+    top: -2,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 12,
+    backgroundColor: '#FFF',
+    paddingVertical: 4,
+    paddingLeft: 4,
+    paddingRight: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  interactedAvatarWrap: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#FFF',
+    overflow: 'hidden',
+  },
+  interactedPlus: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginLeft: 4,
+  },
+  repostTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 8,
+  },
+  repostDescription: {
+    fontSize: 15,
+    color: '#444',
+    lineHeight: 22,
+    marginBottom: 14,
+  },
+  embeddedCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    minHeight: 200,
+    position: 'relative',
+  },
+  embeddedCardBg: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  embeddedCardBgPlaceholder: {
+    backgroundColor: '#6B5B8E',
+  },
+  embeddedCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  embeddedCardContent: {
+    padding: 16,
+    paddingTop: 12,
+    justifyContent: 'flex-end',
+    minHeight: 200,
+  },
+  originalAuthorPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  originalAuthorName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFF',
+    marginLeft: 8,
+  },
+  embeddedTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  embeddedDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.95)',
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  embeddedTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 14,
+  },
+  embeddedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  embeddedTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+    marginLeft: 4,
+  },
+  embeddedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  embeddedJoinBtn: {
+    backgroundColor: '#FFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  embeddedJoinText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  embeddedShareBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   userPill: {
     position: 'absolute',
