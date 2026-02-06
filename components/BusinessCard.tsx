@@ -45,7 +45,7 @@ interface BusinessCardProps {
   onRequireAuth?: () => void;
 }
 
-// Base Business Card Component – layout per reference: white card, author pill (left), interacted pill (right), image block, title/description/tags, Register + icons
+// Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
 function BusinessCardBase({
   plan,
   user,
@@ -82,86 +82,80 @@ function BusinessCardBase({
 
   return (
     <TouchableOpacity
-      style={[styles.cardContainer, containerStyle]}
+      style={[styles.cardWrapper, containerStyle]}
       onPress={onPress}
       activeOpacity={0.98}
     >
-      <View style={styles.card}>
-        <View style={styles.headerRow}>
-          {/* Author pill – top left (light grey) */}
-          <View style={styles.organizerPill} pointerEvents="none">
-            <Avatar uri={organizerAvatar} size={32} />
-            <View style={styles.organizerInfo}>
-              <Text style={styles.organizerName}>{organizerName}</Text>
-              <Text style={styles.organizerTime}>{timeText}</Text>
-            </View>
-          </View>
-
-          {/* Interacted users pill – top right (dark) */}
-          {showInteracted && (
-          <View style={styles.interactedPill} pointerEvents="none">
-            {displayUsers.length > 0 ? (
-              displayUsers.map((u: any, idx: number) => (
-                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
-                  <Avatar uri={u.avatar} size={24} />
-                </View>
-              ))
-            ) : (
-              [1, 2, 3].map((i) => (
-                <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -8, zIndex: 4 - i }]}>
-                  <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={24} />
-                </View>
-              ))
-            )}
-            {(extraCount > 0 || displayUsers.length === 0) && (
-              <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : attendeesCount}</Text>
-            )}
-          </View>
-          )}
-        </View>
-
-        {/* Image block – rounded bottom corners */}
-        <View style={styles.imageWrap}>
+      {/* Inner card (clipped) – image + white overlay only */}
+      <View style={styles.cardInner}>
+        <View style={styles.imageBehind}>
           {mainImage ? (
-            <Image source={{ uri: mainImage }} style={styles.cardImage} resizeMode="cover" />
+            <Image source={{ uri: mainImage }} style={styles.imageBehindImg} resizeMode="cover" />
           ) : (
-            <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-              <Ionicons name="image-outline" size={40} color="#8E8E93" />
+            <View style={[styles.imageBehindImg, styles.imageBehindPlaceholder]}>
+              <Ionicons name="image-outline" size={48} color="#8E8E93" />
             </View>
           )}
         </View>
-
-        {/* Content below image */}
-        <View style={styles.content}>
-          <Text style={styles.title}>{plan.title}</Text>
-          <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
-            {plan.description}
-          </Text>
-          {tags.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {tags.slice(0, 3).map((tag: string, index: number) => (
-                <View key={index} style={styles.tag}>
-                  <Ionicons name="checkbox" size={10} color="#555" style={styles.tagIcon} />
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Footer: Register (black) + repost + share (circular grey) */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-              <Text style={styles.registerButtonText}>Register</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
+        <View style={styles.contentOverlay}>
+        <Text style={styles.title}>{plan.title}</Text>
+        <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+          {plan.description}
+        </Text>
+        {tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {tags.slice(0, 3).map((tag: string, index: number) => (
+              <View key={index} style={styles.tag}>
+                <Ionicons name="checkbox" size={10} color="#555" style={styles.tagIcon} />
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
           </View>
+        )}
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+            <Text style={styles.registerButtonText}>Register</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+            <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+            <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+          </TouchableOpacity>
         </View>
       </View>
+      </View>
+
+      {/* User pill – on the border, extending beyond card top/left */}
+      <View style={styles.organizerPillOnBorder} pointerEvents="none">
+        <Avatar uri={organizerAvatar} size={32} />
+        <View style={styles.organizerInfo}>
+          <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
+          <Text style={styles.organizerTime}>{timeText}</Text>
+        </View>
+      </View>
+
+      {/* Attendees pill – top-right, light semi-transparent */}
+      {showInteracted && (
+        <View style={styles.interactedPillOnImage} pointerEvents="none">
+          {displayUsers.length > 0 ? (
+            displayUsers.map((u: any, idx: number) => (
+              <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
+                <Avatar uri={u.avatar} size={24} />
+              </View>
+            ))
+          ) : (
+            [1, 2, 3].map((i) => (
+              <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -8, zIndex: 4 - i }]}>
+                <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={24} />
+              </View>
+            ))
+          )}
+          {(extraCount > 0 || displayUsers.length === 0) && (
+            <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : attendeesCount}</Text>
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   );
 }
@@ -322,10 +316,16 @@ const styles = StyleSheet.create({
   swipeContainer: {
     marginBottom: 25,
   },
-  cardContainer: {
+  cardWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 16,
+    height: 400,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  cardInner: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -333,27 +333,37 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    overflow: 'hidden',
+  imageBehind: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    position: 'relative',
+  imageBehindImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
   },
-  organizerPill: {
+  imageBehindPlaceholder: {
+    backgroundColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  organizerPillOnBorder: {
+    position: 'absolute',
+    top: -6,
+    left: 10,
+    zIndex: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5E5EA',
+    backgroundColor: 'rgba(255,255,255,0.95)',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 20,
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   organizerInfo: {
     flex: 1,
@@ -367,48 +377,41 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#8E8E93',
   },
-  interactedPill: {
+  interactedPillOnImage: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 10,
+    right: 12,
+    zIndex: 11,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 20,
-    gap: 6,
+    gap: 4,
   },
   interactedAvatarWrap: {
     borderWidth: 2,
-    borderColor: '#1C1C1E',
+    borderColor: 'rgba(255,255,255,0.95)',
     borderRadius: 12,
   },
   interactedPlus: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fff',
+    color: '#1C1C1E',
   },
-  imageWrap: {
-    width: '100%',
-    marginTop: 12,
-    overflow: 'hidden',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  cardImage: {
-    width: '100%',
-    aspectRatio: 16 / 10,
-  },
-  cardImagePlaceholder: {
-    backgroundColor: '#E5E5EA',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  content: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 16,
+  contentOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: '52%',
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 18,
   },
   title: {
     fontSize: 20,

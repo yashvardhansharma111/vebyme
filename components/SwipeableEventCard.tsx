@@ -32,9 +32,19 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
 
   return (
     <View style={styles.cardContainer}>
-      {/* Main White Card */}
-      <View style={styles.card}>
-        {/* Interacted users: 3 DPs + "+N" on upper right (on the border) */}
+      {/* Normal post: header row – author pill (left), interacted pill (right) */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          style={styles.userPill}
+          onPress={() => onUserPress && user.id && onUserPress(user.id)}
+          activeOpacity={0.7}
+        >
+          <Avatar uri={user.avatar} size={32} />
+          <View style={styles.userPillText}>
+            <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
+            <Text style={styles.userTime}>{user.time}</Text>
+          </View>
+        </TouchableOpacity>
         {showInteracted && (
           <View style={styles.interactedPill}>
             {interactedUsers.slice(0, 3).map((u: any, idx: number) => (
@@ -47,7 +57,10 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
             )}
           </View>
         )}
+      </View>
 
+      {/* Main White Card */}
+      <View style={styles.card}>
         <View style={styles.content}>
           {isRepost ? (
             <>
@@ -126,36 +139,19 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
         </View>
 
         {!isRepost && !event?.repost_data && (
-          <View style={styles.footerPill}>
-            <View style={styles.footerIcons}>
-              <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
-                <Ionicons name="repeat-outline" size={22} color="#000" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
-                <Ionicons name="paper-plane-outline" size={22} color="#000" />
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity style={styles.joinPill} onPress={onJoinPress}>
+          <View style={styles.footerRow}>
+            <TouchableOpacity style={styles.joinButton} onPress={onJoinPress}>
               <Text style={styles.joinButtonText}>Join</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
+              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
+              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
             </TouchableOpacity>
           </View>
         )}
       </View>
-
-      {/* Floating User Pill (reposter or author) */}
-      <TouchableOpacity
-        style={styles.userPill}
-        onPress={() => onUserPress && user.id && onUserPress(user.id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatarContainer}>
-          <Avatar uri={user.avatar} size={32} />
-        </View>
-        <View>
-          <Text style={styles.userName}>{user.name}</Text>
-          <Text style={styles.userTime}>{user.time}</Text>
-        </View>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -360,12 +356,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  userPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E5E5EA',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    maxWidth: '70%',
+  },
+  userPillText: {
+    marginLeft: 8,
+  },
+  userName: { fontSize: 14, fontWeight: '700', color: '#1C1C1E' },
+  userTime: { fontSize: 11, color: '#8E8E93' },
   // Card Styles
   card: {
     backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 20,
-    paddingTop: 35,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -373,19 +389,13 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   interactedPill: {
-    position: 'absolute',
-    top: -2,
-    right: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: '#E5E5EA',
     paddingVertical: 4,
     paddingLeft: 4,
     paddingRight: 8,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
   },
   interactedAvatarWrap: {
     width: 24,
@@ -526,9 +536,6 @@ const styles = StyleSheet.create({
     borderColor: '#F0F0F0',
     zIndex: 10,
   },
-  avatarContainer: { marginRight: 8 },
-  userName: { fontSize: 14, fontWeight: '700', color: '#000' },
-  userTime: { fontSize: 11, color: '#888' },
   content: { marginBottom: 16 },
   // Repost Styles
   repostBadge: {
@@ -585,44 +592,35 @@ const styles = StyleSheet.create({
   tagsContainer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   tagText: { fontSize: 12, fontWeight: '600', color: '#333' },
-  eventImage: { width: 80, height: 60, borderRadius: 12, marginLeft: 10 },
+  eventImage: { width: 96, height: 96, borderRadius: 12, marginLeft: 12 },
   eventImagePlaceholder: {
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  footerPill: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    borderRadius: 24,
-    minHeight: 54,
-    paddingVertical: 10,
-    paddingLeft: 14,
-    paddingRight: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    marginTop: 16,
+    gap: 10,
+    alignSelf: 'stretch',
+    width: '100%',
   },
-  footerIcons: {
-    flexDirection: 'row',
+  joinButton: {
+    flex: 1,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 14,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
   },
+  joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
   footerIconBtn: {
     width: 44,
     height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  joinPill: {
-    flex: 1,
-    maxWidth: '50%',
-    marginLeft: 8,
-    height: 34,
-    backgroundColor: '#1C1C1E',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 17,
-  },
-  joinButtonText: { color: '#FFF', fontWeight: '600', fontSize: 16 },
 });

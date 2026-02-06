@@ -300,7 +300,7 @@ export default function ShareToChatModal({
             <Text style={styles.copyLinkText}>Copy Link</Text>
           </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     </Modal>
   );
 }

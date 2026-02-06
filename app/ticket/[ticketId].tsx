@@ -58,10 +58,10 @@ export default function TicketScreen() {
   const [reviewedPlans, setReviewedPlans] = useState<Record<string, EventReviewRating>>({});
   const [selectedReview, setSelectedReview] = useState<EventReviewRating | null>(null);
 
-  const planId = ticket?.plan?.plan_id;
+  const planIdFromTicket = ticket?.plan?.plan_id;
   const eventDate = ticket?.plan?.date ? new Date(ticket.plan.date) : null;
   const hasEventPassed = eventDate ? eventDate < new Date() : false;
-  const isReviewed = planId ? !!reviewedPlans[planId] : false;
+  const isReviewed = planIdFromTicket ? !!reviewedPlans[planIdFromTicket] : false;
   const showReviewCard = !loading && !!ticket && hasEventPassed && !isReviewed;
 
   useEffect(() => {
@@ -187,9 +187,9 @@ export default function TicketScreen() {
   };
 
   const handleReviewSubmit = async (rating: EventReviewRating) => {
-    if (!planId) return;
+    if (!planIdFromTicket) return;
     try {
-      const next = { ...reviewedPlans, [planId]: rating };
+      const next = { ...reviewedPlans, [planIdFromTicket]: rating };
       setReviewedPlans(next);
       setSelectedReview(rating);
       await AsyncStorage.setItem(EVENT_REVIEWS_KEY, JSON.stringify(next));
