@@ -1,8 +1,8 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
-import { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { View, ActivityIndicator, StyleSheet, Linking } from 'react-native';
 import 'react-native-reanimated';
 
 import { store } from '@/store/store';
@@ -10,13 +10,50 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loadUser } from '@/store/slices/authSlice';
 import { Colors } from '@/constants/theme';
 
+const VYBEME_SCHEME = 'vybeme://';
+
+function parsePostIdFromUrl(url: string | null): string | null {
+  if (!url || !url.startsWith(VYBEME_SCHEME)) return null;
+  const path = url.slice(VYBEME_SCHEME.length);
+  const match = /^post\/([^/?]+)/i.exec(path);
+  return match ? match[1] : null;
+}
+
 function RootLayoutNav() {
   const dispatch = useAppDispatch();
-  const { isLoading, isAuthenticated, isNewUser } = useAppSelector((state) => state.auth);
+  const router = useRouter();
+  const { isLoading } = useAppSelector((state) => state.auth);
+  const handledInitialUrl = useRef(false);
 
   useEffect(() => {
     dispatch(loadUser());
   }, [dispatch]);
+
+  // Deep link: open post in app when user opens vybeme://post/xxx (from shared link gateway)
+  useEffect(() => {
+    const navigateToPost = (postId: string) => {
+      router.replace(`/business-plan/${postId}` as any);
+    };
+
+    const handleUrl = (url: string | null) => {
+      const postId = parsePostIdFromUrl(url);
+      if (postId) navigateToPost(postId);
+    };
+
+    // Cold start: app opened from link (short delay so navigator is ready)
+    if (!handledInitialUrl.current) {
+      handledInitialUrl.current = true;
+      Linking.getInitialURL().then((url) => {
+        if (!url) return;
+        const postId = parsePostIdFromUrl(url);
+        if (postId) setTimeout(() => navigateToPost(postId), 100);
+      });
+    }
+
+    // Warm start: app in background, user opens link
+    const sub = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => sub.remove();
+  }, [router]);
 
   if (isLoading) {
     return (
