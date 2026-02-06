@@ -62,6 +62,9 @@ function BusinessCardBase({
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
   const tags = plan.category_sub || [];
+  const passes = plan.passes || [];
+  const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
+  const minPrice = prices.length > 0 ? Math.min(...prices) : null;
   const showInteracted = attendeesCount > 0 || (interactedUsers && interactedUsers.length > 0);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
   const extraCount = Math.max(0, (attendeesCount || 0) - displayUsers.length) || (displayUsers.length === 0 ? attendeesCount : 0);
@@ -102,11 +105,22 @@ function BusinessCardBase({
         <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
           {plan.description}
         </Text>
-        {tags.length > 0 && (
+        {(minPrice != null || tags.length > 0) && (
           <View style={styles.tagsContainer}>
+            {minPrice != null && (
+              <View style={styles.tag}>
+                <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                <Text style={styles.tagText}>₹{minPrice}</Text>
+              </View>
+            )}
             {tags.slice(0, 3).map((tag: string, index: number) => (
               <View key={index} style={styles.tag}>
-                <Ionicons name="checkbox" size={10} color="#555" style={styles.tagIcon} />
+                <Ionicons
+                  name={tag.toLowerCase().includes('evening') ? 'cloud-outline' : 'checkmark-circle'}
+                  size={12}
+                  color="#3C3C43"
+                  style={styles.tagIcon}
+                />
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
             ))}
@@ -126,9 +140,9 @@ function BusinessCardBase({
       </View>
       </View>
 
-      {/* User pill – on the border, extending beyond card top/left */}
-      <View style={styles.organizerPillOnBorder} pointerEvents="none">
-        <Avatar uri={organizerAvatar} size={32} />
+      {/* User pill – hovers slightly outside card, small (~25% width) */}
+      <View style={styles.organizerPill} pointerEvents="none">
+        <Avatar uri={organizerAvatar} size={26} />
         <View style={styles.organizerInfo}>
           <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
           <Text style={styles.organizerTime}>{timeText}</Text>
@@ -347,35 +361,37 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  organizerPillOnBorder: {
+  organizerPill: {
     position: 'absolute',
     top: -6,
     left: 10,
-    zIndex: 12,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    gap: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    maxWidth: '28%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 6,
+    elevation: 4,
   },
   organizerInfo: {
+    marginLeft: 6,
     flex: 1,
+    minWidth: 0,
   },
   organizerName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     color: '#1C1C1E',
   },
   organizerTime: {
-    fontSize: 11,
-    color: '#8E8E93',
+    fontSize: 10,
+    color: '#888',
   },
   interactedPillOnImage: {
     position: 'absolute',
@@ -434,18 +450,19 @@ const styles = StyleSheet.create({
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5E5EA',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
+    backgroundColor: '#EFEFEF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     gap: 4,
   },
   tagIcon: {
     marginRight: 2,
   },
   tagText: {
-    fontSize: 12,
-    color: '#3C3C43',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#1C1C1E',
   },
   footer: {
     flexDirection: 'row',

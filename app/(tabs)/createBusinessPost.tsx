@@ -25,6 +25,16 @@ import BusinessCard from '@/components/BusinessCard';
 import CalendarPicker from '@/components/CalendarPicker';
 
 const CATEGORY_TAGS = ['Music', 'Cafe', 'Clubs', 'Sports', 'Comedy', 'Travel'];
+
+const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
+  Music: ['Rave', 'Live Music', 'DJ', 'Concert', 'Karaoke'],
+  Cafe: ['Coffee', 'Brunch', 'Work'],
+  Clubs: ['Nightlife', 'Lounge'],
+  Sports: ['Running', 'Cycling', 'Football', 'Yoga', 'Weekend'],
+  Comedy: ['Standup', 'Open Mic'],
+  Travel: ['Road Trip', 'Hitchhiking', 'Weekend', 'Evening'],
+};
+
 const ADDITIONAL_SETTINGS = [
   { id: 'distance', label: 'Distance', icon: 'location' },
   { id: 'starting_point', label: 'Starting Point', icon: 'navigate' },
@@ -67,6 +77,7 @@ export default function CreateBusinessPostScreen() {
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [ticketsEnabled, setTicketsEnabled] = useState(false);
   const [passes, setPasses] = useState<Pass[]>([]);
   const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<string[]>([]);
@@ -114,6 +125,9 @@ export default function CreateBusinessPostScreen() {
           if (planData.description) setDescription(planData.description);
           if (planData.location_text) setLocation(planData.location_text);
           if (planData.category_main) setSelectedCategory(planData.category_main);
+          if (planData.category_sub && Array.isArray(planData.category_sub)) {
+            setSelectedSubcategories(planData.category_sub);
+          }
           if (planData.is_women_only) setWomenOnly(planData.is_women_only);
           if (planData.venue_required) setVenueRequired(planData.venue_required);
           if (planData.allow_view_guest_list) setAllowViewGuestList(planData.allow_view_guest_list);
@@ -332,7 +346,7 @@ export default function CreateBusinessPostScreen() {
       location_text: location || undefined,
       date: selectedDate ? selectedDate : undefined,
       time: timeEnabled && startTime ? formatTime(startTime) : undefined,
-      category_sub: selectedCategory ? [selectedCategory] : [],
+      category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
       passes: passes.filter(p => p.name && p.price > 0),
       user: currentUser ? {
         user_id: currentUser.user_id,
@@ -447,7 +461,7 @@ export default function CreateBusinessPostScreen() {
         title: title.trim(),
         description: description.trim(),
         category_main: selectedCategory.toLowerCase(),
-        category_sub: selectedCategory ? [selectedCategory] : [],
+        category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
       };
 
       // Only set post_status when creating, not when editing
@@ -786,7 +800,7 @@ export default function CreateBusinessPostScreen() {
             </>
           )}
 
-          {/* Category */}
+          {/* Category – select category then expand subcategories */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>CATEGORY</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -798,7 +812,12 @@ export default function CreateBusinessPostScreen() {
                       styles.categoryChip,
                       selectedCategory === category && styles.categoryChipSelected,
                     ]}
-                    onPress={() => setSelectedCategory(category)}
+                    onPress={() => {
+                      setSelectedCategory(category);
+                      setSelectedSubcategories((prev) =>
+                        prev.filter((s) => (CATEGORY_SUBCATEGORIES[category] || []).includes(s))
+                      );
+                    }}
                   >
                     <Text
                       style={[
@@ -812,6 +831,41 @@ export default function CreateBusinessPostScreen() {
                 ))}
               </View>
             </ScrollView>
+            {selectedCategory && (CATEGORY_SUBCATEGORIES[selectedCategory]?.length ?? 0) > 0 && (
+              <View style={styles.subcategorySection}>
+                <Text style={styles.subcategoryLabel}>Subcategories (optional)</Text>
+                <View style={styles.subcategoryChips}>
+                  {(CATEGORY_SUBCATEGORIES[selectedCategory] || []).map((sub) => {
+                    const isSelected = selectedSubcategories.includes(sub);
+                    return (
+                      <TouchableOpacity
+                        key={sub}
+                        style={[
+                          styles.subcategoryChip,
+                          isSelected && styles.subcategoryChipSelected,
+                        ]}
+                        onPress={() => {
+                          if (isSelected) {
+                            setSelectedSubcategories((prev) => prev.filter((s) => s !== sub));
+                          } else {
+                            setSelectedSubcategories((prev) => [...prev, sub]);
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.subcategoryChipText,
+                            isSelected && styles.subcategoryChipTextSelected,
+                          ]}
+                        >
+                          {sub}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Tickets */}
@@ -1195,6 +1249,38 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   categoryChipTextSelected: {
+    color: '#FFF',
+  },
+  subcategorySection: {
+    marginTop: 12,
+  },
+  subcategoryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  subcategoryChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  subcategoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: '#E5E5E5',
+  },
+  subcategoryChipSelected: {
+    backgroundColor: '#1C1C1E',
+  },
+  subcategoryChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+  },
+  subcategoryChipTextSelected: {
     color: '#FFF',
   },
   passesSection: {
