@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
-import { apiService } from '@/services/api';
+import { apiService, getWebBaseUrl } from '@/services/api';
 import Avatar from './Avatar';
 import RepostModal from './RepostModal';
 
@@ -75,7 +75,7 @@ function BusinessCardBase({
         Alert.alert('Error', 'Plan ID not found');
         return;
       }
-      const planUrl = `https://vybeme.com/plan/${plan.plan_id}`;
+      const planUrl = `${getWebBaseUrl()}/go/post/${plan.plan_id}`;
       const shareMessage = `Check out this event: ${plan.title}\n\n${planUrl}`;
       await Share.share({ message: shareMessage, url: planUrl, title: plan.title });
     } catch (error: any) {

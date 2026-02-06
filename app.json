@@ -53,6 +53,7 @@
     },
     "extra": {
       "apiUrl": "https://189b-2405-201-3016-9117-a89b-b0e1-b82b-d1d9.ngrok-free.app ",
+      "webUrl": "https://app.vybeme.in",
       "router": {},
       "eas": {
         "projectId": "af4f1d7d-04ab-496f-a122-78ac8473bccd"

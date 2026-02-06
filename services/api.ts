@@ -79,6 +79,19 @@ const getBaseURL = () => {
 
 const API_BASE_URL = getBaseURL();
 
+/**
+ * Base URL for the hosted website (used when sharing post links from the app).
+ * When someone opens the link, they see the single post on the web — app can run locally.
+ * Set EXPO_PUBLIC_WEB_URL or extra.webUrl in app.json to your hosted site (e.g. https://vybeme.vercel.app).
+ */
+export function getWebBaseUrl(): string {
+  const env = process.env.EXPO_PUBLIC_WEB_URL;
+  if (env && env.trim()) return env.replace(/\/$/, '');
+  const extra = Constants.expoConfig?.extra as { webUrl?: string } | undefined;
+  if (extra?.webUrl?.trim()) return extra.webUrl.replace(/\/$/, '');
+  return 'https://app.vybeme.in';
+}
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;

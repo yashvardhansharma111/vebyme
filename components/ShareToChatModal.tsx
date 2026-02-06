@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { apiService } from '@/services/api';
+import { apiService, getWebBaseUrl } from '@/services/api';
 import Avatar from './Avatar';
 
 const COLS = 3;
@@ -146,7 +146,7 @@ export default function ShareToChatModal({
     }
   };
 
-  const planUrl = `https://vybeme.com/plan/${postId}`;
+  const planUrl = `${getWebBaseUrl()}/go/post/${postId}`;
   const shareMessage = `Check out this plan: ${postTitle}\n\n${planUrl}`;
 
   const handleCopyLink = async () => {
