@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   organizerPill: {
     position: 'absolute',
-    top: -6,
+    top: -12,
     left: 10,
     zIndex: 10,
     flexDirection: 'row',

@@ -204,7 +204,7 @@ export default function BusinessPlanDetailScreen() {
           <View style={styles.organizerPill}>
             <Avatar uri={organizerAvatar} size={32} />
             <View style={styles.organizerInfo}>
-              <Text style={styles.organizerName}>{organizerName}</Text>
+              <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
               <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
             </View>
           </View>
@@ -400,9 +400,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 8,
     zIndex: 2,
+    maxWidth: '38%',
   },
   organizerInfo: {
     flex: 1,
+    minWidth: 0,
   },
   organizerName: {
     fontSize: 14,

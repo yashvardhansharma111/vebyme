@@ -9,14 +9,17 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '@/constants/theme';
+import { useAppSelector } from '@/store/hooks';
+import { apiService } from '@/services/api';
 
 interface RepostModalProps {
   visible: boolean;
   onClose: () => void;
-  /** Plan id to send to the API (must be the original plan id, not a repost post id) */
   originalPlanId: string;
   postId?: string;
   originalPostTitle?: string;
@@ -35,11 +38,10 @@ export default function RepostModal({
   originalAuthorName,
   onSuccess,
 }: RepostModalProps) {
+  const insets = useSafeAreaInsets();
   const [repostTitle, setRepostTitle] = useState('');
   const [repostDescription, setRepostDescription] = useState('');
   const [loading, setLoading] = useState(false);
-  const { useAppSelector } = require('@/store/hooks');
-  const { apiService } = require('@/services/api');
   const { user } = useAppSelector((state: any) => state.auth);
 
   const handleClose = () => {
@@ -53,16 +55,10 @@ export default function RepostModal({
       Alert.alert('Error', 'Please login to repost');
       return;
     }
-    const title = repostTitle.trim();
-    if (!title) {
-      Alert.alert('Required', 'Please add a title for your repost');
-      return;
-    }
-
     setLoading(true);
     try {
       await apiService.createRepost(originalPlanId, user.user_id, {
-        repost_title: title,
+        repost_title: repostTitle.trim() || undefined,
         repost_description: repostDescription.trim() || undefined,
       });
       Alert.alert('Success', 'Post reposted!');
@@ -79,91 +75,104 @@ export default function RepostModal({
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
+      transparent
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.modalContainer}
+        style={styles.modalOverlay}
       >
-        <View style={styles.modalContent}>
-          {/* Header */}
+        <View style={[styles.modalContent, { paddingBottom: insets.bottom + 24 }]}>
+          {/* Header - matches app pages */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Repost</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={handleClose} style={styles.closeButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
               <Ionicons name="close" size={24} color="#1C1C1E" />
             </TouchableOpacity>
           </View>
 
-          {/* Original Post Preview */}
-          <View style={styles.originalPostContainer}>
-            <View style={styles.originalPostHeader}>
-              <Ionicons name="repeat" size={16} color="#8B5CF6" />
-              <Text style={styles.originalPostLabel}>
-                {originalAuthorName ? `Reposting from ${originalAuthorName}` : 'Original Post'}
-              </Text>
-            </View>
-            <View style={styles.originalPostContent}>
-              {originalPostTitle && (
-                <Text style={styles.originalPostTitle}>{originalPostTitle}</Text>
-              )}
-              {originalPostDescription && (
-                <Text style={styles.originalPostDescription} numberOfLines={3}>
-                  {originalPostDescription}
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Original post preview */}
+            <View style={styles.originalBlock}>
+              <View style={styles.originalHeader}>
+                <Ionicons name="repeat" size={18} color="#1C1C1E" />
+                <Text style={styles.originalLabel}>
+                  {originalAuthorName ? `From ${originalAuthorName}` : 'Original post'}
                 </Text>
+              </View>
+              {(originalPostTitle || originalPostDescription) ? (
+                <View style={styles.originalBody}>
+                  {originalPostTitle ? (
+                    <Text style={styles.originalTitle} numberOfLines={2}>{originalPostTitle}</Text>
+                  ) : null}
+                  {originalPostDescription ? (
+                    <Text style={styles.originalDescription} numberOfLines={3}>
+                      {originalPostDescription}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : (
+                <Text style={styles.originalPlaceholder}>No title or description</Text>
               )}
             </View>
-          </View>
 
-          {/* Repost Title (required) */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Title</Text>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="e.g. Spontaneous ooty trip?"
-              placeholderTextColor="#999"
-              value={repostTitle}
-              onChangeText={setRepostTitle}
-              maxLength={120}
-            />
-            <Text style={styles.charCount}>{repostTitle.length}/120</Text>
-          </View>
+            {/* Your title (optional) */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Your title (optional)</Text>
+              <TextInput
+                style={styles.titleInput}
+                placeholder="e.g. Spontaneous ooty trip?"
+                placeholderTextColor="#9CA3AF"
+                value={repostTitle}
+                onChangeText={setRepostTitle}
+                maxLength={120}
+              />
+              <Text style={styles.charCount}>{repostTitle.length}/120</Text>
+            </View>
 
-          {/* Repost Description */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Description</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="Add a description or your thoughts..."
-              placeholderTextColor="#999"
-              multiline
-              numberOfLines={4}
-              value={repostDescription}
-              onChangeText={setRepostDescription}
-              maxLength={500}
-            />
-            <Text style={styles.charCount}>{repostDescription.length}/500</Text>
-          </View>
+            {/* Your description (optional) */}
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Your thoughts (optional)</Text>
+              <TextInput
+                style={styles.descInput}
+                placeholder="Add a description or your thoughts..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+                numberOfLines={4}
+                value={repostDescription}
+                onChangeText={setRepostDescription}
+                maxLength={500}
+              />
+              <Text style={styles.charCount}>{repostDescription.length}/500</Text>
+            </View>
 
-          {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.cancelButton, loading && styles.buttonDisabled]}
-              onPress={handleClose}
-              disabled={loading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.repostButton, loading && styles.buttonDisabled]}
-              onPress={handleRepost}
-              disabled={loading}
-            >
-              <Text style={styles.repostButtonText}>
-                {loading ? 'Reposting...' : 'Repost'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            {/* Actions */}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.cancelButton, loading && styles.buttonDisabled]}
+                onPress={handleClose}
+                disabled={loading}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.repostButton, loading && styles.buttonDisabled]}
+                onPress={handleRepost}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFF" size="small" />
+                ) : (
+                  <Text style={styles.repostText}>Repost</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -171,129 +180,145 @@ export default function RepostModal({
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   modalContent: {
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F2',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     maxHeight: '90%',
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: '#F2F2F2',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  originalPostContainer: {
-    backgroundColor: '#F8F8F8',
+  scroll: {
+    maxHeight: 400,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  originalBlock: {
+    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
   },
-  originalPostHeader: {
+  originalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  originalPostLabel: {
-    fontSize: 12,
+  originalLabel: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#8B5CF6',
-    marginLeft: 6,
+    color: '#1C1C1E',
+    marginLeft: 8,
   },
-  originalPostContent: {
-    paddingLeft: 22,
+  originalBody: {
+    paddingLeft: 26,
   },
-  originalPostTitle: {
+  originalTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1C1C1E',
     marginBottom: 6,
   },
-  originalPostDescription: {
+  originalDescription: {
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
   },
-  inputContainer: {
+  originalPlaceholder: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    fontStyle: 'italic',
+    paddingLeft: 26,
+  },
+  field: {
     marginBottom: 20,
   },
-  inputLabel: {
+  fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1C1C1E',
     marginBottom: 8,
   },
   titleInput: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#1C1C1E',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
-  textInput: {
-    backgroundColor: '#F8F8F8',
-    borderRadius: 16,
-    padding: 16,
+  descInput: {
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     fontSize: 16,
     color: '#1C1C1E',
     textAlignVertical: 'top',
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    minHeight: 100,
   },
   charCount: {
     fontSize: 12,
-    color: '#999',
+    color: '#9CA3AF',
     textAlign: 'right',
-    marginTop: 4,
+    marginTop: 6,
   },
   actions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 8,
   },
   cancelButton: {
     flex: 1,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F2F2F7',
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cancelButtonText: {
+  cancelText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
   },
   repostButton: {
     flex: 1,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.light.primary,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: '#1C1C1E',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  repostButtonText: {
+  repostText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
@@ -302,4 +327,3 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
 });
-

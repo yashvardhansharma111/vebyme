@@ -32,36 +32,38 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
 
   return (
     <View style={styles.cardContainer}>
-      {/* Normal post: header row – author pill (left), interacted pill (right) */}
-      <View style={styles.headerRow}>
+      {/* Card wrapper: pill overlays top-left (slightly outside), interacted top-right */}
+      <View style={styles.cardWrapper}>
+        {/* User pill: top-left, hovering slightly outside the card */}
         <TouchableOpacity
           style={styles.userPill}
           onPress={() => onUserPress && user.id && onUserPress(user.id)}
           activeOpacity={0.7}
         >
-          <Avatar uri={user.avatar} size={32} />
+          <Avatar uri={user.avatar} size={36} />
           <View style={styles.userPillText}>
             <Text style={styles.userName} numberOfLines={1}>{user.name}</Text>
             <Text style={styles.userTime}>{user.time}</Text>
           </View>
         </TouchableOpacity>
         {showInteracted && (
-          <View style={styles.interactedPill}>
-            {interactedUsers.slice(0, 3).map((u: any, idx: number) => (
-              <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
-                <Avatar uri={u.avatar} size={24} />
-              </View>
-            ))}
-            {(extraCount > 0 || displayCount === 0) && (
-              <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : interactionCount}</Text>
-            )}
+          <View style={styles.interactedPillPositioned}>
+            <View style={styles.interactedPill}>
+              {interactedUsers.slice(0, 3).map((u: any, idx: number) => (
+                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
+                  <Avatar uri={u.avatar} size={24} />
+                </View>
+              ))}
+              {(extraCount > 0 || displayCount === 0) && (
+                <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : interactionCount}</Text>
+              )}
+            </View>
           </View>
         )}
-      </View>
 
-      {/* Main White Card */}
-      <View style={styles.card}>
-        <View style={styles.content}>
+        {/* Main White Card */}
+        <View style={styles.card}>
+          <View style={styles.content}>
           {isRepost ? (
             <>
               {/* Reposter's title and description only (do not fall back to original) */}
@@ -75,6 +77,10 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
                   {event.repost_description}
                 </Text>
               ) : null}
+              {/* When user reposted without adding title or description, add 2-line space for better UI */}
+              {!(event.repost_title && event.repost_title.trim()) && !(event.repost_description && event.repost_description.trim()) && (
+                <View style={styles.repostEmptySpacer} />
+              )}
               <View style={styles.embeddedCard}>
               {hasEventImage ? (
                 <Image source={{ uri: event.image }} style={styles.embeddedCardBg} resizeMode="cover" />
@@ -136,21 +142,22 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
               </View>
             </>
           )}
-        </View>
-
-        {!isRepost && !event?.repost_data && (
-          <View style={styles.footerRow}>
-            <TouchableOpacity style={styles.joinButton} onPress={onJoinPress}>
-              <Text style={styles.joinButtonText}>Join</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
-              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
-              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
           </View>
-        )}
+
+          {!isRepost && !event?.repost_data && (
+            <View style={styles.footerRow}>
+              <TouchableOpacity style={styles.joinButton} onPress={onJoinPress}>
+                <Text style={styles.joinButtonText}>Join</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
+                <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
+                <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -356,32 +363,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 4,
+  cardWrapper: {
+    position: 'relative',
+    marginBottom: 0,
   },
   userPill: {
+    position: 'absolute',
+    top: -8,
+    left: -6,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#FFF',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 20,
-    maxWidth: '70%',
+    borderRadius: 22,
+    maxWidth: '38%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   userPillText: {
     marginLeft: 8,
+    flex: 1,
   },
   userName: { fontSize: 14, fontWeight: '700', color: '#1C1C1E' },
   userTime: { fontSize: 11, color: '#8E8E93' },
+  interactedPillPositioned: {
+    position: 'absolute',
+    top: -6,
+    right: 12,
+    zIndex: 10,
+  },
   // Card Styles
   card: {
     backgroundColor: '#FFF',
     borderRadius: 24,
     padding: 20,
+    paddingTop: 48,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -422,6 +443,10 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 22,
     marginBottom: 14,
+  },
+  repostEmptySpacer: {
+    height: 44,
+    width: '100%',
   },
   embeddedCard: {
     borderRadius: 20,
@@ -521,20 +546,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  userPill: {
-    position: 'absolute',
-    top: 5,
-    left: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-    zIndex: 10,
   },
   content: { marginBottom: 16 },
   // Repost Styles
