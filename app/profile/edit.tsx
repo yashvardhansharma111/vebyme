@@ -31,15 +31,20 @@ export default function EditProfileScreen() {
   const [name, setName] = useState('');
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [gender, setGender] = useState<string>('');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const genderLabel = gender ? (gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase()) : 'Select';
 
   useEffect(() => {
     if (currentUser) {
       setName(currentUser.name || '');
       setBio(currentUser.bio || '');
       setProfileImage(currentUser.profile_image);
+      setGender((currentUser as any).gender || '');
     } else if (user?.session_id) {
       dispatch(fetchCurrentUser(user.session_id));
     }
@@ -192,6 +197,7 @@ export default function EditProfileScreen() {
             name: name.trim(),
             bio: bio.trim(),
             profile_image: profileImage,
+            ...(gender ? { gender: gender.toLowerCase() } : {}),
           },
         })
       ).unwrap();
@@ -259,8 +265,47 @@ export default function EditProfileScreen() {
             maxLength={90}
             textAlignVertical="top"
           />
+
+          <TouchableOpacity
+            style={styles.genderRow}
+            onPress={() => setShowGenderPicker(true)}
+          >
+            <Text style={styles.genderLabel}>Gender</Text>
+            <Text style={styles.genderValue}>{genderLabel}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {showGenderPicker && (
+        <Modal visible transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.genderModalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowGenderPicker(false)}
+          >
+            <View style={styles.genderModalContent} onStartShouldSetResponder={() => true}>
+              <Text style={styles.genderModalTitle}>Gender</Text>
+              {['male', 'female', 'other'].map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={styles.genderOption}
+                  onPress={() => {
+                    setGender(g);
+                    setShowGenderPicker(false);
+                  }}
+                >
+                  <Text style={styles.genderOptionText}>{g.charAt(0).toUpperCase() + g.slice(1)}</Text>
+                  {gender === g && <Ionicons name="checkmark" size={22} color="#1C1C1E" />}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={styles.genderCancel} onPress={() => setShowGenderPicker(false)}>
+                <Text style={styles.genderCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       {/* Save Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
@@ -415,6 +460,49 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     textAlignVertical: 'top',
   },
+  genderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+    backgroundColor: '#FFF',
+    borderRadius: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    marginBottom: 16,
+  },
+  genderLabel: { fontSize: 17, color: '#1C1C1E' },
+  genderValue: { fontSize: 17, color: '#9CA3AF' },
+  genderModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  genderModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    minWidth: 280,
+  },
+  genderModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  genderOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  genderOptionText: { fontSize: 17, color: '#1C1C1E' },
+  genderCancel: { marginTop: 8, paddingVertical: 12, alignItems: 'center' },
+  genderCancelText: { fontSize: 16, color: '#8E8E93' },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 12,

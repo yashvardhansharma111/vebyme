@@ -17,8 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import EventReviewCard, { EventReviewRating } from '@/components/EventReviewCard';
-// QR Code generation - install react-native-qrcode-svg or use alternative
-// import QRCode from 'react-native-qrcode-svg';
+import QRCode from 'react-native-qrcode-svg';
 
 const EVENT_REVIEWS_KEY = '@vybeme_event_reviews';
 
@@ -324,24 +323,22 @@ export default function TicketScreen() {
             </View>
           </LinearGradient>
 
-          {/* QR Code Section – backend provides qr_code (display string) and qr_code_hash (value to encode in QR; scanner sends this to /ticket/scan) */}
+          {/* QR Code: encode qr_code_hash so scanner can send it to /ticket/scan for check-in */}
           <View style={styles.qrCodeSection}>
             <View style={styles.qrCodeContainer}>
-              {/* Encode ticket.qr_code_hash in the QR so the event scanner can validate and check-in. Placeholder until a QR lib is used. */}
-              <View style={styles.qrCodePlaceholder}>
-                <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
-                <Text style={styles.qrCodeData} numberOfLines={3}>
-                  {ticket.qr_code ? ticket.qr_code.substring(0, 50) + '...' : 'QR Code'}
-                </Text>
-              </View>
-              {/* Uncomment when QR library is installed:
-              <QRCode
-                value={ticket.qr_code}
-                size={200}
-                color="#1C1C1E"
-                backgroundColor="#FFF"
-              />
-              */}
+              {ticket.qr_code_hash ? (
+                <QRCode
+                  value={ticket.qr_code_hash}
+                  size={200}
+                  color="#1C1C1E"
+                  backgroundColor="#FFF"
+                />
+              ) : (
+                <View style={styles.qrCodePlaceholder}>
+                  <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
+                  <Text style={styles.qrCodeData}>QR unavailable</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.ticketType}>Early Bird Pass</Text>
             <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>

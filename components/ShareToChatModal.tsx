@@ -201,14 +201,14 @@ export default function ShareToChatModal({
         <View style={styles.tileAvatarWrap}>
           {isGroup ? (
             image ? (
-              <Image source={{ uri: image }} style={styles.tileImage} resizeMode="cover" />
+              <Avatar uri={image} size={TILE_SIZE - 8} />
             ) : (
               <View style={styles.tilePlaceholder}>
                 <Ionicons name="people" size={28} color="#8E8E93" />
               </View>
             )
           ) : (
-            <Avatar uri={image} size={TILE_SIZE - 8} />
+            <Avatar uri={image ?? undefined} size={TILE_SIZE - 8} />
           )}
         </View>
         <Text style={styles.tileName} numberOfLines={1}>{name}</Text>

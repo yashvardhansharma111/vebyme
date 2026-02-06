@@ -15,6 +15,7 @@ import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import PostInteractionModal from '@/components/PostInteractionModal';
 import LoginModal from '@/components/LoginModal';
+import Avatar from '@/components/Avatar';
 
 interface SavedPlan {
   post_id: string;
@@ -98,9 +99,9 @@ function SavedPlanCard({
         onPress={() => plan.user_id && onUserPress?.(plan.user_id)}
         activeOpacity={0.9}
       >
-        <Image
-          source={{ uri: plan.user?.profile_image || 'https://via.placeholder.com/40' }}
-          style={styles.avatar}
+        <Avatar
+          uri={plan.user?.profile_image ?? undefined}
+          size={36}
         />
         <View>
           <Text style={styles.userName}>{plan.user?.name || 'Unknown User'}</Text>
