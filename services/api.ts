@@ -1007,6 +1007,14 @@ class ApiService {
       body: JSON.stringify({ registration_id, user_id, action }),
     });
   }
+
+  async getEventAnalytics(plan_id: string) {
+    return this.request<any>(`/analytics/business/event/${plan_id}`, { method: 'GET' });
+  }
+
+  async getBusinessOverallAnalytics(months: number = 1) {
+    return this.request<any>(`/analytics/business/overall?months=${months}`, { method: 'GET' });
+  }
 }
 
 export const apiService = new ApiService();

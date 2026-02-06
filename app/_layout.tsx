@@ -33,6 +33,7 @@ function RootLayoutNav() {
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="profile" />
+        <Stack.Screen name="analytics" />
         <Stack.Screen name="otherProfile" />
       </Stack>
       <StatusBar style="auto" />

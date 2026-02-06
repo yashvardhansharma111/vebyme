@@ -190,6 +190,16 @@ export default function BusinessPlanDetailScreen() {
               <Ionicons name="arrow-back" size={24} color="#000" />
             </View>
           </TouchableOpacity>
+          {user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id) && (
+            <TouchableOpacity
+              style={styles.analyticsButton}
+              onPress={() => router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any)}
+            >
+              <View style={styles.analyticsButtonCircle}>
+                <Ionicons name="stats-chart" size={22} color="#000" />
+              </View>
+            </TouchableOpacity>
+          )}
           {/* Organizer pill – top left over hero */}
           <View style={styles.organizerPill}>
             <Avatar uri={organizerAvatar} size={32} />
@@ -357,6 +367,20 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  analyticsButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  analyticsButtonCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
