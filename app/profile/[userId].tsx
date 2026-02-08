@@ -36,6 +36,7 @@ const INTEREST_ICONS: { [key: string]: string } = {
   Sports: 'football',
   Karaoke: 'mic',
   Cycling: 'bicycle',
+  Work: 'briefcase',
   Breakfast: 'restaurant',
   Lunch: 'restaurant',
   Dinner: 'restaurant',
@@ -76,7 +77,7 @@ export default function OtherUserProfileScreen() {
   const [loadingPlans, setLoadingPlans] = useState(false);
 
   const topSectionHeight = screenHeight * 0.6;
-  const blurHeight = topSectionHeight * 0.4;
+  const blurHeight = topSectionHeight * 0.5; // blur on bottom 50% – too tall = washed look
 
   useEffect(() => {
     if (userId) {
@@ -132,17 +133,14 @@ export default function OtherUserProfileScreen() {
   const interests = viewedUser?.interests || [];
   const hasProfileImage = viewedUser?.profile_image;
   const hasInteracted = (viewedUser as any)?.has_interacted === true;
-  const isBusiness = (viewedUser as any)?.is_business === true;
-  const businessEmail = (viewedUser as any)?.email ?? (viewedUser as any)?.business_email ?? '';
   const instagramId = extractInstagramIdFromUrl(socialMedia.instagram) || socialMedia.instagram?.replace(/^@/, '') || '';
   const instagramUrl = getInstagramProfileUrl(socialMedia.instagram) || (instagramId ? `https://www.instagram.com/${instagramId}/` : null);
 
-  const socialEntries = [
-    (instagramId || socialMedia.instagram) && { key: 'instagram', icon: 'logo-instagram', handle: instagramId || socialMedia.instagram, url: instagramUrl || `https://instagram.com/${String(socialMedia.instagram).replace(/^@/, '')}`, isX: false },
-    (socialMedia.x || socialMedia.twitter) && { key: 'x', icon: 'x', handle: socialMedia.x || socialMedia.twitter, url: `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}`, isX: true },
-    socialMedia.facebook && { key: 'facebook', icon: 'logo-facebook', handle: socialMedia.facebook, url: `https://facebook.com/${String(socialMedia.facebook).replace(/^@/, '')}`, isX: false },
-    socialMedia.snapchat && { key: 'snapchat', icon: 'logo-snapchat', handle: socialMedia.snapchat, url: `https://snapchat.com/add/${String(socialMedia.snapchat).replace(/^@/, '')}`, isX: false },
-  ].filter(Boolean) as { key: string; icon: string; handle: string; url: string; isX?: boolean }[];
+  // Always show Instagram and X rows (with logos); show handle or placeholder
+  const socialCardEntries: { key: string; icon: string; handle: string; url: string | null; isX: boolean }[] = [
+    { key: 'instagram', icon: 'logo-instagram', handle: instagramId || socialMedia.instagram || 'Not added', url: instagramUrl || (instagramId ? `https://instagram.com/${instagramId}` : null), isX: false },
+    { key: 'x', icon: 'x', handle: socialMedia.x || socialMedia.twitter || 'Not added', url: (socialMedia.x || socialMedia.twitter) ? `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}` : null, isX: true },
+  ];
 
   const copySocialLink = async (url: string, handle: string) => {
     await Clipboard.setStringAsync(url);
@@ -151,19 +149,9 @@ export default function OtherUserProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {isBusiness && (
-        <View style={styles.businessProfileHeader}>
-          <Text style={styles.businessProfileHeaderText}>Business Profile</Text>
-        </View>
-      )}
-      {!hasInteracted && !isBusiness && (
-        <View style={styles.profileTypeHeader}>
-          <Text style={styles.profileTypeHeaderText} numberOfLines={1}>Other User Profile - Not interacted</Text>
-        </View>
-      )}
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* 1. Top section: profile image, blur on bottom 40% fading to background color */}
-        <View style={[styles.topSection, { height: topSectionHeight }]}>
+        {/* 1. Top section: profile image, blur on bottom 60% */}
+        <View key="top-section" style={[styles.topSection, { height: topSectionHeight }]}>
           {hasProfileImage ? (
             <Image
               source={{ uri: viewedUser!.profile_image! }}
@@ -174,27 +162,23 @@ export default function OtherUserProfileScreen() {
             <View style={styles.profileBackgroundPlaceholder} />
           )}
 
-          {/* Transition Layer: Blur + Gradient */}
-          <View style={[styles.blurOverlay, { height: blurHeight }]}>
-            {/* Layer 1: The Blur - Intensity 90+ gives that thick glass look */}
+          {/* Blur with gradient so it mixes into the image and content below (no box edge) */}
+          <View style={[styles.blurOverlay, { height: blurHeight }]} pointerEvents="none">
             <BlurView
-              intensity={95}
-              tint="light"
+              intensity={90}
+              tint="default"
               style={StyleSheet.absoluteFill}
             />
-            {/* Layer 2: The Grain/Texture Overlay (Optional)
-                If you have a small noise/grain png, you'd place it here with 0.05 opacity
-            */}
-            {/* Layer 3: The "Melt" Gradient - 4-step to control where grainy photo turns into solid background */}
             <LinearGradient
               colors={[
-                'rgba(242, 242, 242, 0)',
-                'rgba(242, 242, 242, 0.2)',
-                'rgba(242, 242, 242, 0.7)',
-                '#F2F2F2',
+                'transparent',
+                'transparent',
+                'rgba(242,242,242,0.08)',
+                'rgba(242,242,242,0.35)',
               ]}
-              locations={[0, 0.3, 0.7, 1]}
+              locations={[0, 0.45, 0.75, 1]}
               style={StyleSheet.absoluteFill}
+              pointerEvents="none"
             />
           </View>
 
@@ -223,88 +207,47 @@ export default function OtherUserProfileScreen() {
           </View>
         </View>
 
-        {/* 2. Bottom section: solid #F2F2F2, content cards */}
-        <View style={styles.bottomSection}>
-          {isBusiness ? (
-            <>
-              {/* Business: email + Instagram (extracted ID from link) */}
-              <View style={styles.businessContactRow}>
-                <View style={styles.businessContactField}>
-                  <Ionicons name="mail-outline" size={20} color="#8E8E93" />
-                  <Text style={styles.businessContactText} numberOfLines={1}>
-                    {businessEmail || 'No email'}
-                  </Text>
-                </View>
+        {/* 2. Bottom section: solid #F2F2F2, content cards – order as in screenshot */}
+        <View key="bottom-section" style={styles.bottomSection}>
+          {/* Social card: always Instagram above, X below – show logos always; handle or "Not added" */}
+          <View key="social-card" style={[styles.sectionCard, { marginBottom: 15 }]}>
+            {socialCardEntries.map((entry, index) => (
+              <React.Fragment key={entry.key}>
+                {index > 0 && <View style={styles.hairlineDivider} />}
                 <TouchableOpacity
-                  style={styles.businessContactField}
-                  onPress={() => instagramUrl && copySocialLink(instagramUrl, instagramId)}
-                  activeOpacity={0.7}
+                  style={styles.socialRow}
+                  onPress={() => entry.url && copySocialLink(entry.url, entry.handle)}
+                  activeOpacity={entry.url ? 0.7 : 1}
+                  disabled={!entry.url}
                 >
-                  <Ionicons name="logo-instagram" size={20} color="#8E8E93" />
-                  <Text style={styles.businessContactText} numberOfLines={1}>
-                    {instagramId || 'No Instagram'}
-                  </Text>
+                  {entry.isX ? (
+                    <Text style={styles.socialXIcon}>𝕏</Text>
+                  ) : (
+                    <Ionicons name={entry.icon as any} size={22} color="#1C1C1E" />
+                  )}
+                  <Text style={[styles.socialHandle, !entry.url && styles.socialHandlePlaceholder]}>{entry.handle}</Text>
+                  {entry.url ? <Ionicons name="copy-outline" size={18} color="#8E8E93" /> : null}
                 </TouchableOpacity>
-              </View>
-              {/* Instagram grid placeholder (9 cells) – link to profile if we have ID */}
-              {instagramId ? (
-                <View style={styles.instagramGrid}>
-                  {Array.from({ length: 9 }).map((_, i) => (
-                    <View key={i} style={styles.instagramGridCell}>
-                      <View style={styles.instagramGridPlaceholder} />
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-              {/* All Plans header */}
-              <View style={styles.allPlansHeader}>
-                <Text style={styles.allPlansTitle}>All Plans</Text>
-                <Ionicons name="chevron-forward" size={20} color="#1C1C1E" />
-              </View>
-            </>
-          ) : null}
+              </React.Fragment>
+            ))}
+          </View>
 
-          {!isBusiness && (
-            <View style={[styles.sectionCard, styles.statsCard, { marginBottom: 15 }]}>
-              <View style={styles.statHalf}>
-                <Text style={styles.statNumber}>{stats?.plans_count ?? 0}</Text>
-                <Text style={styles.statLabel}>#plans</Text>
-              </View>
-              <View style={styles.statsDivider} />
-              <View style={styles.statHalf}>
-                <Text style={styles.statNumber}>{stats?.interactions_count ?? 0}</Text>
-                <Text style={styles.statLabel}>#interactions</Text>
-              </View>
+          {/* Stats card: #plans (left) | #interactions (right) */}
+          <View key="stats-card" style={[styles.sectionCard, styles.statsCard, { marginBottom: 15 }]}>
+            <View style={styles.statHalf}>
+              <Text style={styles.statNumber}>{stats?.plans_count ?? 0}</Text>
+              <Text style={styles.statLabel}>#plans</Text>
             </View>
-          )}
-
-          {/* Social links card - tap to copy (non-business or when business and we show both) */}
-          {!isBusiness && socialEntries.length > 0 && (
-            <View style={[styles.sectionCard, { marginBottom: 15 }]}>
-              {socialEntries.map((entry, index) => (
-                <React.Fragment key={entry.key}>
-                  {index > 0 && <View style={styles.hairlineDivider} />}
-                  <TouchableOpacity
-                    style={styles.socialRow}
-                    onPress={() => copySocialLink(entry.url, entry.handle)}
-                    activeOpacity={0.7}
-                  >
-                    {entry.isX ? (
-                      <Text style={styles.socialXIcon}>𝕏</Text>
-                    ) : (
-                      <Ionicons name={entry.icon as any} size={22} color="#1C1C1E" />
-                    )}
-                    <Text style={styles.socialHandle}>{entry.handle}</Text>
-                    <Ionicons name="copy-outline" size={18} color="#8E8E93" />
-                  </TouchableOpacity>
-                </React.Fragment>
-              ))}
+            <View style={styles.statsDivider} />
+            <View style={styles.statHalf}>
+              <Text style={styles.statNumber}>{stats?.interactions_count ?? 0}</Text>
+              <Text style={styles.statLabel}>#interactions</Text>
             </View>
-          )}
+          </View>
 
           {/* Interests card */}
           {interests.length > 0 && (
-            <View style={[styles.sectionCard, { marginBottom: 15 }]}>
+            <View key="interests-card" style={[styles.sectionCard, { marginBottom: 15 }]}>
               <Text style={styles.interestsLabel}>#interests</Text>
               <View style={styles.interestsWrap}>
                 {interests.map((interest, index) => (
@@ -324,99 +267,75 @@ export default function OtherUserProfileScreen() {
 
           {/* Recent Plans / All Plans */}
           {loadingPlans ? (
-            <ActivityIndicator size="small" color="#1C1C1E" style={{ paddingVertical: 20 }} />
+            <View key="plans-loading">
+              <ActivityIndicator size="small" color="#1C1C1E" style={{ paddingVertical: 20 }} />
+            </View>
           ) : recentPlans.length === 0 ? (
-            <>
+            <React.Fragment key="empty-plans">
               <View style={styles.recentPlansHeader}>
                 <View style={styles.recentPlansPill}>
-                  <Text style={styles.recentPlansPillText}>{isBusiness ? 'All Plans' : 'Recent Plans'}</Text>
+                  <Text style={styles.recentPlansPillText}>Recent Plans</Text>
                 </View>
               </View>
               <Text style={styles.emptyText}>No plans yet</Text>
-            </>
+            </React.Fragment>
           ) : (
-            <View style={[styles.recentPlansListWrapper, isBusiness && styles.recentPlansListHorizontal]}>
-              {!isBusiness && (
-                <View style={styles.recentPlansPillStuck}>
-                  <Text style={styles.recentPlansPillText}>Recent Plans</Text>
-                </View>
-              )}
-              {isBusiness ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allPlansScroll}>
-                  {recentPlans.map((plan, planIndex) => {
-                    const hasImage = plan.media && plan.media.length > 0;
-                    return (
-                      <TouchableOpacity
-                        key={plan.plan_id}
-                        style={styles.planCardHorizontal}
-                        onPress={() => router.push((plan.is_business ? '/business-plan/' : '/plan/') + plan.plan_id as any)}
-                        activeOpacity={0.9}
-                      >
-                        {hasImage ? (
-                          <Image source={{ uri: plan.media[0].url }} style={styles.planCardHorizontalImage} resizeMode="cover" />
-                        ) : (
-                          <View style={[styles.planCardHorizontalImage, styles.planCardHorizontalPlaceholder]} />
-                        )}
-                        <View style={styles.planCardHorizontalOverlay} />
-                        <Text style={styles.planCardHorizontalTitle} numberOfLines={2}>{plan.title || 'Untitled'}</Text>
-                        <Text style={styles.planCardHorizontalDesc} numberOfLines={2}>{plan.description || ''}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              ) : (
-                <>
-            {recentPlans.map((plan, planIndex) => {
-              const allTags = [
-                ...(plan.temporal_tags || []),
-                ...(plan.category_sub || []),
-              ].slice(0, 3);
-              const hasImage = plan.media && plan.media.length > 0;
-              const isFirstCard = planIndex === 0;
+            <View key="recent-plans-wrapper" style={styles.recentPlansListWrapper}>
+              <View key="recent-plans-pill" style={styles.recentPlansPillStuck}>
+                <Text style={styles.recentPlansPillText}>Recent Plans</Text>
+              </View>
+              <React.Fragment key="recent-plans-list">
+                {recentPlans.map((plan, planIndex) => {
+                  const allTags = [
+                    ...(plan.temporal_tags || []),
+                    ...(plan.category_sub || []),
+                  ].slice(0, 3);
+                  const hasImage = plan.media && plan.media.length > 0;
+                  const isFirstCard = planIndex === 0;
+                  const planKey = plan.plan_id ?? (plan as any).planId ?? (plan as any).id ?? `plan-${planIndex}`;
 
-              return (
-                <View key={plan.plan_id} style={[styles.planCard, isFirstCard && styles.planCardFirst]}>
-                  <View style={styles.planCardInner}>
-                    <View style={styles.planTextBlock}>
-                      <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-                      <Text style={styles.planDescription} numberOfLines={4}>
-                        {plan.description || 'No description'}
-                      </Text>
-                      {allTags.length > 0 && (
-                        <View style={styles.planTagsRow}>
-                          {allTags.map((tag: string, idx: number) => (
-                            <View key={idx} style={styles.planTagChip}>
-                              <Ionicons
-                                name={(TAG_ICONS[tag] || 'ellipse') as any}
-                                size={12}
-                                color="#222"
-                                style={{ marginRight: 4 }}
-                              />
-                              <Text style={styles.planTagChipText}>{tag}</Text>
+                  return (
+                    <View key={planKey} style={[styles.planCard, isFirstCard && styles.planCardFirst]}>
+                      <View style={styles.planCardInner}>
+                        <View style={styles.planTextBlock}>
+                          <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
+                          <Text style={styles.planDescription} numberOfLines={4}>
+                            {plan.description || 'No description'}
+                          </Text>
+                          {allTags.length > 0 && (
+                            <View style={styles.planTagsRow}>
+                              {allTags.map((tag: string, idx: number) => (
+                                <View key={idx} style={styles.planTagChip}>
+                                  <Ionicons
+                                    name={(TAG_ICONS[tag] || 'ellipse') as any}
+                                    size={12}
+                                    color="#222"
+                                    style={{ marginRight: 4 }}
+                                  />
+                                  <Text style={styles.planTagChipText}>{tag}</Text>
+                                </View>
+                              ))}
                             </View>
-                          ))}
+                          )}
                         </View>
-                      )}
+                        {hasImage && (
+                          <Image
+                            source={{ uri: plan.media[0].url }}
+                            style={styles.planThumbnail}
+                            resizeMode="cover"
+                          />
+                        )}
+                      </View>
                     </View>
-                    {hasImage && (
-                      <Image
-                        source={{ uri: plan.media[0].url }}
-                        style={styles.planThumbnail}
-                        resizeMode="cover"
-                      />
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-                </>
-              )}
+                  );
+                })}
+              </React.Fragment>
             </View>
           )}
 
           {/* Actions: Interacted = Remove Interaction + Report in one card + Chat. Non-interacted = Report only */}
           {hasInteracted ? (
-            <>
+            <React.Fragment key="actions-interacted">
               <View style={[styles.sectionCard, { marginBottom: 15 }]}>
                 <TouchableOpacity style={styles.actionRow} onPress={() => {}} activeOpacity={0.7}>
                   <Ionicons name="close-circle-outline" size={20} color="#1C1C1E" />
@@ -435,14 +354,14 @@ export default function OtherUserProfileScreen() {
               >
                 <Text style={styles.chatButtonText}>Chat</Text>
               </TouchableOpacity>
-            </>
+            </React.Fragment>
           ) : (
-            <TouchableOpacity style={styles.reportOnlyButton} onPress={handleReport} activeOpacity={0.7}>
+            <TouchableOpacity key="actions-report-only" style={styles.reportOnlyButton} onPress={handleReport} activeOpacity={0.7}>
               <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
               <Text style={styles.reportOnlyText}>Report User</Text>
             </TouchableOpacity>
           )}
-          <View style={{ height: 40 }} />
+          <View key="bottom-spacer" style={{ height: 40 }} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -453,26 +372,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F2',
-  },
-  businessProfileHeader: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#F2F2F7',
-  },
-  businessProfileHeaderText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  profileTypeHeader: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#E8E8ED',
-  },
-  profileTypeHeaderText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
@@ -502,7 +401,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     overflow: 'hidden',
     zIndex: 1,
-    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   backButton: {
     position: 'absolute',
@@ -529,13 +427,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   userName: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '800',
     color: '#FFF',
     marginRight: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
   verifiedIcon: {
     marginLeft: 4,
@@ -585,98 +483,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 15,
   },
-  businessContactRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  businessContactField: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E5E5EA',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    gap: 10,
-  },
-  businessContactText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#1C1C1E',
-    fontWeight: '500',
-  },
-  instagramGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 20,
-  },
-  instagramGridCell: {
-    width: '32%',
-    aspectRatio: 1,
-  },
-  instagramGridPlaceholder: {
-    flex: 1,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 8,
-  },
-  allPlansHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  allPlansTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1C1C1E',
-  },
-  allPlansScroll: {
-    paddingBottom: 16,
-    gap: 12,
-  },
-  recentPlansListHorizontal: {
-    flexDirection: 'column',
-  },
-  planCardHorizontal: {
-    width: 280,
-    marginRight: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#E5E5EA',
-  },
-  planCardHorizontalImage: {
-    width: '100%',
-    height: 140,
-  },
-  planCardHorizontalPlaceholder: {
-    backgroundColor: '#C7C7CC',
-  },
-  planCardHorizontalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  planCardHorizontalTitle: {
-    position: 'absolute',
-    bottom: 36,
-    left: 12,
-    right: 12,
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFF',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  planCardHorizontalDesc: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    right: 12,
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-  },
   sectionCard: {
     backgroundColor: '#FFF',
     borderRadius: 30,
@@ -706,6 +512,9 @@ const styles = StyleSheet.create({
     marginLeft: 14,
     fontWeight: '500',
     flex: 1,
+  },
+  socialHandlePlaceholder: {
+    color: '#8E8E93',
   },
   actionRow: {
     flexDirection: 'row',
