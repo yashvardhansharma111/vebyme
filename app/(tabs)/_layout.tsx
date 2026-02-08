@@ -1,14 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchUnreadCount } from '@/store/slices/notificationsSlice';
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
-  
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const unreadCount = useAppSelector((state) => state.notifications.unreadCount);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.user_id) {
+      dispatch(fetchUnreadCount(user.user_id));
+    }
+  }, [dispatch, isAuthenticated, user?.user_id]);
+
   // Hide tab bar when on createPost or createBusinessPost screen
   const currentRoute = state.routes[state.index];
   if (currentRoute.name === 'createPost' || currentRoute.name === 'createBusinessPost') {
@@ -52,11 +62,20 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
               onPress={onPress}
               style={[styles.tabItem, isFocused ? styles.tabItemFocused : null]}
             >
-              <Ionicons 
-                name={iconName} 
-                size={26} 
-                color={isFocused ? '#FFF' : '#222'} 
-              />
+              <View style={styles.iconWrapper}>
+                <Ionicons
+                  name={iconName}
+                  size={26}
+                  color={isFocused ? '#FFF' : '#222'}
+                />
+                {route.name === 'notifications' && unreadCount > 0 && (
+                  <View style={styles.notificationsBadge}>
+                    <Text style={styles.notificationsBadgeText} numberOfLines={1}>
+                      {unreadCount > 99 ? '99+' : String(unreadCount)}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           );
           })}
@@ -131,6 +150,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 25,
+  },
+  iconWrapper: {
+    width: 26,
+    height: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationsBadge: {
+    position: 'absolute',
+    top: -10,
+    right: -14,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationsBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   tabItemFocused: {
     backgroundColor: '#1C1C1E', // Black circle for active state

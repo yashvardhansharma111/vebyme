@@ -254,6 +254,21 @@ export default function BusinessPlanDetailScreen() {
           <Text style={styles.title}>{plan.title}</Text>
           <Text style={styles.description}>{plan.description}</Text>
 
+          {Array.isArray(plan.category_sub) && plan.category_sub.length > 0 && (
+            <View style={styles.tagsContainer}>
+              {plan.category_sub.slice(0, 6).map((tag, idx) => (
+                <View key={`${tag}-${idx}`} style={styles.tag}>
+                  <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
+                </View>
+              ))}
+              {plan.category_sub.length > 6 && (
+                <View style={styles.tag}>
+                  <Text style={styles.tagText} numberOfLines={1}>+{plan.category_sub.length - 6}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Location + Date side by side */}
           <View style={styles.keyInfoRow}>
             {plan.location_text && (
@@ -276,9 +291,9 @@ export default function BusinessPlanDetailScreen() {
             <View style={styles.detailPillsWrap}>
               {plan.add_details.slice(0, 4).map((detail, index) => (
                 <View key={index} style={styles.detailPill}>
-                  <Text style={styles.detailPillLabel}>{detail.title}</Text>
+                  <Text style={styles.detailPillLabel}>{detail.title || detail.detail_type}</Text>
                   {detail.description ? (
-                    <Text style={styles.detailPillValue} numberOfLines={1}>{detail.description}</Text>
+                    <Text style={styles.detailPillValue} numberOfLines={2}>{detail.description}</Text>
                   ) : null}
                 </View>
               ))}
@@ -523,6 +538,23 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     marginBottom: 18,
   },
+  tagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 16,
+  },
+  tag: {
+    backgroundColor: '#F2F2F7',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#333',
+  },
   keyInfoRow: {
     flexDirection: 'row',
     gap: 12,
@@ -557,17 +589,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     minWidth: '47%',
+    minHeight: 62,
   },
   detailPillLabel: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#8E8E93',
     marginBottom: 4,
   },
   detailPillValue: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1C1C1E',
+    lineHeight: 18,
   },
   attendeesCard: {
     flexDirection: 'row',

@@ -38,6 +38,12 @@ interface GroupedPlanCardProps {
   showInteractions?: boolean;
 }
 
+interface EventAnalyticsMini {
+  registered_count: number;
+  first_timers_count: number;
+  returning_count: number;
+}
+
 export default function GroupedPlanCard({
   post_id,
   post,
@@ -55,10 +61,44 @@ export default function GroupedPlanCard({
   const [expanded, setExpanded] = useState(isExpanded);
   const [guests, setGuests] = useState<Array<{ user_id: string; name: string; profile_image: string | null }>>([]);
   const [loadingGuests, setLoadingGuests] = useState(false);
+  const [analytics, setAnalytics] = useState<EventAnalyticsMini | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showAddToCommunityModal, setShowAddToCommunityModal] = useState(false);
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
 
   const planId = post?.plan_id;
+
+  useEffect(() => {
+    if (!planId) {
+      setAnalytics(null);
+      return;
+    }
+    let cancelled = false;
+    setLoadingAnalytics(true);
+    apiService
+      .getEventAnalytics(planId)
+      .then((res: any) => {
+        const data = res?.data ?? res;
+        const payload = data?.data ?? data;
+        if (!cancelled && payload && typeof payload === 'object') {
+          const next: EventAnalyticsMini = {
+            registered_count: Number(payload.registered_count ?? 0) || 0,
+            first_timers_count: Number(payload.first_timers_count ?? 0) || 0,
+            returning_count: Number(payload.returning_count ?? 0) || 0,
+          };
+          setAnalytics(next);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAnalytics(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAnalytics(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [planId]);
 
   // Fetch guest list (all registered users) when card is expanded and we have a plan_id
   useEffect(() => {
@@ -212,6 +252,26 @@ export default function GroupedPlanCard({
         <Text style={styles.description} numberOfLines={expanded && showInteractions ? undefined : 2}>
           {postText}
         </Text>
+
+        {/* Analytics - Always visible on Level 2 (and also visible on Level 3) */}
+        {planId && (
+          <View style={styles.analyticsRow}>
+            <View style={styles.analyticsItem}>
+              <Text style={styles.analyticsLabel}>Registrations</Text>
+              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+            </View>
+            <View style={styles.analyticsDivider} />
+            <View style={styles.analyticsItem}>
+              <Text style={styles.analyticsLabel}>First-timers</Text>
+              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
+            </View>
+            <View style={styles.analyticsDivider} />
+            <View style={styles.analyticsItem}>
+              <Text style={styles.analyticsLabel}>Returning</Text>
+              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+            </View>
+          </View>
+        )}
 
         {/* Stacked Avatars - Level 2 only (top-right); do NOT show in Level 3 */}
         {!showInteractions && (
@@ -450,6 +510,36 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     lineHeight: 18,
     marginBottom: 12,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  analyticsItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  analyticsLabel: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontWeight: '600',
+  },
+  analyticsValue: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#1C1C1E',
+    fontWeight: '800',
+  },
+  analyticsDivider: {
+    width: 1,
+    height: 26,
+    backgroundColor: '#E5E5EA',
   },
   avatarsContainerTopRight: {
     position: 'absolute',

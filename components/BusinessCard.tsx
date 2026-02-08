@@ -65,6 +65,8 @@ function BusinessCardBase({
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
   const tags = plan.category_sub || [];
+  const tagsToShow = tags.slice(0, 4);
+  const remainingTags = Math.max(0, tags.length - tagsToShow.length);
   const passes = plan.passes || [];
   const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -115,7 +117,7 @@ function BusinessCardBase({
                 <Text style={styles.tagText}>₹{minPrice}</Text>
               </View>
             )}
-            {tags.slice(0, 3).map((tag: string, index: number) => (
+            {tagsToShow.map((tag: string, index: number) => (
               <View key={index} style={styles.tag}>
                 <Ionicons
                   name={tag.toLowerCase().includes('evening') ? 'cloud-outline' : 'checkmark-circle'}
@@ -123,9 +125,15 @@ function BusinessCardBase({
                   color="#3C3C43"
                   style={styles.tagIcon}
                 />
-                <Text style={styles.tagText}>{tag}</Text>
+                <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
               </View>
             ))}
+            {remainingTags > 0 && (
+              <View style={styles.tag}>
+                <Ionicons name="add" size={12} color="#3C3C43" style={styles.tagIcon} />
+                <Text style={styles.tagText} numberOfLines={1}>+{remainingTags}</Text>
+              </View>
+            )}
           </View>
         )}
         <View style={styles.footer}>
@@ -152,7 +160,7 @@ function BusinessCardBase({
       </View>
 
       {/* Attendees pill – tap to open guest list modal */}
-      {showInteracted && (
+      {onGuestListPress && (
         <TouchableOpacity
           style={styles.interactedPillOnImage}
           onPress={(e) => {
@@ -161,19 +169,24 @@ function BusinessCardBase({
           }}
           activeOpacity={0.8}
         >
-          {displayUsers.length > 0 ? (
-            displayUsers.map((u: any, idx: number) => (
-              <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
-                <Avatar uri={u.avatar} size={20} />
-              </View>
-            ))
+          {showInteracted ? (
+            displayUsers.length > 0 ? (
+              displayUsers.map((u: any, idx: number) => (
+                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
+                  <Avatar uri={u.avatar} size={20} />
+                </View>
+              ))
+            ) : (
+              [1, 2, 3].map((i) => (
+                <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -10, zIndex: 4 - i }]}>
+                  <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={20} />
+                </View>
+              ))
+            )
           ) : (
-            [1, 2, 3].map((i) => (
-              <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -10, zIndex: 4 - i }]}>
-                <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={20} />
-              </View>
-            ))
+            <Ionicons name="people-outline" size={18} color="#1C1C1E" />
           )}
+          {attendeesCount > 0 && <Text style={styles.interactedPlus}>+{attendeesCount}</Text>}
         </TouchableOpacity>
       )}
     </TouchableOpacity>

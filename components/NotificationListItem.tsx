@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Avatar from './Avatar';
 
 interface NotificationListItemProps {
   interaction: {
@@ -17,6 +18,7 @@ interface NotificationListItemProps {
   };
   userCache: { [key: string]: { name: string; profile_image: string | null } };
   onPress?: () => void;
+  onUserPress?: (userId: string) => void;
   showDivider?: boolean;
 }
 
@@ -24,11 +26,21 @@ export default function NotificationListItem({
   interaction,
   userCache,
   onPress,
+  onUserPress,
   showDivider = true,
 }: NotificationListItemProps) {
   const cachedUser = userCache[interaction.source_user_id];
   const user = cachedUser || interaction.user;
   const userName = user?.name || 'Unknown';
+  const userAvatar = (user as any)?.profile_image || null;
+
+  const handleUserPress = () => {
+    if (onUserPress) {
+      onUserPress(interaction.source_user_id);
+      return;
+    }
+    onPress?.();
+  };
 
   const getInteractionText = () => {
     // Check if payload has custom notification text
@@ -75,14 +87,20 @@ export default function NotificationListItem({
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={onPress}
+      onPress={onUserPress ? handleUserPress : onPress}
       activeOpacity={0.7}
     >
       <View style={styles.row}>
+        <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+          <Avatar uri={userAvatar} size={44} />
+        </TouchableOpacity>
+
         {/* Text */}
         <View style={styles.textContainer}>
           <Text style={styles.text}>
-            <Text style={styles.userName}>{userName}</Text>
+            <Text style={styles.userName} onPress={handleUserPress}>
+              {userName}
+            </Text>
             {' '}
             <Text style={styles.actionText}>{getInteractionText()}</Text>
           </Text>

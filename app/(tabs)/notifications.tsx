@@ -14,8 +14,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
+import { fetchUnreadCount } from '@/store/slices/notificationsSlice';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 import NotificationCard from '@/components/NotificationCard';
@@ -63,22 +64,32 @@ interface PlanGroupInfo {
 export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationGroup[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
-  const [groupName, setGroupName] = useState<string>('');
   const [creatingGroup, setCreatingGroup] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
-  const [planGroupInfo, setPlanGroupInfo] = useState<{ [postId: string]: PlanGroupInfo }>({});
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
   const [loadingUsers, setLoadingUsers] = useState<Set<string>>(new Set());
+  const [announcementGroupId, setAnnouncementGroupId] = useState<string | null>(null);
+  const [announcementMemberIds, setAnnouncementMemberIds] = useState<Set<string>>(new Set());
+  const [loadingAnnouncementMembers, setLoadingAnnouncementMembers] = useState(false);
   const [viewMode, setViewMode] = useState<'summary' | 'eventsList' | 'eventDetail'>('summary');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const router = useRouter();
+  const dispatch = useAppDispatch();
   
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+
+  const openUserProfile = useCallback(
+    (userId: string) => {
+      if (!userId) return;
+      router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+    },
+    [router]
+  );
 
   const loadNotifications = useCallback(async (isRefresh = false) => {
     if (!isAuthenticated || !user?.user_id) {
@@ -99,28 +110,6 @@ export default function NotificationsScreen() {
         // Always start in summary view (Level 1)
         setViewMode('summary');
         setSelectedEventId(null);
-        
-        // Load group info for each plan
-        const groupInfoPromises = response.data.map(async (group) => {
-          if (group.post_id) {
-            try {
-              const groupInfo = await apiService.getPlanGroups(group.post_id, user.user_id);
-              return { postId: group.post_id, info: groupInfo.data };
-            } catch (error) {
-              return { postId: group.post_id, info: { has_active_group: false, latest_group: null, total_active_groups: 0 } };
-            }
-          }
-          return null;
-        });
-        
-        const groupInfos = await Promise.all(groupInfoPromises);
-        const groupInfoMap: { [postId: string]: PlanGroupInfo } = {};
-        groupInfos.forEach((item) => {
-          if (item && item.info) {
-            groupInfoMap[item.postId] = item.info;
-          }
-        });
-        setPlanGroupInfo(groupInfoMap);
       }
     } catch (error: any) {
       console.error('Error loading notifications:', error);
@@ -191,21 +180,46 @@ export default function NotificationsScreen() {
     }
   }, [notifications, userCache, fetchUserProfile]);
 
-  const openGroupModal = (postId: string) => {
+  const openGroupModal = async (postId: string) => {
     setCurrentPostId(postId);
     setSelectedUsers(new Set());
-    setGroupName('');
     setShowGroupModal(true);
+    setLoadingAnnouncementMembers(true);
+    try {
+      const res = await apiService.getOrCreateAnnouncementGroup();
+      const groupId = (res as any)?.data?.group_id ?? (res as any)?.group_id ?? null;
+      setAnnouncementGroupId(groupId);
+      if (groupId) {
+        const details = await apiService.getGroupDetails(groupId);
+        const data = details?.data ?? details;
+        const members = data?.members ?? [];
+        const ids = new Set<string>();
+        if (Array.isArray(members)) {
+          members.forEach((m: any) => {
+            const id = typeof m === 'string' ? m : (m?.user_id ?? m?.id);
+            if (id) ids.add(String(id));
+          });
+        }
+        setAnnouncementMemberIds(ids);
+      } else {
+        setAnnouncementMemberIds(new Set());
+      }
+    } catch {
+      setAnnouncementGroupId(null);
+      setAnnouncementMemberIds(new Set());
+    } finally {
+      setLoadingAnnouncementMembers(false);
+    }
   };
 
   const closeGroupModal = () => {
     setShowGroupModal(false);
     setCurrentPostId(null);
     setSelectedUsers(new Set());
-    setGroupName('');
   };
 
   const toggleUserSelection = (userId: string) => {
+    if (announcementMemberIds.has(userId)) return;
     setSelectedUsers((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(userId)) {
@@ -221,7 +235,8 @@ export default function NotificationsScreen() {
     const currentGroup = currentPostId ? notifications.find((n) => n.post_id === currentPostId) : null;
     if (!currentGroup) return;
 
-    const uniqueUserIds = [...new Set(currentGroup.interactions.map((i) => i.source_user_id))];
+    const uniqueUserIds = [...new Set(currentGroup.interactions.map((i) => i.source_user_id))]
+      .filter((id) => id && !announcementMemberIds.has(id));
     const allSelected = uniqueUserIds.length > 0 && selectedUsers.size === uniqueUserIds.length;
 
     if (allSelected) {
@@ -231,72 +246,35 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!currentPostId || !user?.user_id) return;
-
-    const name = groupName.trim();
+  const handleAddToAnnouncementGroup = async () => {
+    if (!user?.user_id) return;
+    if (!announcementGroupId) {
+      Alert.alert('Error', 'Announcement group not available');
+      return;
+    }
     if (selectedUsers.size === 0) {
       Alert.alert('Error', 'Please select at least one user');
       return;
     }
 
-    if (!name && !planGroupInfo[currentPostId]?.has_active_group) {
-      Alert.alert('Error', 'Please enter a group name');
-      return;
-    }
-
-    setCreatingGroup(currentPostId);
+    setCreatingGroup(currentPostId || 'adding');
     try {
-      const memberIds = Array.from(selectedUsers);
-      const groupInfo = planGroupInfo[currentPostId];
-      const hasActiveGroup = groupInfo?.has_active_group || false;
-      
-      if (hasActiveGroup && groupInfo?.latest_group) {
-        // Add to existing group
-        await apiService.addMembersToGroup(groupInfo.latest_group.group_id, memberIds);
-        Alert.alert(
-          'Members Added! 🎉',
-          `${memberIds.length} member${memberIds.length > 1 ? 's' : ''} added to "${groupInfo.latest_group.group_name || 'the group'}"`,
-          [
-            {
-              text: 'Go to Chat',
-              onPress: () => {
-                router.push({
-                  pathname: '/chat/group/[groupId]',
-                  params: { groupId: groupInfo.latest_group!.group_id },
-                } as any);
-              },
-            },
-            { text: 'OK', style: 'cancel' },
-          ]
-        );
-      } else {
-        // Create new group
-        const response = await apiService.createGroup(currentPostId, user.user_id, memberIds, name);
-        if (response.data && response.data.group_id) {
-          Alert.alert(
-            'Group Created! 🎉',
-            `"${name}" group has been created. You can now chat with ${selectedUsers.size} member${selectedUsers.size > 1 ? 's' : ''} about this plan.`,
-            [
-              {
-                text: 'Go to Chat',
-                onPress: () => {
-                  router.push({
-                    pathname: '/chat/group/[groupId]',
-                    params: { groupId: response.data!.group_id },
-                  } as any);
-                },
-              },
-              { text: 'OK', style: 'cancel' },
-            ]
-          );
-        }
+      const memberIds = Array.from(selectedUsers)
+        .filter((id) => id && id !== user.user_id)
+        .filter((id) => !announcementMemberIds.has(id));
+      if (memberIds.length === 0) {
+        Alert.alert('Done', 'All selected users are already in your announcement group.');
+        closeGroupModal();
+        return;
       }
-      
+      await apiService.addMembersToGroup(announcementGroupId, memberIds);
+      const next = new Set(announcementMemberIds);
+      memberIds.forEach((id) => next.add(id));
+      setAnnouncementMemberIds(next);
+      Alert.alert('Done', `${memberIds.length} user(s) added to your announcement group.`);
       closeGroupModal();
-      loadNotifications();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create group');
+      Alert.alert('Error', error?.message || 'Failed to add members');
     } finally {
       setCreatingGroup(null);
     }
@@ -341,9 +319,8 @@ export default function NotificationsScreen() {
 
   const currentGroup = currentPostId ? notifications.find((n) => n.post_id === currentPostId) : null;
   const uniqueUserIds = currentGroup ? [...new Set(currentGroup.interactions.map((i) => i.source_user_id))] : [];
-  const allSelected = uniqueUserIds.length > 0 && selectedUsers.size === uniqueUserIds.length;
-  const groupInfo = currentPostId ? planGroupInfo[currentPostId] : null;
-  const hasActiveGroup = groupInfo?.has_active_group || false;
+  const availableUserIds = uniqueUserIds.filter((id) => id && !announcementMemberIds.has(id));
+  const allSelected = availableUserIds.length > 0 && selectedUsers.size === availableUserIds.length;
 
   // Separate grouped plan cards from individual notifications
   const groupedPlanCards = notifications
@@ -443,6 +420,17 @@ export default function NotificationsScreen() {
 
   const handleEventCardPress = (postId: string) => {
     if (viewMode === 'eventsList') {
+      // Mark all interactions for this card as read when opening the event card
+      const group = notifications.find((g) => g.post_id === postId);
+      const ids = group?.interactions?.map((i) => i.notification_id).filter(Boolean) ?? [];
+      if (ids.length > 0) {
+        Promise.all(ids.map((id) => apiService.markNotificationAsRead(id).catch(() => null)))
+          .catch(() => null)
+          .finally(() => {
+            if (user?.user_id) dispatch(fetchUnreadCount(user.user_id));
+          });
+      }
+
       // Expand to Level 3: Show interactions for this specific event
       setViewMode('eventDetail');
       setSelectedEventId(postId);
@@ -459,7 +447,6 @@ export default function NotificationsScreen() {
   const handleCreateGroupFromCard = (postId: string) => {
     setCurrentPostId(postId);
     setSelectedUsers(new Set());
-    setGroupName('');
     setShowGroupModal(true);
   };
 
@@ -570,6 +557,7 @@ export default function NotificationsScreen() {
                           key={interaction.notification_id}
                           interaction={interaction}
                           userCache={userCache}
+                          onUserPress={openUserProfile}
                           onPress={() => {
                             const planId = (interaction as any)._planId || interaction.payload?.plan_id;
                             if (planId) {
@@ -600,6 +588,7 @@ export default function NotificationsScreen() {
                           key={interaction.notification_id}
                           interaction={interaction}
                           userCache={userCache}
+                          onUserPress={openUserProfile}
                           onPress={() => {
                             const planId = (interaction as any)._planId || interaction.payload?.plan_id;
                             if (planId) {
@@ -629,6 +618,7 @@ export default function NotificationsScreen() {
                           key={interaction.notification_id}
                           interaction={interaction}
                           userCache={userCache}
+                          onUserPress={openUserProfile}
                           onPress={() => {
                             const planId = (interaction as any)._planId || interaction.payload?.plan_id;
                             if (planId) {
@@ -671,9 +661,7 @@ export default function NotificationsScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.modalHeaderLeft}>
                 <Ionicons name="bicycle-outline" size={24} color="#1C1C1E" />
-                <Text style={styles.modalHeaderText}>
-                  {hasActiveGroup ? (groupInfo?.latest_group?.group_name || 'Group') : 'Cycling Group'}
-                </Text>
+                <Text style={styles.modalHeaderText}>Announcement Group</Text>
               </View>
               <TouchableOpacity onPress={closeGroupModal}>
                 <Ionicons name="close" size={24} color="#1C1C1E" />
@@ -690,19 +678,21 @@ export default function NotificationsScreen() {
                 const cachedUser = userCache[userId];
                 const user = cachedUser || interaction?.user;
                 const isSelected = selectedUsers.has(userId);
+                const isAlreadyAdded = announcementMemberIds.has(userId);
                 
                 return (
                   <TouchableOpacity
                     key={userId}
-                    style={styles.userItem}
+                    style={[styles.userItem, isAlreadyAdded && styles.userItemDisabled]}
                     onPress={() => toggleUserSelection(userId)}
+                    disabled={isAlreadyAdded}
                     activeOpacity={0.7}
                   >
                     <Avatar
                       uri={user?.profile_image || null}
                       size={40}
                     />
-                    <Text style={styles.userName}>{user?.name || 'Unknown'}</Text>
+                    <Text style={[styles.userName, isAlreadyAdded && styles.userNameDisabled]}>{user?.name || 'Unknown'}</Text>
                     <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
                       {isSelected && (
                         <Ionicons name="checkmark" size={16} color="#FFFFFF" />
@@ -727,33 +717,22 @@ export default function NotificationsScreen() {
               </TouchableOpacity>
             </ScrollView>
 
-            {/* Group Name Input */}
-            {!hasActiveGroup && (
-              <TextInput
-                style={styles.groupNameInput}
-                placeholder="Group Name"
-                placeholderTextColor="#9CA3AF"
-                value={groupName}
-                onChangeText={setGroupName}
-              />
-            )}
-
             {/* Action Button */}
             <TouchableOpacity
               style={[
                 styles.modalActionButton,
-                (selectedUsers.size === 0 || (!hasActiveGroup && !groupName.trim()) || creatingGroup !== null) &&
+                (selectedUsers.size === 0 || creatingGroup !== null || loadingAnnouncementMembers) &&
                   styles.modalActionButtonDisabled,
               ]}
-              onPress={handleCreateGroup}
-              disabled={selectedUsers.size === 0 || (!hasActiveGroup && !groupName.trim()) || creatingGroup !== null}
+              onPress={handleAddToAnnouncementGroup}
+              disabled={selectedUsers.size === 0 || creatingGroup !== null || loadingAnnouncementMembers}
               activeOpacity={0.8}
             >
               {creatingGroup ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={styles.modalActionButtonText}>
-                  {hasActiveGroup ? 'Add to Group' : 'Create group'}
+                  {loadingAnnouncementMembers ? 'Loading…' : 'Add to Announcement Group'}
                 </Text>
               )}
             </TouchableOpacity>
@@ -927,22 +906,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F2F2F7',
   },
+  userItemDisabled: {
+    opacity: 0.45,
+  },
   userName: {
+    flex: 1,
     fontSize: 16,
+    fontWeight: '600',
     color: '#1C1C1E',
     marginLeft: 12,
-    flex: 1,
+  },
+  userNameDisabled: {
+    color: '#8E8E93',
   },
   selectAllItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingVertical: 12,
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
   },
   selectAllText: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
@@ -950,7 +935,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 6,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: '#1C1C1E',
     justifyContent: 'center',
