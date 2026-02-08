@@ -192,7 +192,8 @@ export default function IndividualChatScreen() {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error: any) {
-      Alert.alert('Error', 'Failed to send message.');
+      const msg = error?.message || error?.data?.message || 'Failed to send message.';
+      Alert.alert('Error', msg.includes('not a member') ? 'You need to join this plan to send messages here.' : msg);
     } finally {
       setSending(false);
     }

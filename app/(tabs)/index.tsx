@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import LoginModal from '@/components/LoginModal';
+import ShareToChatModal from '@/components/ShareToChatModal';
 import { Colors } from '@/constants/theme';
 import Avatar from '@/components/Avatar';
 
@@ -75,6 +76,15 @@ export default function HomeScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showBusinessShareModal, setShowBusinessShareModal] = useState(false);
+  const [sharedBusinessPlan, setSharedBusinessPlan] = useState<{
+    planId: string;
+    title: string;
+    description: string;
+    media: Array<{ url: string; type?: string }>;
+    tags?: string[];
+    category_main?: string;
+  } | null>(null);
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -399,18 +409,17 @@ export default function HomeScreen() {
               })}
             </ScrollView>
 
-            {/* Business Plans Horizontal Section */}
+            {/* Business Plans Horizontal Section – whole header opens business posts list */}
             {businessEvents.length > 0 && (
               <View style={styles.businessSection}>
-                <View style={styles.businessSectionHeader}>
+                <TouchableOpacity
+                  style={styles.businessSectionHeader}
+                  onPress={() => router.push('/business-posts')}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.businessSectionTitle}>Happening near me</Text>
-                  <TouchableOpacity
-                    style={styles.businessSectionArrow}
-                    onPress={() => router.push('/business-posts')}
-                  >
-                    <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
+                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
+                </TouchableOpacity>
                 <ScrollView 
                   horizontal 
                   showsHorizontalScrollIndicator={false}
@@ -426,13 +435,15 @@ export default function HomeScreen() {
                           title: item.event.title,
                           description: item.event.description,
                           media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                          category_sub: item.event.tags,
+                          category_main: rawPost?.category_main || '',
+                          category_sub: item.event.tags || rawPost?.tags || [],
                           location_text: rawPost?.location_text || '',
-                          date: rawPost?.timestamp || new Date(),
+                          date: rawPost?.date || rawPost?.timestamp || new Date(),
                           time: rawPost?.time || '',
+                          passes: rawPost?.passes || [],
                         }}
                         user={item.user}
-                        attendeesCount={7}
+                        attendeesCount={rawPost?.joins_count ?? 0}
                         isSwipeable={false}
                         containerStyle={styles.businessCardContainer}
                         onPress={() => {
@@ -464,6 +475,22 @@ export default function HomeScreen() {
                           if (!isAuthenticated) {
                             setShowLoginModal(true);
                           }
+                        }}
+                        onSharePress={() => {
+                          if (!isAuthenticated) {
+                            setShowLoginModal(true);
+                            return;
+                          }
+                          const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+                          setSharedBusinessPlan({
+                            planId: item.id,
+                            title: item.event.title,
+                            description: item.event.description,
+                            media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                            tags: item.event.tags || rawPost?.tags,
+                            category_main: rawPost?.category_main,
+                          });
+                          setShowBusinessShareModal(true);
                         }}
                       />
                     );
@@ -539,6 +566,24 @@ export default function HomeScreen() {
           loadFeed();
         }}
       />
+      {sharedBusinessPlan && (
+        <ShareToChatModal
+          visible={showBusinessShareModal}
+          onClose={() => {
+            setShowBusinessShareModal(false);
+            setSharedBusinessPlan(null);
+          }}
+          postId={sharedBusinessPlan.planId}
+          postTitle={sharedBusinessPlan.title}
+          postDescription={sharedBusinessPlan.description}
+          postMedia={sharedBusinessPlan.media}
+          postTags={sharedBusinessPlan.tags}
+          postCategoryMain={sharedBusinessPlan.category_main}
+          postIsBusiness={true}
+          userId={user?.user_id ?? ''}
+          currentUserAvatar={currentUser?.profile_image ?? undefined}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

@@ -67,6 +67,28 @@ export default function MyProfileScreen() {
     );
   }
 
+  if (!user?.session_id) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>Please log in to view your profile.</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/login')}>
+          <Text style={styles.retryButtonText}>Log in</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!isLoading && !currentUser) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>Could not load profile.</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => user?.session_id && dispatch(fetchCurrentUser(user.session_id))}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
@@ -274,6 +296,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F2F2F2',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#1C1C1E',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+    fontSize: 16,
   },
   
   // Header

@@ -24,6 +24,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PAD = 20;
 const GAP = 16;
 const TILE_SIZE = (SCREEN_WIDTH - PAD * 2 - GAP * (COLS - 1)) / COLS;
+/** User/chat circle size: 30% smaller than tile */
+const CIRCLE_SIZE = Math.round(TILE_SIZE * 0.7);
 
 interface ShareToChatModalProps {
   visible: boolean;
@@ -146,19 +148,29 @@ export default function ShareToChatModal({
     }
   };
 
-  const planUrl = `${getWebBaseUrl()}/go/post/${postId}`;
-  const shareMessage = `Check out this plan: ${postTitle}\n\n${planUrl}`;
+  const baseUrl = (getWebBaseUrl() || 'https://app.vybeme.in').replace(/\/$/, '');
+  const safePostId = typeof postId === 'string' && postId.trim() ? postId.trim() : '';
+  const planUrl = safePostId ? `${baseUrl}/post/${safePostId}` : '';
+  const shareMessage = planUrl ? `Check out this plan: ${postTitle}\n\n${planUrl}` : `Check out this plan: ${postTitle}`;
 
   const handleCopyLink = async () => {
+    if (!planUrl) {
+      Alert.alert('Cannot copy link', 'Post link is not available.');
+      return;
+    }
     try {
       await Clipboard.setStringAsync(planUrl);
-      Alert.alert('Link copied', 'Plan link copied to clipboard.');
+      Alert.alert('Link copied', `Plan link copied to clipboard.\n\n${planUrl}`);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to copy link');
     }
   };
 
   const handleExternalShare = async () => {
+    if (!planUrl) {
+      Alert.alert('Cannot share', 'Post link is not available.');
+      return;
+    }
     try {
       await Share.share({ message: shareMessage, url: planUrl, title: postTitle });
     } catch (e: any) {
@@ -168,6 +180,10 @@ export default function ShareToChatModal({
   };
 
   const handleWhatsApp = () => {
+    if (!planUrl) {
+      Alert.alert('Cannot share', 'Post link is not available.');
+      return;
+    }
     Linking.openURL(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`).catch(() => handleExternalShare());
   };
 
@@ -201,14 +217,14 @@ export default function ShareToChatModal({
         <View style={styles.tileAvatarWrap}>
           {isGroup ? (
             image ? (
-              <Avatar uri={image} size={TILE_SIZE - 8} />
+              <Avatar uri={image} size={CIRCLE_SIZE - 6} />
             ) : (
               <View style={styles.tilePlaceholder}>
-                <Ionicons name="people" size={28} color="#8E8E93" />
+                <Ionicons name="people" size={Math.round(28 * 0.7)} color="#8E8E93" />
               </View>
             )
           ) : (
-            <Avatar uri={image ?? undefined} size={TILE_SIZE - 8} />
+            <Avatar uri={image ?? undefined} size={CIRCLE_SIZE - 6} />
           )}
         </View>
         <Text style={styles.tileName} numberOfLines={1}>{name}</Text>
@@ -295,7 +311,11 @@ export default function ShareToChatModal({
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.copyLinkButton} onPress={handleCopyLink}>
+          <TouchableOpacity
+            style={[styles.copyLinkButton, !planUrl && styles.copyLinkButtonDisabled]}
+            onPress={handleCopyLink}
+            disabled={!planUrl}
+          >
             <Ionicons name="link" size={22} color="#FFF" />
             <Text style={styles.copyLinkText}>Copy Link</Text>
           </TouchableOpacity>
@@ -364,12 +384,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tileAvatarWrap: {
-    width: TILE_SIZE,
-    height: TILE_SIZE,
-    borderRadius: TILE_SIZE / 2,
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+    borderRadius: CIRCLE_SIZE / 2,
     overflow: 'hidden',
     backgroundColor: '#F2F2F7',
     marginBottom: 8,
+    alignSelf: 'center',
   },
   tileImage: {
     width: '100%',
@@ -422,6 +443,9 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 14,
     gap: 10,
+  },
+  copyLinkButtonDisabled: {
+    opacity: 0.5,
   },
   copyLinkText: {
     fontSize: 16,

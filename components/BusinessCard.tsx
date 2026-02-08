@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share, ScrollView, Dimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import { apiService, getWebBaseUrl } from '@/services/api';
@@ -16,6 +16,7 @@ interface BusinessCardProps {
     location_text?: string;
     date?: string | Date;
     time?: string;
+    category_main?: string;
     category_sub?: string[];
     passes?: Array<{
       pass_id: string;
@@ -43,9 +44,13 @@ interface BusinessCardProps {
   onPress?: () => void;
   onRegisterPress?: () => void;
   onRequireAuth?: () => void;
+  /** When set, share icon opens this instead of native share (e.g. ShareToChatModal from parent) */
+  onSharePress?: () => void;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
+const CARD_WIDTH = Dimensions.get('window').width - 32;
+
 function BusinessCardBase({
   plan,
   user,
@@ -56,18 +61,33 @@ function BusinessCardBase({
   onRegisterPress,
   onRequireAuth,
   onRepostPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
-  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
+  onSharePress,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
+  const mediaList = plan.media && plan.media.length > 0 ? plan.media.filter((m) => m.type === 'image') : [];
+  const mainImage = mediaList.length > 0 ? mediaList[0].url : undefined;
+  const [imageIndex, setImageIndex] = useState(0);
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
-  const tags = plan.category_sub || [];
+  // Complete tags: category_main + category_sub (avoid duplicate)
+  const mainTag = plan.category_main ? [plan.category_main] : [];
+  const subTags = plan.category_sub || [];
+  const tags = mainTag.length > 0
+    ? [...mainTag, ...subTags.filter((t) => t !== plan.category_main)]
+    : subTags;
   const passes = plan.passes || [];
-  const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
-  const minPrice = prices.length > 0 ? Math.min(...prices) : null;
+  const hasFreePass = passes.some((p) => Number(p.price) === 0);
+  const prices = passes.filter((p) => Number(p.price) > 0).map((p) => p.price);
+  const minPrice = hasFreePass ? 0 : (prices.length > 0 ? Math.min(...prices) : null);
   const showInteracted = attendeesCount > 0 || (interactedUsers && interactedUsers.length > 0);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
   const extraCount = Math.max(0, (attendeesCount || 0) - displayUsers.length) || (displayUsers.length === 0 ? attendeesCount : 0);
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const x = e.nativeEvent.contentOffset.x;
+    const idx = Math.round(x / CARD_WIDTH);
+    setImageIndex(Math.min(idx, mediaList.length - 1));
+  };
 
   const handleShare = async () => {
     try {
@@ -75,7 +95,7 @@ function BusinessCardBase({
         Alert.alert('Error', 'Plan ID not found');
         return;
       }
-      const planUrl = `${getWebBaseUrl()}/go/post/${plan.plan_id}`;
+      const planUrl = `${getWebBaseUrl()}/post/${plan.plan_id}`;
       const shareMessage = `Check out this event: ${plan.title}\n\n${planUrl}`;
       await Share.share({ message: shareMessage, url: planUrl, title: plan.title });
     } catch (error: any) {
@@ -92,51 +112,73 @@ function BusinessCardBase({
       {/* Inner card (clipped) – image + white overlay only */}
       <View style={styles.cardInner}>
         <View style={styles.imageBehind}>
-          {mainImage ? (
-            <Image source={{ uri: mainImage }} style={styles.imageBehindImg} resizeMode="cover" />
+          {mediaList.length > 0 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              onMomentumScrollEnd={onScroll}
+              showsHorizontalScrollIndicator={false}
+              style={styles.imageScroll}
+              contentContainerStyle={styles.imageScrollContent}
+            >
+              {mediaList.map((m, idx) => (
+                <Image key={idx} source={{ uri: m.url }} style={styles.imageBehindImg} resizeMode="cover" />
+              ))}
+            </ScrollView>
           ) : (
             <View style={[styles.imageBehindImg, styles.imageBehindPlaceholder]}>
               <Ionicons name="image-outline" size={48} color="#8E8E93" />
             </View>
           )}
+          {mediaList.length > 1 && (
+            <View style={styles.dotsRow}>
+              {mediaList.map((_, idx) => (
+                <View key={idx} style={[styles.dot, idx === imageIndex && styles.dotActive]} />
+              ))}
+            </View>
+          )}
         </View>
         <View style={styles.contentOverlay}>
-        <Text style={styles.title}>{plan.title}</Text>
-        <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
-          {plan.description}
-        </Text>
-        {(minPrice != null || tags.length > 0) && (
-          <View style={styles.tagsContainer}>
-            {minPrice != null && (
-              <View style={styles.tag}>
-                <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
-                <Text style={styles.tagText}>₹{minPrice}</Text>
+          <View style={styles.contentOverlayTop}>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">{plan.title}</Text>
+            <View style={styles.descriptionWrap}>
+              <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+                {plan.description}
+              </Text>
+            </View>
+            {(minPrice != null || tags.length > 0) && (
+              <View style={styles.tagsContainer}>
+                {minPrice != null && (
+                  <View style={styles.tag}>
+                    <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                    <Text style={styles.tagText}>{minPrice === 0 ? 'Free' : `₹${minPrice}`}</Text>
+                  </View>
+                )}
+                {tags.slice(0, 3).map((tag: string, index: number) => (
+                  <View key={index} style={styles.tag}>
+                    <Ionicons
+                      name={tag.toLowerCase().includes('evening') ? 'cloud-outline' : 'checkmark-circle'}
+                      size={12}
+                      color="#3C3C43"
+                      style={styles.tagIcon}
+                    />
+                    <Text style={styles.tagText}>{tag}</Text>
+                  </View>
+                ))}
               </View>
             )}
-            {tags.slice(0, 3).map((tag: string, index: number) => (
-              <View key={index} style={styles.tag}>
-                <Ionicons
-                  name={tag.toLowerCase().includes('evening') ? 'cloud-outline' : 'checkmark-circle'}
-                  size={12}
-                  color="#3C3C43"
-                  style={styles.tagIcon}
-                />
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
           </View>
-        )}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-            <Text style={styles.registerButtonText}>Register</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-            <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-            <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+              <Text style={styles.registerButtonText}>Register</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={onSharePress ?? handleShare}>
+              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
       </View>
       </View>
 
@@ -184,6 +226,7 @@ export default function BusinessCard({
   onPress,
   onRegisterPress,
   onRequireAuth,
+  onSharePress,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -272,6 +315,7 @@ export default function BusinessCard({
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
           onRepostPress={handleRepost}
+          onSharePress={onSharePress}
         />
         <RepostModal
           visible={showRepostModal}
@@ -308,6 +352,7 @@ export default function BusinessCard({
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
           onRepostPress={handleRepost}
+          onSharePress={onSharePress}
         />
       </Swipeable>
       <RepostModal
@@ -351,8 +396,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     borderRadius: 20,
   },
+  imageScroll: {
+    flex: 1,
+    borderRadius: 20,
+  },
+  imageScrollContent: {
+    flexGrow: 1,
+  },
   imageBehindImg: {
-    width: '100%',
+    width: CARD_WIDTH,
     height: '100%',
     borderRadius: 20,
   },
@@ -360,6 +412,27 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dotsRow: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255,255,255,0.5)',
+  },
+  dotActive: {
+    backgroundColor: '#FFF',
+    width: 8,
+    height: 6,
+    borderRadius: 3,
   },
   organizerPill: {
     position: 'absolute',
@@ -421,31 +494,41 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    minHeight: '52%',
+    height: 208,
     backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 18,
-    paddingTop: 18,
+    paddingTop: 14,
     paddingBottom: 18,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
+  contentOverlayTop: {
+    flex: 1,
+    minHeight: 0,
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1C1C1E',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  descriptionWrap: {
+    height: 60,
+    marginBottom: 8,
+    justifyContent: 'flex-start',
   },
   description: {
     fontSize: 14,
     color: '#3C3C43',
     lineHeight: 20,
-    marginBottom: 8,
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   tag: {
     flexDirection: 'row',
@@ -468,6 +551,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 'auto',
+    flexShrink: 0,
   },
   registerButton: {
     flex: 1,

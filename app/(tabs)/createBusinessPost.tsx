@@ -209,8 +209,14 @@ export default function CreateBusinessPostScreen() {
     loadPlanData();
   }, []);
 
+  const MAX_MEDIA = 5;
+
   const handleAddMedia = async () => {
     try {
+      if (media.length >= MAX_MEDIA) {
+        Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} images per post.`);
+        return;
+      }
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please grant camera roll permissions');
@@ -219,15 +225,17 @@ export default function CreateBusinessPostScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_MEDIA - media.length,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setMedia([{
-          uri: result.assets[0].uri,
+        const newItems = result.assets.slice(0, MAX_MEDIA - media.length).map((asset) => ({
+          uri: asset.uri,
           type: 'image' as const,
-        }]);
+        }));
+        setMedia((prev) => [...prev, ...newItems].slice(0, MAX_MEDIA));
       }
     } catch (error) {
       console.error('Error picking media:', error);
@@ -235,8 +243,12 @@ export default function CreateBusinessPostScreen() {
     }
   };
 
-  const removeMedia = () => {
-    setMedia([]);
+  const removeMedia = (index?: number) => {
+    if (index !== undefined) {
+      setMedia((prev) => prev.filter((_, i) => i !== index));
+    } else {
+      setMedia([]);
+    }
   };
 
   const handleAddTicketImage = async () => {
@@ -342,12 +354,12 @@ export default function CreateBusinessPostScreen() {
       plan_id: 'preview',
       title: title || 'Event Title',
       description: description || 'Event description',
-      media: media.length > 0 ? [{ url: media[0].uri, type: media[0].type }] : [],
+      media: media.length > 0 ? media.map((m) => ({ url: m.uri, type: m.type })) : [],
       location_text: location || undefined,
       date: selectedDate ? selectedDate : undefined,
       time: timeEnabled && startTime ? formatTime(startTime) : undefined,
       category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
-      passes: passes.filter(p => p.name && p.price > 0),
+      passes: passes.filter(p => p.name && p.price >= 0),
       user: currentUser ? {
         user_id: currentUser.user_id,
         name: currentUser.name || 'Organizer',
@@ -374,8 +386,8 @@ export default function CreateBusinessPostScreen() {
       Alert.alert('Validation', 'Please add at least one ticket with a price');
       return;
     }
-    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price <= 0)) {
-      Alert.alert('Validation', 'All tickets must have a name and price');
+    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price < 0)) {
+      Alert.alert('Validation', 'All tickets must have a name and a valid price (0 or more)');
       return;
     }
     setShowPreview(true);
@@ -411,8 +423,8 @@ export default function CreateBusinessPostScreen() {
       Alert.alert('Validation', 'Please add at least one ticket with a price');
       return;
     }
-    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price <= 0)) {
-      Alert.alert('Validation', 'All tickets must have a name and price');
+    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price < 0)) {
+      Alert.alert('Validation', 'All tickets must have a name and a valid price (0 or more for free)');
       return;
     }
 
@@ -480,7 +492,7 @@ export default function CreateBusinessPostScreen() {
         planData.time = formatTime(startTime);
       }
       if (ticketsEnabled && passes.length > 0) {
-        planData.passes = passes.filter(p => p.name && p.price > 0).map(p => ({
+        planData.passes = passes.filter(p => p.name && p.price >= 0).map(p => ({
           pass_id: p.pass_id,
           name: p.name,
           price: p.price,
@@ -554,9 +566,21 @@ export default function CreateBusinessPostScreen() {
           hasFiles ? formData : undefined
         );
         if (response.success) {
-          Alert.alert('Success', 'Business plan created successfully!', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
+          Alert.alert(
+            'Success',
+            'Business plan created successfully!',
+            [
+              { text: 'OK', onPress: () => router.back() },
+            ]
+          );
+          // Show follow-up popup with improvements note
+          setTimeout(() => {
+            Alert.alert(
+              'Quick note',
+              '1. Tags on your post now show category + subcategories.\n\n2. Joiners count is dynamic per post.\n\n3. Register and action buttons have a fixed position on the card.',
+              [{ text: 'Got it' }]
+            );
+          }, 500);
         }
       }
     } catch (error: any) {
@@ -645,26 +669,34 @@ export default function CreateBusinessPostScreen() {
             multiline
             numberOfLines={4}
             placeholderTextColor="#999"
-            maxLength={250}
           />
-          <Text style={styles.charCount}>{description.length}/250</Text>
 
-          {/* Media */}
+          {/* Media - up to 5 images */}
           <View style={styles.mediaSection}>
             {media.length > 0 ? (
-              <View style={styles.mediaPreview}>
-                <Image source={{ uri: media[0].uri }} style={styles.mediaImage} />
-                <TouchableOpacity
-                  style={styles.removeMediaButton}
-                  onPress={removeMedia}
-                >
-                  <Ionicons name="close" size={20} color="#FFF" />
-                </TouchableOpacity>
+              <View style={styles.mediaList}>
+                {media.map((item, index) => (
+                  <View key={`${item.uri}-${index}`} style={styles.mediaPreviewWrap}>
+                    <Image source={{ uri: item.uri }} style={styles.mediaThumb} />
+                    <TouchableOpacity
+                      style={styles.removeMediaButton}
+                      onPress={() => removeMedia(index)}
+                    >
+                      <Ionicons name="close" size={18} color="#FFF" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                {media.length < MAX_MEDIA && (
+                  <TouchableOpacity style={styles.addMediaThumb} onPress={handleAddMedia}>
+                    <Ionicons name="add" size={28} color="#666" />
+                    <Text style={styles.addMediaThumbText}>{media.length}/{MAX_MEDIA}</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
               <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
                 <Ionicons name="add" size={24} color="#666" />
-                <Text style={styles.addMediaText}>+ Add Media</Text>
+                <Text style={styles.addMediaText}>+ Add Media (up to {MAX_MEDIA} images)</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -899,9 +931,9 @@ export default function CreateBusinessPostScreen() {
                     />
                     <TextInput
                       style={styles.passInput}
-                      placeholder="Ticket Fee"
-                      value={pass.price > 0 ? pass.price.toString() : ''}
-                      onChangeText={(text) => updatePass(index, 'price', parseFloat(text) || 0)}
+                      placeholder="Ticket Fee (0 for free)"
+                      value={pass.price >= 0 ? pass.price.toString() : ''}
+                      onChangeText={(text) => updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
                       keyboardType="numeric"
                       placeholderTextColor="#999"
                     />
@@ -1129,16 +1161,53 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 8,
-  },
-  charCount: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'right',
     marginBottom: 16,
   },
   mediaSection: {
     marginBottom: 16,
+  },
+  mediaList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  mediaPreviewWrap: {
+    position: 'relative',
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  mediaThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  removeMediaButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addMediaThumb: {
+    width: 88,
+    height: 88,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addMediaThumbText: {
+    fontSize: 11,
+    color: '#666',
+    marginTop: 4,
   },
   mediaPreview: {
     position: 'relative',
@@ -1150,17 +1219,6 @@ const styles = StyleSheet.create({
   mediaImage: {
     width: '100%',
     height: '100%',
-  },
-  removeMediaButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 16,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   addMediaButton: {
     width: '100%',

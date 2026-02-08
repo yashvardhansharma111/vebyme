@@ -6,7 +6,10 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
   ScrollView,
   StyleSheet,
   Text,
@@ -53,6 +56,7 @@ export default function BusinessPlanDetailScreen() {
   const [organizer, setOrganizer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPass, setSelectedPass] = useState<string | null>(null);
+  const [imageIndex, setImageIndex] = useState(0);
 
   useEffect(() => {
     loadPlan();
@@ -174,17 +178,44 @@ export default function BusinessPlanDetailScreen() {
     );
   }
 
-  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
-  const mediaCount = plan.media?.length ?? 0;
+  const imageList = (plan.media || [])
+    .filter((m) => m.url && (m.type === 'image' || !m.type))
+    .map((m) => m.url);
+  const mediaCount = imageList.length;
+  const hasImages = mediaCount > 0;
   const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
   const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
+
+  const onImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const width = Dimensions.get('window').width;
+    const x = e.nativeEvent.contentOffset.x;
+    const index = Math.round(x / width);
+    setImageIndex(Math.min(index, mediaCount - 1));
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
+        {/* Hero Image – swipeable when multiple images */}
         <View style={styles.headerImageContainer}>
-          <Image source={{ uri: mainImage }} style={styles.headerImage} resizeMode="cover" />
+          {hasImages ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              onMomentumScrollEnd={onImageScroll}
+              showsHorizontalScrollIndicator={false}
+              style={styles.headerImageScroll}
+              contentContainerStyle={styles.headerImageScrollContent}
+            >
+              {imageList.map((uri, i) => (
+                <Image key={i} source={{ uri }} style={styles.headerImage} resizeMode="cover" />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={[styles.headerImage, styles.headerImagePlaceholder]}>
+              <Ionicons name="image-outline" size={56} color="#8E8E93" />
+            </View>
+          )}
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <View style={styles.backButtonCircle}>
               <Ionicons name="arrow-back" size={24} color="#000" />
@@ -208,11 +239,11 @@ export default function BusinessPlanDetailScreen() {
               <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
             </View>
           </View>
-          {/* Carousel dots */}
+          {/* Carousel dots – one per image, reflect current index */}
           {mediaCount > 1 && (
             <View style={styles.carouselDots}>
-              {plan.media!.slice(0, 3).map((_, i) => (
-                <View key={i} style={[styles.carouselDot, i === 0 && styles.carouselDotActive]} />
+              {imageList.map((_, i) => (
+                <View key={i} style={[styles.carouselDot, i === imageIndex && styles.carouselDotActive]} />
               ))}
             </View>
           )}
@@ -356,9 +387,21 @@ const styles = StyleSheet.create({
     height: 280,
     position: 'relative',
   },
-  headerImage: {
+  headerImageScroll: {
     width: '100%',
     height: '100%',
+  },
+  headerImageScrollContent: {
+    flexGrow: 1,
+  },
+  headerImage: {
+    width: Dimensions.get('window').width,
+    height: '100%',
+  },
+  headerImagePlaceholder: {
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     position: 'absolute',

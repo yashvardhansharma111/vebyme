@@ -8,6 +8,7 @@ import { ActivityIndicator, Alert, Platform, RefreshControl, SafeAreaView, Scrol
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppSelector } from '@/store/hooks';
 import LoginModal from '@/components/LoginModal';
+import ShareToChatModal from '@/components/ShareToChatModal';
 
 interface FeedPost {
   post_id: string;
@@ -46,8 +47,18 @@ export default function BusinessPostsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showBusinessShareModal, setShowBusinessShareModal] = useState(false);
+  const [sharedBusinessPlan, setSharedBusinessPlan] = useState<{
+    planId: string;
+    title: string;
+    description: string;
+    media: Array<{ url: string; type?: string }>;
+    tags?: string[];
+    category_main?: string;
+  } | null>(null);
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
 
   // User profile cache
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
@@ -260,13 +271,15 @@ export default function BusinessPostsScreen() {
                         title: item.event.title,
                         description: item.event.description,
                         media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                        category_sub: item.event.tags,
+                        category_main: rawPost?.category_main || '',
+                        category_sub: item.event.tags || rawPost?.tags || [],
                         location_text: rawPost?.location_text || '',
-                        date: rawPost?.timestamp || new Date(),
+                        date: rawPost?.date || rawPost?.timestamp || new Date(),
                         time: rawPost?.time || '',
+                        passes: rawPost?.passes || [],
                       }}
                       user={item.user}
-                      attendeesCount={7}
+                      attendeesCount={rawPost?.joins_count ?? 0}
                       isSwipeable={true}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
@@ -298,6 +311,21 @@ export default function BusinessPostsScreen() {
                           setShowLoginModal(true);
                         }
                       }}
+                      onSharePress={() => {
+                        if (!isAuthenticated) {
+                          setShowLoginModal(true);
+                          return;
+                        }
+                        setSharedBusinessPlan({
+                          planId: item.id,
+                          title: item.event.title,
+                          description: item.event.description,
+                          media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                          tags: item.event.tags || rawPost?.tags,
+                          category_main: rawPost?.category_main,
+                        });
+                        setShowBusinessShareModal(true);
+                      }}
                     />
                   );
                 })}
@@ -314,6 +342,24 @@ export default function BusinessPostsScreen() {
           loadFeed();
         }}
       />
+      {sharedBusinessPlan && (
+        <ShareToChatModal
+          visible={showBusinessShareModal}
+          onClose={() => {
+            setShowBusinessShareModal(false);
+            setSharedBusinessPlan(null);
+          }}
+          postId={sharedBusinessPlan.planId}
+          postTitle={sharedBusinessPlan.title}
+          postDescription={sharedBusinessPlan.description}
+          postMedia={sharedBusinessPlan.media}
+          postTags={sharedBusinessPlan.tags}
+          postCategoryMain={sharedBusinessPlan.category_main}
+          postIsBusiness={true}
+          userId={user?.user_id ?? ''}
+          currentUserAvatar={currentUser?.profile_image ?? undefined}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

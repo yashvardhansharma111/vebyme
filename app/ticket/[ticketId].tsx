@@ -1,4 +1,5 @@
 import { apiService } from '@/services/api';
+import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState, useMemo } from 'react';
@@ -37,7 +38,11 @@ interface TicketData {
     time?: string;
     media?: Array<{ url: string; type: string }>;
     ticket_image?: string;
+    passes?: Array<{ pass_id: string; name: string; price?: number }>;
+    category_main?: string;
+    category_sub?: string[];
   };
+  pass_id?: string;
   user: {
     user_id: string;
     name: string;
@@ -52,6 +57,7 @@ export default function TicketScreen() {
     planId: string;
     ticketData?: string; // JSON stringified ticket data
   }>();
+  const { user } = useAppSelector((state) => state.auth);
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [loading, setLoading] = useState(true);
   const [reviewedPlans, setReviewedPlans] = useState<Record<string, EventReviewRating>>({});
@@ -95,7 +101,8 @@ export default function TicketScreen() {
                 location_text: null,
                 date: null,
                 time: null,
-                media: []
+                media: [],
+                ticket_image: null
               };
             }
             setTicket(parsedTicket);
@@ -219,12 +226,29 @@ export default function TicketScreen() {
     );
   }
 
-  // Use ticket_image if available, otherwise fallback to plan media or placeholder
-  const mainImage = ticket.plan?.ticket_image 
+  // Use this ticket's plan image (ticket_image first, then first media, then placeholder)
+  const mainImage = ticket.plan?.ticket_image
     ? ticket.plan.ticket_image
-    : (ticket.plan?.media && ticket.plan.media.length > 0 
-      ? ticket.plan.media[0].url 
-      : 'https://picsum.photos/id/1011/400/500');
+    : (ticket.plan?.media && ticket.plan.media.length > 0 && ticket.plan.media[0]?.url)
+      ? ticket.plan.media[0].url
+      : undefined;
+
+  // Pass name from ticket.pass_id + plan.passes
+  const passName = (() => {
+    const passId = (ticket as TicketData & { pass_id?: string }).pass_id;
+    const passes = ticket.plan?.passes || [];
+    if (passId && passes.length > 0) {
+      const p = passes.find((x: { pass_id: string }) => x.pass_id === passId);
+      if (p?.name) return p.name;
+    }
+    if (passes.length > 0 && passes[0].name) return passes[0].name;
+    return 'Ticket';
+  })();
+
+  const categoryTags = [
+    ...(ticket.plan?.category_main ? [ticket.plan.category_main] : []),
+    ...(ticket.plan?.category_sub || []).slice(0, 2),
+  ].filter(Boolean);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -250,8 +274,8 @@ export default function TicketScreen() {
 
         {/* Ticket Card */}
         <View style={styles.ticketCard}>
-          {/* Event Image */}
-          {mainImage && (
+          {/* Event Image - unique per plan (ticket_image or first media) */}
+          {mainImage ? (
             <View style={styles.eventImageContainer}>
               <Image 
                 source={{ uri: mainImage }} 
@@ -266,6 +290,12 @@ export default function TicketScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
                   <Ionicons name="share-outline" size={20} color="#FFF" />
                 </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.eventImageContainer}>
+              <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
+                <Ionicons name="image-outline" size={48} color="#8E8E93" />
               </View>
             </View>
           )}
@@ -288,38 +318,30 @@ export default function TicketScreen() {
               <Text style={styles.detailLocation}>{ticket.plan.location_text}</Text>
             )}
 
-            {/* Info Pills */}
+            {/* Info Pills - location and categories only */}
             <View style={styles.infoPillsContainer}>
-              <View style={styles.infoPillRow}>
-                <View style={styles.infoPill}>
-                  <View style={styles.infoPillIcon}>
-                    <Ionicons name="location" size={12} color="#FFF" />
-                  </View>
-                  <Text style={styles.infoPillText}>3km</Text>
-                </View>
-                {ticket.plan?.location_text && (
+              {ticket.plan?.location_text && (
+                <View style={styles.infoPillRow}>
                   <View style={styles.infoPill}>
                     <View style={styles.infoPillIcon}>
-                      <Ionicons name="train" size={12} color="#FFF" />
+                      <Ionicons name="location" size={12} color="#FFF" />
                     </View>
-                    <Text style={styles.infoPillText}>{ticket.plan.location_text}</Text>
+                    <Text style={styles.infoPillText} numberOfLines={1}>{ticket.plan.location_text}</Text>
                   </View>
-                )}
-              </View>
-              <View style={styles.infoPillRow}>
-                <View style={styles.infoPill}>
-                  <View style={styles.infoPillIcon}>
-                    <Ionicons name="add" size={12} color="#FFF" />
-                  </View>
-                  <Text style={styles.infoPillText}>Macha Rave</Text>
                 </View>
-                <View style={styles.infoPill}>
-                  <View style={styles.infoPillIcon}>
-                    <Ionicons name="add" size={12} color="#FFF" />
-                  </View>
-                  <Text style={styles.infoPillText}>Macha Rave</Text>
+              )}
+              {categoryTags.length > 0 && (
+                <View style={styles.infoPillRow}>
+                  {categoryTags.map((tag: string, idx: number) => (
+                    <View key={idx} style={styles.infoPill}>
+                      <View style={styles.infoPillIcon}>
+                        <Ionicons name="pricetag" size={12} color="#FFF" />
+                      </View>
+                      <Text style={styles.infoPillText}>{tag}</Text>
+                    </View>
+                  ))}
                 </View>
-              </View>
+              )}
             </View>
           </LinearGradient>
 
@@ -340,7 +362,7 @@ export default function TicketScreen() {
                 </View>
               )}
             </View>
-            <Text style={styles.ticketType}>Early Bird Pass</Text>
+            <Text style={styles.ticketType}>{passName}</Text>
             <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>
           </View>
         </View>
@@ -370,10 +392,19 @@ export default function TicketScreen() {
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.bottomActionButton, styles.bottomActionButtonPrimary]} 
-            onPress={() => {
-              if (ticket.plan?.plan_id) {
-                // Navigate to event chat group
-                router.push(`/chat/group/${ticket.plan.plan_id}`);
+            onPress={async () => {
+              const planId = ticket?.plan?.plan_id;
+              if (!planId || !user?.user_id) return;
+              try {
+                const res = await apiService.getPlanGroups(planId, user.user_id);
+                const groupId = res.data?.latest_group?.group_id;
+                if (groupId) {
+                  router.push(`/chat/group/${groupId}` as any);
+                } else {
+                  Alert.alert('No chat', 'Join the event to access the chat.');
+                }
+              } catch (_) {
+                Alert.alert('Error', 'Could not open event chat.');
               }
             }}
           >
@@ -460,6 +491,11 @@ const styles = StyleSheet.create({
   eventImage: {
     width: '100%',
     height: '100%',
+  },
+  eventImagePlaceholder: {
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   actionButtons: {
     position: 'absolute',
