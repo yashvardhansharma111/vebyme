@@ -6,10 +6,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   Image,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '@/components/Avatar';
+import GuestListModal from '@/components/GuestListModal';
 
 interface BusinessPlan {
   plan_id: string;
@@ -56,7 +54,7 @@ export default function BusinessPlanDetailScreen() {
   const [organizer, setOrganizer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPass, setSelectedPass] = useState<string | null>(null);
-  const [imageIndex, setImageIndex] = useState(0);
+  const [showGuestListModal, setShowGuestListModal] = useState(false);
 
   useEffect(() => {
     loadPlan();
@@ -125,6 +123,15 @@ export default function BusinessPlanDetailScreen() {
     }
 
     try {
+      const alreadyRegistered = await apiService.hasTicketForPlan(planId, user.user_id);
+      if (alreadyRegistered) {
+        Alert.alert(
+          'Already Registered',
+          "You are already registered for this event. You can check your pass from your profile."
+        );
+        return;
+      }
+
       const response = await apiService.registerForEvent(
         planId,
         user.user_id,
@@ -178,44 +185,17 @@ export default function BusinessPlanDetailScreen() {
     );
   }
 
-  const imageList = (plan.media || [])
-    .filter((m) => m.url && (m.type === 'image' || !m.type))
-    .map((m) => m.url);
-  const mediaCount = imageList.length;
-  const hasImages = mediaCount > 0;
+  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
+  const mediaCount = plan.media?.length ?? 0;
   const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
   const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
-
-  const onImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const width = Dimensions.get('window').width;
-    const x = e.nativeEvent.contentOffset.x;
-    const index = Math.round(x / width);
-    setImageIndex(Math.min(index, mediaCount - 1));
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image – swipeable when multiple images */}
+        {/* Hero Image */}
         <View style={styles.headerImageContainer}>
-          {hasImages ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              onMomentumScrollEnd={onImageScroll}
-              showsHorizontalScrollIndicator={false}
-              style={styles.headerImageScroll}
-              contentContainerStyle={styles.headerImageScrollContent}
-            >
-              {imageList.map((uri, i) => (
-                <Image key={i} source={{ uri }} style={styles.headerImage} resizeMode="cover" />
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={[styles.headerImage, styles.headerImagePlaceholder]}>
-              <Ionicons name="image-outline" size={56} color="#8E8E93" />
-            </View>
-          )}
+          <Image source={{ uri: mainImage }} style={styles.headerImage} resizeMode="cover" />
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <View style={styles.backButtonCircle}>
               <Ionicons name="arrow-back" size={24} color="#000" />
@@ -239,11 +219,11 @@ export default function BusinessPlanDetailScreen() {
               <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
             </View>
           </View>
-          {/* Carousel dots – one per image, reflect current index */}
+          {/* Carousel dots */}
           {mediaCount > 1 && (
             <View style={styles.carouselDots}>
-              {imageList.map((_, i) => (
-                <View key={i} style={[styles.carouselDot, i === imageIndex && styles.carouselDotActive]} />
+              {plan.media!.slice(0, 3).map((_, i) => (
+                <View key={i} style={[styles.carouselDot, i === 0 && styles.carouselDotActive]} />
               ))}
             </View>
           )}
@@ -285,11 +265,15 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {/* See who's coming – dark block, text left, avatars right */}
-          <View style={styles.attendeesCard}>
+          {/* See who's coming – tap to open guest list modal */}
+          <TouchableOpacity
+            style={styles.attendeesCard}
+            onPress={() => setShowGuestListModal(true)}
+            activeOpacity={0.9}
+          >
             <View style={styles.attendeesTextBlock}>
               <Text style={styles.attendeesTitle}>See who's coming</Text>
-              <Text style={styles.attendeesSubtitle}>Join event to view.</Text>
+              <Text style={styles.attendeesSubtitle}>Tap to view guest list</Text>
             </View>
             <View style={styles.attendeesAvatars}>
               {[1, 2, 3].map((i) => (
@@ -298,7 +282,7 @@ export default function BusinessPlanDetailScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Select Tickets */}
           {plan.passes && plan.passes.length > 0 && (
@@ -349,6 +333,16 @@ export default function BusinessPlanDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <GuestListModal
+        visible={showGuestListModal}
+        onClose={() => setShowGuestListModal(false)}
+        planId={planId || ''}
+        onRegisterPress={() => {
+          setShowGuestListModal(false);
+          handleRegister();
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -387,21 +381,9 @@ const styles = StyleSheet.create({
     height: 280,
     position: 'relative',
   },
-  headerImageScroll: {
+  headerImage: {
     width: '100%',
     height: '100%',
-  },
-  headerImageScrollContent: {
-    flexGrow: 1,
-  },
-  headerImage: {
-    width: Dimensions.get('window').width,
-    height: '100%',
-  },
-  headerImagePlaceholder: {
-    backgroundColor: '#E5E5EA',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   backButton: {
     position: 'absolute',
