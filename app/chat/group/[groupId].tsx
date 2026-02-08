@@ -15,6 +15,7 @@ import {
   Modal,
   ScrollView,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -84,6 +85,7 @@ interface GroupDetails {
   is_closed: boolean;
   is_announcement_group?: boolean;
   created_by?: string;
+  drive_link?: string | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -145,6 +147,9 @@ export default function GroupChatScreen() {
   const [typingLabel, setTypingLabel] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const [driveLink, setDriveLink] = useState<string>('');
+  const [showDriveModal, setShowDriveModal] = useState(false);
+  const [driveDraft, setDriveDraft] = useState('');
 
   useEffect(() => {
     if (groupId) {
@@ -155,15 +160,44 @@ export default function GroupChatScreen() {
     }
   }, [groupId]);
 
+  const openDriveLink = async () => {
+    const url = (driveLink || '').trim();
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Error', 'Could not open link');
+    }
+  };
+
+  const saveDriveLink = async () => {
+    if (!groupId || !user?.user_id) return;
+    const url = driveDraft.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      Alert.alert('Invalid link', 'Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+    try {
+      await apiService.setGroupDriveLink(groupId, user.user_id, url || null);
+      setDriveLink(url);
+      setShowDriveModal(false);
+    } catch {
+      Alert.alert('Error', 'Failed to save link');
+    }
+  };
+
   const loadGroupDetails = async () => {
     if (!groupId) return;
     try {
       const response = await apiService.getGroupDetails(groupId);
       if (response.data) {
         setGroupDetails(response.data);
+        setDriveLink((response.data.drive_link || '').trim());
       }
     } catch (error: any) {
       console.error('Error loading group details:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -331,6 +365,8 @@ export default function GroupChatScreen() {
   // --- Render Functions ---
 
   const renderHeader = () => {
+    const isCreator = !!(groupDetails?.created_by && groupDetails.created_by === user?.user_id);
+    const hasLink = !!driveLink.trim();
     return (
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -387,9 +423,25 @@ export default function GroupChatScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push(`/chat/group/details/${groupId}` as any)} style={styles.headerRightBtn}>
-          <Ionicons name="ellipsis-vertical" size={24} color="#000" />
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            onPress={() => {
+              if (isCreator) {
+                setDriveDraft(driveLink);
+                setShowDriveModal(true);
+              } else if (hasLink) {
+                openDriveLink();
+              }
+            }}
+            style={[styles.headerIconBtn, !isCreator && !hasLink && styles.headerIconBtnDisabled]}
+            disabled={!isCreator && !hasLink}
+          >
+            <Ionicons name={isCreator ? 'link-outline' : 'link'} size={22} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push(`/chat/group/details/${groupId}` as any)} style={styles.headerRightBtn}>
+            <Ionicons name="ellipsis-vertical" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -483,6 +535,7 @@ export default function GroupChatScreen() {
     const showTimeHeader = !previousMessage || 
       (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showAvatar = !isMe && (!previousMessage || previousMessage.user_id !== item.user_id);
+    const showName = !isMe && showAvatar;
 
     return (
       <View style={{ paddingHorizontal: 16 }}>
@@ -498,10 +551,13 @@ export default function GroupChatScreen() {
         ) : (
           <View style={[styles.messageRow, isMe ? styles.rowRight : styles.rowLeft]}>
             {!isMe && (
-               <Image 
-                 source={{ uri: item.user?.profile_image || 'https://via.placeholder.com/30' }} 
-                 style={[styles.messageAvatar, { opacity: showAvatar ? 1 : 0 }]} 
-               />
+              <View style={styles.leftAvatarCol}>
+                {showAvatar ? (
+                  <Avatar uri={item.user?.profile_image || null} size={34} />
+                ) : (
+                  <View style={{ width: 34, height: 34 }} />
+                )}
+              </View>
             )}
             
             {item.type === 'plan' && item.shared_plan ? (
@@ -563,12 +619,15 @@ export default function GroupChatScreen() {
               })()}
             </View>
           ) : (
-          <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
-              {item.type === 'text' && (
-                <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
-                  {item.content}
-                </Text>
-              )}
+            <View style={{ maxWidth: '78%' }}>
+              {showName && <Text style={styles.senderName}>{item.user?.name || 'User'}</Text>}
+              <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+                {item.type === 'text' && (
+                  <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                    {item.content}
+                  </Text>
+                )}
+              </View>
             </View>
           )}
             {(item.reactions && item.reactions.length > 0) && (
@@ -727,6 +786,36 @@ export default function GroupChatScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showDriveModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDriveModal(false)}
+      >
+        <View style={styles.driveModalOverlay}>
+          <View style={styles.driveModalCard}>
+            <Text style={styles.driveModalTitle}>Google Drive link</Text>
+            <TextInput
+              style={styles.driveModalInput}
+              placeholder="https://drive.google.com/..."
+              placeholderTextColor="#9CA3AF"
+              value={driveDraft}
+              onChangeText={setDriveDraft}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.driveModalActions}>
+              <TouchableOpacity style={styles.driveModalCancel} onPress={() => setShowDriveModal(false)}>
+                <Text style={styles.driveModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.driveModalSave} onPress={saveDriveLink}>
+                <Text style={styles.driveModalSaveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -815,6 +904,19 @@ const styles = StyleSheet.create({
   },
   headerRightBtn: {
     padding: 4,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerIconBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+  },
+  headerIconBtnDisabled: {
+    opacity: 0.35,
   },
 
   // --- Plan Card Styles (The "Spontaneous Trip" box) ---
@@ -951,6 +1053,19 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 20,
   },
+  leftAvatarCol: {
+    width: 42,
+    alignItems: 'flex-start',
+    paddingTop: 4,
+    marginRight: 6,
+  },
+  senderName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#6B7280',
+    marginBottom: 6,
+    marginLeft: 2,
+  },
   timeHeaderContainer: {
     alignItems: 'center',
     marginBottom: 20,
@@ -967,14 +1082,6 @@ const styles = StyleSheet.create({
   },
   rowLeft: { justifyContent: 'flex-start' },
   rowRight: { justifyContent: 'flex-end' },
-  
-  messageAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    marginRight: 8,
-    marginBottom: 4,
-  },
   planCardWrap: {
     maxWidth: 280,
     backgroundColor: 'transparent',
@@ -986,19 +1093,19 @@ const styles = StyleSheet.create({
     maxWidth: '75%',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 24, // Curvy bubbles
+    borderRadius: 18,
   },
   bubbleLeft: {
-    backgroundColor: '#E8E8ED',
-    borderBottomLeftRadius: 4,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 18,
   },
   bubbleRight: {
-    backgroundColor: '#1C1C1E',
-    borderBottomRightRadius: 4,
+    backgroundColor: '#2D2D2D',
+    borderTopRightRadius: 18,
   },
   messageText: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   textLeft: { color: '#1F2937' },
   textRight: { color: '#FFF' },
@@ -1045,6 +1152,58 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#8E8E93',
     fontStyle: 'italic',
+  },
+
+  driveModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  driveModalCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 16,
+  },
+  driveModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 10,
+  },
+  driveModalInput: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#111827',
+  },
+  driveModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 12,
+  },
+  driveModalCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#F2F2F7',
+  },
+  driveModalCancelText: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  driveModalSave: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: '#111827',
+  },
+  driveModalSaveText: {
+    color: '#FFF',
+    fontWeight: '800',
   },
 
   // --- Input ---

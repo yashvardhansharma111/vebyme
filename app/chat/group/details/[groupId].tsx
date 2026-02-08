@@ -166,9 +166,9 @@ export default function GroupDetailsScreen() {
           <View style={styles.membersBadge}>
             <Text style={styles.membersBadgeText}>All Members</Text>
           </View>
-          <View style={styles.membersGrid}>
+          <View style={styles.membersList}>
             {groupDetails.members.map((member) => (
-              <View key={member.user_id} style={styles.memberItem}>
+              <View key={member.user_id} style={styles.memberRow}>
                 <Image
                   source={{ uri: member.profile_image || 'https://via.placeholder.com/50' }}
                   style={styles.memberAvatar}
@@ -352,24 +352,27 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     textTransform: 'uppercase',
   },
-  membersGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
+  membersList: {
+    paddingVertical: 12,
   },
-  memberItem: {
-    width: '30%',
+  memberRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
   },
   memberAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginBottom: 8,
   },
   memberName: {
-    fontSize: 12,
-    color: '#000',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
     textAlign: 'center',
   },
   footer: {

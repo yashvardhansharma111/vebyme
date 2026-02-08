@@ -908,6 +908,13 @@ class ApiService {
     });
   }
 
+  async setGroupDriveLink(group_id: string, user_id: string, drive_link: string | null) {
+    return this.request<any>('/chat/group/drive-link', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id, drive_link }),
+    });
+  }
+
   async sendMessage(group_id: string, user_id: string, type: 'text' | 'image' | 'poll' | 'plan', content: any) {
     return this.request<{ message_id: string }>('/chat/send', {
       method: 'POST',
