@@ -890,13 +890,16 @@ class ApiService {
   }
 
   async getChatLists(user_id: string) {
-    return this.request<{
+    const res = await this.request<{
       their_plans: any[];
       my_plans: any[];
       groups: any[];
     }>(`/chat/lists?user_id=${user_id}`, {
       method: 'GET',
     });
+    const groups = res?.data?.groups ?? [];
+    console.log('[API] getChatLists:', { user_id, groupsCount: groups.length, groupIds: groups.map((g: any) => g?.group_id) });
+    return res;
   }
 
   async getGroupDetails(group_id: string) {
@@ -983,9 +986,11 @@ class ApiService {
 
   /** Get or create the current (business) user's announcement group. Returns { group_id }. */
   async getOrCreateAnnouncementGroup() {
-    return this.request<{ group_id: string }>('/chat/announcement-group/get-or-create', {
+    const res = await this.request<{ group_id: string }>('/chat/announcement-group/get-or-create', {
       method: 'GET',
     });
+    console.log('[API] getOrCreateAnnouncementGroup:', res?.data ? { group_id: res.data.group_id } : res);
+    return res;
   }
 
   // Ticket APIs

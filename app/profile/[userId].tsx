@@ -23,10 +23,10 @@ import { extractInstagramIdFromUrl, getInstagramProfileUrl } from '@/utils/socia
 
 const CARD_SHADOW = {
   shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.05,
-  shadowRadius: 10,
-  elevation: 3,
+  shadowOffset: { width: 0, height: 72 },
+  shadowOpacity: 0.02,
+  shadowRadius: 64,
+  elevation: 8,
 };
 
 const INTEREST_ICONS: { [key: string]: string } = {
@@ -162,21 +162,21 @@ export default function OtherUserProfileScreen() {
             <View style={styles.profileBackgroundPlaceholder} />
           )}
 
-          {/* Blur with gradient so it mixes into the image and content below (no box edge) */}
+          {/* Glass blur: frosted blur + subtle blue tint, gradient blends into image */}
           <View style={[styles.blurOverlay, { height: blurHeight }]} pointerEvents="none">
             <BlurView
-              intensity={90}
-              tint="default"
+              intensity={80}
+              tint="light"
               style={StyleSheet.absoluteFill}
             />
             <LinearGradient
               colors={[
                 'transparent',
-                'transparent',
-                'rgba(242,242,242,0.08)',
-                'rgba(242,242,242,0.35)',
+                'rgba(248,250,252,0.12)',
+                'rgba(240,247,255,0.25)',
+                'rgba(241,245,249,0.5)',
               ]}
-              locations={[0, 0.45, 0.75, 1]}
+              locations={[0, 0.4, 0.7, 1]}
               style={StyleSheet.absoluteFill}
               pointerEvents="none"
             />
@@ -223,7 +223,7 @@ export default function OtherUserProfileScreen() {
                   {entry.isX ? (
                     <Text style={styles.socialXIcon}>𝕏</Text>
                   ) : (
-                    <Ionicons name={entry.icon as any} size={22} color="#1C1C1E" />
+                    <Ionicons name={entry.icon as any} size={24} color="#252525" />
                   )}
                   <Text style={[styles.socialHandle, !entry.url && styles.socialHandlePlaceholder]}>{entry.handle}</Text>
                   {entry.url ? <Ionicons name="copy-outline" size={18} color="#8E8E93" /> : null}
@@ -254,8 +254,8 @@ export default function OtherUserProfileScreen() {
                   <View key={index} style={styles.interestTag}>
                     <Ionicons
                       name={(INTEREST_ICONS[interest] || 'ellipse') as any}
-                      size={14}
-                      color="#1C1C1E"
+                      size={20}
+                      color="#3b3c3d"
                       style={styles.interestTagIcon}
                     />
                     <Text style={styles.interestTagText}>{interest}</Text>
@@ -336,14 +336,14 @@ export default function OtherUserProfileScreen() {
           {/* Actions: Interacted = Remove Interaction + Report in one card + Chat. Non-interacted = Report only */}
           {hasInteracted ? (
             <React.Fragment key="actions-interacted">
-              <View style={[styles.sectionCard, { marginBottom: 15 }]}>
+              <View style={[styles.sectionCard, { marginBottom: 15, gap: 16 }]}>
                 <TouchableOpacity style={styles.actionRow} onPress={() => {}} activeOpacity={0.7}>
-                  <Ionicons name="close-circle-outline" size={20} color="#1C1C1E" />
+                  <Ionicons name="close-circle-outline" size={24} color="#252525" />
                   <Text style={styles.actionRowText}>Remove Interaction</Text>
                 </TouchableOpacity>
                 <View style={styles.hairlineDivider} />
                 <TouchableOpacity style={styles.actionRow} onPress={handleReport} activeOpacity={0.7}>
-                  <Ionicons name="person-remove-outline" size={20} color="#FF3B30" />
+                  <Ionicons name="person-remove-outline" size={24} color="#c33939" />
                   <Text style={[styles.actionRowText, styles.actionRowTextDanger]}>Report User</Text>
                 </TouchableOpacity>
               </View>
@@ -371,7 +371,7 @@ export default function OtherUserProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#f3f3f3',
   },
   scrollView: {
     flex: 1,
@@ -380,12 +380,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#f3f3f3',
   },
   topSection: {
     width: '100%',
     position: 'relative',
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#f3f3f3',
   },
   profileBackgroundImage: {
     ...StyleSheet.absoluteFillObject,
@@ -424,29 +424,32 @@ const styles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
     marginBottom: 6,
   },
   userName: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFF',
-    marginRight: 8,
+    letterSpacing: -1.1,
+    lineHeight: 38,
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
   },
   verifiedIcon: {
-    marginLeft: 4,
+    marginLeft: 0,
   },
   taglineRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusTagline: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.95)',
     fontWeight: '500',
-    lineHeight: 20,
+    letterSpacing: -0.3,
+    lineHeight: 22,
     flex: 1,
   },
   taglineIcon: {
@@ -455,6 +458,8 @@ const styles = StyleSheet.create({
   statsCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   statHalf: {
     flex: 1,
@@ -463,77 +468,90 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   statsDivider: {
-    width: 0.5,
-    backgroundColor: '#E5E5EA',
+    width: 2,
+    backgroundColor: 'rgba(71, 71, 71, 0.1)',
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1C1C1E',
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#252525',
+    letterSpacing: -1.4,
+    lineHeight: 36,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+    fontSize: 14,
+    color: 'rgba(71, 71, 71, 0.85)',
+    fontWeight: '700',
+    letterSpacing: -0.6,
+    lineHeight: 14,
   },
   bottomSection: {
     flex: 1,
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#f3f3f3',
     paddingHorizontal: 20,
     paddingTop: 15,
+    gap: 8,
   },
   sectionCard: {
     backgroundColor: '#FFF',
-    borderRadius: 30,
-    padding: 22,
+    borderRadius: 32,
+    padding: 20,
     ...CARD_SHADOW,
   },
   hairlineDivider: {
-    height: 0.5,
-    backgroundColor: '#E5E5EA',
+    height: 2,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     marginVertical: 0,
+    alignSelf: 'stretch',
   },
   socialRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
+    gap: 8,
   },
   socialXIcon: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#1C1C1E',
-    width: 28,
+    color: '#252525',
+    width: 24,
+    height: 24,
     textAlign: 'center',
   },
   socialHandle: {
-    fontSize: 15,
-    color: '#1C1C1E',
-    marginLeft: 14,
+    fontSize: 17,
+    color: '#252525',
+    marginLeft: 8,
     fontWeight: '500',
     flex: 1,
+    letterSpacing: -0.2,
+    lineHeight: 20,
   },
   socialHandlePlaceholder: {
-    color: '#8E8E93',
+    color: 'rgba(71, 71, 71, 0.85)',
   },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 14,
-    gap: 10,
+    gap: 8,
   },
   actionRowText: {
-    fontSize: 15,
-    color: '#1C1C1E',
+    fontSize: 17,
+    color: '#252525',
     fontWeight: '500',
+    letterSpacing: -0.2,
+    lineHeight: 20,
+    flex: 1,
   },
   actionRowTextDanger: {
-    color: '#FF3B30',
+    color: '#c33939',
   },
   chatButton: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 28,
-    paddingVertical: 18,
+    borderRadius: 24,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 8,
@@ -553,71 +571,66 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   reportOnlyText: {
-    fontSize: 15,
-    color: '#FF3B30',
+    fontSize: 17,
+    color: '#c33939',
     fontWeight: '600',
   },
   interestsLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    marginBottom: 14,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#3b3c3d',
+    letterSpacing: -1,
+    lineHeight: 24,
+    marginBottom: 12,
   },
   interestsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
   interestTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFEFEF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 25,
+    backgroundColor: '#f3f3f3',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 24,
+    gap: 4,
   },
   interestTagIcon: {
-    marginRight: 6,
+    marginRight: 0,
   },
   interestTagText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#3b3c3d',
+    letterSpacing: -0.6,
+    lineHeight: 19,
   },
   recentPlansHeader: {
-    marginBottom: 8,
+    marginBottom: 16,
   },
   recentPlansPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1C1C1E',
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 20,
+    alignSelf: 'stretch',
   },
   recentPlansListWrapper: {
     position: 'relative',
     marginBottom: 0,
+    paddingTop: 32,
   },
   recentPlansPillStuck: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    zIndex: 10,
-    backgroundColor: '#1C1C1E',
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 20,
+    marginBottom: 16,
   },
   recentPlansPillText: {
-    fontSize: 14,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#3b3c3d',
+    lineHeight: 24,
   },
   planCard: {
     backgroundColor: '#FFF',
-    borderRadius: 35,
-    padding: 22,
+    borderRadius: 32,
+    padding: 20,
     marginBottom: 15,
     ...CARD_SHADOW,
   },
@@ -628,21 +641,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
+    gap: 24,
   },
   planTextBlock: {
     flex: 1,
-    marginRight: 12,
+    marginRight: 0,
   },
   planTitle: {
-    fontSize: 17,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#222222',
-    marginBottom: 8,
+    color: '#263739',
+    letterSpacing: -1,
+    lineHeight: 34,
+    marginBottom: 4,
   },
   planDescription: {
-    fontSize: 14,
-    color: '#555555',
-    lineHeight: 20,
+    fontSize: 18,
+    color: 'rgba(0, 0, 0, 0.7)',
+    lineHeight: 24,
     marginBottom: 10,
   },
   planTagsRow: {
@@ -650,26 +666,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  planTagChipIcon: {
-    marginRight: 4,
-  },
   planTagChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFEFEF',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    backgroundColor: '#f3f3f3',
+    paddingVertical: 16,
+    paddingHorizontal: 10,
+    borderRadius: 24,
+    gap: 4,
   },
   planTagChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#222',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#263739',
+    letterSpacing: -0.6,
+    lineHeight: 14,
   },
   planThumbnail: {
-    width: 75,
-    height: 75,
-    borderRadius: 15,
+    width: 100,
+    height: 84,
+    borderRadius: 20,
   },
   emptyText: {
     fontSize: 14,

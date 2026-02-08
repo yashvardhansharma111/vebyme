@@ -41,11 +41,14 @@ interface ChatItem {
   member_count: number;
   is_group: boolean;
   group_name: string;
+  is_announcement_group?: boolean;
 }
 
 export default function ChatScreen() {
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
+  const isBusinessUser = currentUser?.is_business === true;
   const [activeTab, setActiveTab] = useState<TabType>('their_plans');
   const [theirPlans, setTheirPlans] = useState<ChatItem[]>([]);
   const [myPlans, setMyPlans] = useState<ChatItem[]>([]);
@@ -64,17 +67,65 @@ export default function ChatScreen() {
 
   const loadChats = async () => {
     if (!user?.user_id) return;
-    
+
     try {
       setLoading(true);
       const response = await apiService.getChatLists(user.user_id);
+
+      // Log for announcement group debugging
+      const groupsList = response?.data?.groups || [];
+      const announcementGroups = groupsList.filter((g: any) => g.is_announcement_group);
+      console.log('[Chat] getChatLists response:', {
+        groupsCount: groupsList.length,
+        groupIds: groupsList.map((g: any) => g.group_id),
+        announcementGroupCount: announcementGroups.length,
+        hasAnnouncementGroup: announcementGroups.length > 0,
+      });
+      if (groupsList.length > 0 && announcementGroups.length === 0) {
+        console.log('[Chat] No announcement group in list. Backend /chat/lists may not include it.');
+      }
+
       if (response.data) {
         setTheirPlans(response.data.their_plans || []);
         setMyPlans(response.data.my_plans || []);
-        setGroups(response.data.groups || []);
+
+        let finalGroups = groupsList;
+        const hasAnnouncementInList = groupsList.some((g: any) => g.is_announcement_group || g.group_name === 'Announcement Group');
+
+        if (isBusinessUser && !hasAnnouncementInList) {
+          try {
+            const annRes = await apiService.getOrCreateAnnouncementGroup();
+            const annGroupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
+            if (annGroupId && !groupsList.some((g: any) => g.group_id === annGroupId)) {
+              const details = await apiService.getGroupDetails(annGroupId);
+              const d = details?.data ?? details;
+              const announcementItem: ChatItem = {
+                group_id: annGroupId,
+                plan_id: d?.plan_id ?? '',
+                plan_title: d?.plan_title ?? 'Announcements',
+                plan_description: d?.plan_description ?? '',
+                plan_media: d?.plan_media ?? [],
+                author_id: user?.user_id ?? '',
+                author_name: d?.group_name ?? 'Announcement Group',
+                author_image: currentUser?.profile_image ?? null,
+                last_message: null,
+                member_count: d?.members?.length ?? 0,
+                is_group: true,
+                group_name: d?.group_name ?? 'Announcement Group',
+                ...(d ? { is_announcement_group: !!d.is_announcement_group } : {}),
+              };
+              finalGroups = [announcementItem, ...groupsList];
+              console.log('[Chat] Announcement group added to list (was missing from backend)', { group_id: annGroupId });
+            }
+          } catch (annErr: any) {
+            console.warn('[Chat] Could not load announcement group for list:', annErr?.message ?? annErr);
+          }
+        }
+
+        setGroups(finalGroups);
       }
     } catch (error: any) {
-      console.error('Error loading chats:', error);
+      console.error('[Chat] Error loading chats:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
