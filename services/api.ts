@@ -995,6 +995,31 @@ class ApiService {
     });
   }
 
+  /** Returns true if the user already has a ticket (any type) for this plan; false if not registered. */
+  async hasTicketForPlan(plan_id: string, user_id: string): Promise<boolean> {
+    try {
+      await this.getUserTicket(plan_id, user_id);
+      return true;
+    } catch (e: any) {
+      if (e?.statusCode === 404) return false;
+      throw e;
+    }
+  }
+
+  async getTicketsByUser(user_id: string) {
+    return this.request<{ tickets: Array<{
+      ticket_id: string;
+      ticket_number: string;
+      status: string;
+      price_paid: number;
+      created_at: string;
+      registration_status: string | null;
+      plan: { plan_id: string; title: string; date?: string; time?: string; location_text?: string; media?: any[]; ticket_image?: string } | null;
+    }> }>(`/ticket/user/${user_id}`, {
+      method: 'GET',
+    });
+  }
+
   async getTicketById(ticket_id: string) {
     return this.request<any>(`/ticket/by-id/${ticket_id}`, {
       method: 'GET',
@@ -1012,6 +1037,13 @@ class ApiService {
     return this.request<any>(`/ticket/attendees/${plan_id}?user_id=${user_id}`, {
       method: 'GET',
     });
+  }
+
+  async getGuestList(plan_id: string) {
+    return this.request<{ guests: Array<{ user_id: string; name: string; profile_image: string | null; bio: string }>; total: number }>(
+      `/ticket/guest-list/${plan_id}`,
+      { method: 'GET' }
+    );
   }
 
   async manualCheckIn(registration_id: string, user_id: string, action: 'checkin' | 'checkout') {

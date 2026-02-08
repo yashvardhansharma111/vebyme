@@ -441,6 +441,14 @@ export default function HomeScreen() {
                         onRegisterPress={async () => {
                           if (isAuthenticated && user?.user_id) {
                             try {
+                              const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                              if (alreadyRegistered) {
+                                Alert.alert(
+                                  'Already Registered',
+                                  "You are already registered for this event. You can check your pass from your profile."
+                                );
+                                return;
+                              }
                               const response = await apiService.registerForEvent(item.id, user.user_id);
                               if (response.success && response.data?.ticket) {
                                 const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
@@ -612,10 +620,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   businessSectionTitle: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: '700',
     color: '#000000',
   },
@@ -632,6 +640,7 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   businessCardContainer: {
+    marginTop: 22,
     width: 320,
     marginHorizontal: 0,
     marginRight: 16,

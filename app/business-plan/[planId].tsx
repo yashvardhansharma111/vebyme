@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '@/components/Avatar';
+import GuestListModal from '@/components/GuestListModal';
 
 interface BusinessPlan {
   plan_id: string;
@@ -53,6 +54,7 @@ export default function BusinessPlanDetailScreen() {
   const [organizer, setOrganizer] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPass, setSelectedPass] = useState<string | null>(null);
+  const [showGuestListModal, setShowGuestListModal] = useState(false);
 
   useEffect(() => {
     loadPlan();
@@ -121,6 +123,15 @@ export default function BusinessPlanDetailScreen() {
     }
 
     try {
+      const alreadyRegistered = await apiService.hasTicketForPlan(planId, user.user_id);
+      if (alreadyRegistered) {
+        Alert.alert(
+          'Already Registered',
+          "You are already registered for this event. You can check your pass from your profile."
+        );
+        return;
+      }
+
       const response = await apiService.registerForEvent(
         planId,
         user.user_id,
@@ -254,11 +265,15 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {/* See who's coming – dark block, text left, avatars right */}
-          <View style={styles.attendeesCard}>
+          {/* See who's coming – tap to open guest list modal */}
+          <TouchableOpacity
+            style={styles.attendeesCard}
+            onPress={() => setShowGuestListModal(true)}
+            activeOpacity={0.9}
+          >
             <View style={styles.attendeesTextBlock}>
               <Text style={styles.attendeesTitle}>See who's coming</Text>
-              <Text style={styles.attendeesSubtitle}>Join event to view.</Text>
+              <Text style={styles.attendeesSubtitle}>Tap to view guest list</Text>
             </View>
             <View style={styles.attendeesAvatars}>
               {[1, 2, 3].map((i) => (
@@ -267,7 +282,7 @@ export default function BusinessPlanDetailScreen() {
                 </View>
               ))}
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Select Tickets */}
           {plan.passes && plan.passes.length > 0 && (
@@ -318,6 +333,16 @@ export default function BusinessPlanDetailScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <GuestListModal
+        visible={showGuestListModal}
+        onClose={() => setShowGuestListModal(false)}
+        planId={planId || ''}
+        onRegisterPress={() => {
+          setShowGuestListModal(false);
+          handleRegister();
+        }}
+      />
     </SafeAreaView>
   );
 }

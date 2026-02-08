@@ -274,6 +274,14 @@ export default function BusinessPostsScreen() {
                       onRegisterPress={async () => {
                         if (isAuthenticated && user?.user_id) {
                           try {
+                            const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                            if (alreadyRegistered) {
+                              Alert.alert(
+                                'Already Registered',
+                                "You are already registered for this event. You can check your pass from your profile."
+                              );
+                              return;
+                            }
                             const response = await apiService.registerForEvent(item.id, user.user_id);
                             if (response.success && response.data?.ticket) {
                               const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
@@ -345,21 +353,22 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(2, 2, 2, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#FFF',
+    color: '#000000',
   },
   placeholder: {
     width: 40,
   },
   scrollContainer: {
     paddingBottom: 20,
-    paddingTop: 10,
+    paddingTop: 16,
+    paddingHorizontal: 0,
   },
   feed: {
     paddingBottom: 20,
