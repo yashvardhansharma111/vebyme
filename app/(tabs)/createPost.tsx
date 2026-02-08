@@ -398,10 +398,8 @@ export default function CreatePostScreen() {
               placeholder="Share your plan..."
               value={description}
               onChangeText={setDescription}
-              maxLength={250}
               textAlignVertical="top"
             />
-            <Text style={styles.charCount}>{description.length}/250</Text>
           </View>
 
           {/* Title */}

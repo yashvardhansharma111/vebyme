@@ -52,6 +52,7 @@ interface Pass {
   price: number;
   description: string;
   capacity?: number;
+  media?: { uri: string; type: 'image' }[];
 }
 
 export default function CreateBusinessPostScreen() {
@@ -67,7 +68,6 @@ export default function CreateBusinessPostScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
-  const [ticketImage, setTicketImage] = useState<{ uri: string; type: 'image' } | null>(null);
   const [location, setLocation] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -82,10 +82,9 @@ export default function CreateBusinessPostScreen() {
   const [passes, setPasses] = useState<Pass[]>([]);
   const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<string[]>([]);
   const [additionalDetails, setAdditionalDetails] = useState<{ [key: string]: { title: string; description: string } }>({});
-  const [eventProduction, setEventProduction] = useState<string[]>([]);
   const [venueRequired, setVenueRequired] = useState(false);
   const [womenOnly, setWomenOnly] = useState(false);
-  const [allowViewGuestList, setAllowViewGuestList] = useState(false);
+  const [hideGuestListFromViewers, setHideGuestListFromViewers] = useState(false);
   const [shareToAnnouncementGroup, setShareToAnnouncementGroup] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -130,7 +129,8 @@ export default function CreateBusinessPostScreen() {
           }
           if (planData.is_women_only) setWomenOnly(planData.is_women_only);
           if (planData.venue_required) setVenueRequired(planData.venue_required);
-          if (planData.allow_view_guest_list) setAllowViewGuestList(planData.allow_view_guest_list);
+          if (planData.allow_view_guest_list === false) setHideGuestListFromViewers(true);
+          else if (planData.allow_view_guest_list) setHideGuestListFromViewers(false);
           if (planData.reshare_to_announcement_group) setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
           
           // Handle date
@@ -155,10 +155,15 @@ export default function CreateBusinessPostScreen() {
             }
           }
 
-          // Handle passes/tickets
+          // Handle passes/tickets (normalize pass media to { uri, type })
           if (planData.passes && planData.passes.length > 0) {
             setTicketsEnabled(true);
-            setPasses(planData.passes);
+            setPasses(planData.passes.map((p: any) => ({
+              ...p,
+              media: p.media && p.media.length > 0
+                ? [{ uri: typeof p.media[0] === 'string' ? p.media[0] : p.media[0].url, type: 'image' as const }]
+                : undefined,
+            })));
           }
 
           // Handle additional details
@@ -176,11 +181,6 @@ export default function CreateBusinessPostScreen() {
             setAdditionalDetails(details);
           }
 
-          // Handle event production
-          if (planData.event_production && planData.event_production.length > 0) {
-            setEventProduction(planData.event_production);
-          }
-
           // Handle media
           if (planData.media && planData.media.length > 0) {
             const mediaItems = planData.media.map((item: any) => ({
@@ -190,14 +190,6 @@ export default function CreateBusinessPostScreen() {
             setMedia(mediaItems);
           }
           
-          // Load ticket image if available
-          if (planData.ticket_image) {
-            setTicketImage({
-              uri: planData.ticket_image,
-              type: 'image' as const,
-            });
-          }
-
           // Clear AsyncStorage after loading
           await AsyncStorage.removeItem('planForCreation');
         }
@@ -251,34 +243,33 @@ export default function CreateBusinessPostScreen() {
     }
   };
 
-  const handleAddTicketImage = async () => {
+  const handleAddPassImage = async (passIndex: number) => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please grant camera roll permissions');
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
         quality: 0.8,
       });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTicketImage({
-          uri: result.assets[0].uri,
-          type: 'image' as const,
-        });
+        const updated = [...passes];
+        updated[passIndex] = { ...updated[passIndex], media: [{ uri: result.assets[0].uri, type: 'image' as const }] };
+        setPasses(updated);
       }
     } catch (error) {
-      console.error('Error picking ticket image:', error);
-      Alert.alert('Error', 'Failed to pick ticket image');
+      console.error('Error picking pass image:', error);
+      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
-  const removeTicketImage = () => {
-    setTicketImage(null);
+  const removePassImage = (passIndex: number) => {
+    const updated = [...passes];
+    updated[passIndex] = { ...updated[passIndex], media: undefined };
+    setPasses(updated);
   };
 
   const addPass = () => {
@@ -315,29 +306,6 @@ export default function CreateBusinessPostScreen() {
         [settingId]: { title: '', description: '' },
       });
     }
-  };
-
-  const addEventProduction = () => {
-    Alert.prompt(
-      'Add Event Production',
-      'Enter production type (e.g., Musician, Content Creator)',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: (text: string | undefined) => {
-            if (text && text.trim()) {
-              setEventProduction([...eventProduction, text.trim()]);
-            }
-          },
-        },
-      ],
-      'plain-text'
-    );
-  };
-
-  const removeEventProduction = (index: number) => {
-    setEventProduction(eventProduction.filter((_, i) => i !== index));
   };
 
   const formatTime = (date: Date | null): string => {
@@ -446,16 +414,6 @@ export default function CreateBusinessPostScreen() {
         });
       }
 
-      // Add ticket image if exists
-      if (ticketImage) {
-        formData.append('ticket_image', {
-          uri: Platform.OS === 'ios' ? ticketImage.uri.replace('file://', '') : ticketImage.uri,
-          type: 'image/jpeg',
-          name: 'ticket-image.jpg',
-        } as any);
-        hasFiles = true;
-      }
-
       // Prepare add_details from additional settings
       const addDetails = selectedAdditionalSettings.map(settingId => ({
         detail_type: settingId,
@@ -498,6 +456,7 @@ export default function CreateBusinessPostScreen() {
           price: p.price,
           description: p.description || '',
           capacity: p.capacity || 1,
+          media: p.media && p.media.length > 0 ? [{ url: p.media[0].uri, type: 'image' as const }] : undefined,
         }));
         planData.is_paid_plan = true;
         planData.registration_required = true;
@@ -505,18 +464,13 @@ export default function CreateBusinessPostScreen() {
       if (addDetails.length > 0) {
         planData.add_details = addDetails;
       }
-      if (eventProduction.length > 0) {
-        planData.event_production = eventProduction;
-      }
       if (venueRequired) {
         planData.venue_required = true;
       }
       if (womenOnly) {
         planData.is_women_only = true;
       }
-      if (allowViewGuestList) {
-        planData.allow_view_guest_list = true;
-      }
+      planData.allow_view_guest_list = !hideGuestListFromViewers;
       if (shareToAnnouncementGroup) {
         planData.reshare_to_announcement_group = true;
       }
@@ -912,71 +866,61 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           {ticketsEnabled && (
-            <>
-              <View style={styles.passesSection}>
-                {passes.map((pass, index) => (
-                  <View key={pass.pass_id} style={styles.passCard}>
-                    <View style={styles.passHeader}>
-                      <Text style={styles.passTitle}>Pass {index + 1}</Text>
-                      <TouchableOpacity onPress={() => removePass(index)}>
-                        <Ionicons name="close" size={20} color="#666" />
-                      </TouchableOpacity>
-                    </View>
-                    <TextInput
-                      style={styles.passInput}
-                      placeholder="Ticket Name"
-                      value={pass.name}
-                      onChangeText={(text) => updatePass(index, 'name', text)}
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={styles.passInput}
-                      placeholder="Ticket Fee (0 for free)"
-                      value={pass.price >= 0 ? pass.price.toString() : ''}
-                      onChangeText={(text) => updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
-                      keyboardType="numeric"
-                      placeholderTextColor="#999"
-                    />
-                    <TextInput
-                      style={[styles.passInput, styles.passDescription]}
-                      placeholder="Description (Optional)"
-                      value={pass.description}
-                      onChangeText={(text) => updatePass(index, 'description', text)}
+            <View style={styles.passesSection}>
+              {passes.map((pass, index) => (
+                <View key={pass.pass_id} style={styles.passCard}>
+                  <View style={styles.passHeader}>
+                    <Text style={styles.passTitle}>Pass {index + 1}</Text>
+                    <TouchableOpacity onPress={() => removePass(index)}>
+                      <Ionicons name="close" size={20} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.passInput}
+                    placeholder="Ticket Name"
+                    value={pass.name}
+                    onChangeText={(text) => updatePass(index, 'name', text)}
+                    placeholderTextColor="#999"
+                  />
+                  <TextInput
+                    style={styles.passInput}
+                    placeholder="Ticket Fee (0 for free)"
+                    value={pass.price >= 0 ? pass.price.toString() : ''}
+                    onChangeText={(text) => updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
+                    keyboardType="numeric"
+                    placeholderTextColor="#999"
+                  />
+                  <TextInput
+                    style={[styles.passInput, styles.passDescription]}
+                    placeholder="Description (Optional)"
+                    value={pass.description}
+                    onChangeText={(text) => updatePass(index, 'description', text)}
                     multiline
                     numberOfLines={3}
                     placeholderTextColor="#999"
                   />
+                  <View style={styles.passImageRow}>
+                    <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
+                    {pass.media && pass.media.length > 0 ? (
+                      <View style={styles.passMediaPreview}>
+                        <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
+                        <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
+                          <Ionicons name="close" size={18} color="#FFF" />
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
+                        <Ionicons name="image-outline" size={20} color="#666" />
+                        <Text style={styles.addPassImageText}>Add image</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))}
               <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
                 <Text style={styles.addPassText}>+ Add Type</Text>
               </TouchableOpacity>
             </View>
-
-            {/* Ticket Image Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>TICKET IMAGE</Text>
-              <Text style={styles.sectionDescription}>
-                Add an image that will appear on the ticket (different from post image)
-              </Text>
-              {ticketImage ? (
-                <View style={styles.mediaPreview}>
-                  <Image source={{ uri: ticketImage.uri }} style={styles.mediaImage} />
-                  <TouchableOpacity
-                    style={styles.removeMediaButton}
-                    onPress={removeTicketImage}
-                  >
-                    <Ionicons name="close" size={20} color="#FFF" />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={styles.addMediaButton} onPress={handleAddTicketImage}>
-                  <Ionicons name="image-outline" size={24} color="#666" />
-                  <Text style={styles.addMediaText}>+ Add Ticket Image</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </>
           )}
 
           {/* Share to Announcement Group */}
@@ -1042,26 +986,6 @@ export default function CreateBusinessPostScreen() {
             })}
           </View>
 
-          {/* Event Production */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Event Production</Text>
-              <TouchableOpacity onPress={addEventProduction}>
-                <Ionicons name="add" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.productionTags}>
-              {eventProduction.map((prod, index) => (
-                <View key={index} style={styles.productionTag}>
-                  <Text style={styles.productionTagText}>{prod}</Text>
-                  <TouchableOpacity onPress={() => removeEventProduction(index)}>
-                    <Ionicons name="close" size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </View>
-
           {/* Additional Toggles */}
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Venue Required</Text>
@@ -1084,10 +1008,10 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Allow View Guest List</Text>
+            <Text style={styles.toggleLabel}>Hide guest list from viewers</Text>
             <Switch
-              value={allowViewGuestList}
-              onValueChange={setAllowViewGuestList}
+              value={hideGuestListFromViewers}
+              onValueChange={setHideGuestListFromViewers}
               trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
               thumbColor="#FFF"
             />
@@ -1372,6 +1296,46 @@ const styles = StyleSheet.create({
   passDescription: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  passImageRow: {
+    marginTop: 8,
+  },
+  passImageLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 8,
+  },
+  passMediaPreview: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+  },
+  passMediaThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removePassMediaBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+    padding: 4,
+  },
+  addPassImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  addPassImageText: {
+    fontSize: 13,
+    color: '#666',
   },
   addPassButton: {
     padding: 12,

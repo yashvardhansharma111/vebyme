@@ -39,7 +39,6 @@ interface Plan {
   passes?: Array<{ pass_id: string; name: string; price: number; description: string; capacity?: number }>;
   is_paid_plan?: boolean;
   add_details?: Array<{ detail_type: string; title: string; description: string }>;
-  event_production?: string[];
   venue_required?: boolean;
   allow_view_guest_list?: boolean;
   reshare_to_announcement_group?: boolean;

@@ -70,7 +70,6 @@ function BusinessCardBase({
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
   const showInteracted = attendeesCount > 0 || (interactedUsers && interactedUsers.length > 0);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
-  const extraCount = Math.max(0, (attendeesCount || 0) - displayUsers.length) || (displayUsers.length === 0 ? attendeesCount : 0);
 
   const handleShare = async () => {
     try {
@@ -174,9 +173,6 @@ function BusinessCardBase({
                 <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={20} />
               </View>
             ))
-          )}
-          {(extraCount > 0 || displayUsers.length === 0) && (
-            <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : attendeesCount}</Text>
           )}
         </TouchableOpacity>
       )}

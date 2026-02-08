@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   ScrollView,
   StyleSheet,
@@ -34,16 +35,18 @@ interface BusinessPlan {
     price: number;
     description?: string;
     capacity?: number;
+    media?: Array<{ url: string; type: string }>;
   }>;
   add_details?: Array<{
     detail_type: string;
     title: string;
     description?: string;
   }>;
-  event_production?: string[];
   venue_required?: boolean;
   is_women_only?: boolean;
+  allow_view_guest_list?: boolean;
   user_id?: string;
+  business_id?: string;
   joins_count?: number;
 }
 
@@ -55,6 +58,7 @@ export default function BusinessPlanDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedPass, setSelectedPass] = useState<string | null>(null);
   const [showGuestListModal, setShowGuestListModal] = useState(false);
+  const [heroImageIndex, setHeroImageIndex] = useState(0);
 
   useEffect(() => {
     loadPlan();
@@ -185,17 +189,33 @@ export default function BusinessPlanDetailScreen() {
     );
   }
 
-  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : 'https://picsum.photos/id/1011/200/300';
-  const mediaCount = plan.media?.length ?? 0;
+  const planMedia = plan.media && plan.media.length > 0 ? plan.media.slice(0, 5) : [{ url: 'https://picsum.photos/id/1011/200/300', type: 'image' }];
+  const mediaCount = planMedia.length;
   const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
   const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
+        {/* Hero Images - scrollable up to 5 */}
         <View style={styles.headerImageContainer}>
-          <Image source={{ uri: mainImage }} style={styles.headerImage} resizeMode="cover" />
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.heroScroll}
+            contentContainerStyle={styles.heroScrollContent}
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+              setHeroImageIndex(index);
+            }}
+          >
+            {planMedia.map((item, index) => (
+              <View key={index} style={[styles.heroSlide, { width: Dimensions.get('window').width }]}>
+                <Image source={{ uri: item.url }} style={styles.headerImage} resizeMode="cover" />
+              </View>
+            ))}
+          </ScrollView>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <View style={styles.backButtonCircle}>
               <Ionicons name="arrow-back" size={24} color="#000" />
@@ -222,8 +242,8 @@ export default function BusinessPlanDetailScreen() {
           {/* Carousel dots */}
           {mediaCount > 1 && (
             <View style={styles.carouselDots}>
-              {plan.media!.slice(0, 3).map((_, i) => (
-                <View key={i} style={[styles.carouselDot, i === 0 && styles.carouselDotActive]} />
+              {planMedia.map((_, i) => (
+                <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
               ))}
             </View>
           )}
@@ -265,24 +285,26 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {/* See who's coming – tap to open guest list modal */}
-          <TouchableOpacity
-            style={styles.attendeesCard}
-            onPress={() => setShowGuestListModal(true)}
-            activeOpacity={0.9}
-          >
-            <View style={styles.attendeesTextBlock}>
-              <Text style={styles.attendeesTitle}>See who's coming</Text>
-              <Text style={styles.attendeesSubtitle}>Tap to view guest list</Text>
-            </View>
-            <View style={styles.attendeesAvatars}>
-              {[1, 2, 3].map((i) => (
-                <View key={i} style={[styles.avatarStack, { marginLeft: i === 1 ? 0 : -10 }]}>
-                  <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={32} />
-                </View>
-              ))}
-            </View>
-          </TouchableOpacity>
+          {/* See who's coming – only when allow_view_guest_list is true */}
+          {plan.allow_view_guest_list !== false && (
+            <TouchableOpacity
+              style={styles.attendeesCard}
+              onPress={() => setShowGuestListModal(true)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.attendeesTextBlock}>
+                <Text style={styles.attendeesTitle}>See who's coming</Text>
+                <Text style={styles.attendeesSubtitle}>Tap to view guest list</Text>
+              </View>
+              <View style={styles.attendeesAvatars}>
+                {[1, 2, 3].map((i) => (
+                  <View key={i} style={[styles.avatarStack, { marginLeft: i === 1 ? 0 : -10 }]}>
+                    <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={32} />
+                  </View>
+                ))}
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Select Tickets */}
           {plan.passes && plan.passes.length > 0 && (
@@ -290,6 +312,7 @@ export default function BusinessPlanDetailScreen() {
               <Text style={styles.ticketsTitle}>Select Tickets</Text>
               {plan.passes.map((pass, index) => {
                 const isSelected = selectedPass === pass.pass_id;
+                const passImage = pass.media && pass.media.length > 0 ? pass.media[0].url : null;
                 const gradientColors: [string, string][] = [
                   ['#7C3AED', '#6366F1'],
                   ['#059669', '#10B981'],
@@ -309,6 +332,9 @@ export default function BusinessPlanDetailScreen() {
                       end={{ x: 1, y: 1 }}
                       style={styles.passGradient}
                     >
+                      {passImage ? (
+                        <Image source={{ uri: passImage }} style={styles.passImage} resizeMode="cover" />
+                      ) : null}
                       <View style={styles.passContent}>
                         <Text style={styles.passName}>{pass.name}</Text>
                         {pass.description ? (
@@ -381,6 +407,14 @@ const styles = StyleSheet.create({
     height: 280,
     position: 'relative',
   },
+  heroScroll: {
+    width: '100%',
+    height: '100%',
+  },
+  heroScrollContent: {},
+  heroSlide: {
+    height: 280,
+  },
   headerImage: {
     width: '100%',
     height: '100%',
@@ -390,6 +424,11 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     zIndex: 10,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   backButtonCircle: {
     width: 40,
@@ -580,6 +619,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
+  },
+  passImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+    marginRight: 12,
   },
   passContent: {
     flex: 1,
