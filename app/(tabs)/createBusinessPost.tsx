@@ -520,21 +520,9 @@ export default function CreateBusinessPostScreen() {
           hasFiles ? formData : undefined
         );
         if (response.success) {
-          Alert.alert(
-            'Success',
-            'Business plan created successfully!',
-            [
-              { text: 'OK', onPress: () => router.back() },
-            ]
-          );
-          // Show follow-up popup with improvements note
-          setTimeout(() => {
-            Alert.alert(
-              'Quick note',
-              '1. Tags on your post now show category + subcategories.\n\n2. Joiners count is dynamic per post.\n\n3. Register and action buttons have a fixed position on the card.',
-              [{ text: 'Got it' }]
-            );
-          }, 500);
+          Alert.alert('Business plan created', 'Your business plan has been created.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
         }
       }
     } catch (error: any) {

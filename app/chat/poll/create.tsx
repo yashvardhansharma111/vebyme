@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -22,8 +22,28 @@ export default function CreatePollScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { user } = useAppSelector((state) => state.auth);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState<string[]>(['', '', '']); // Default 3 options like screenshot
+  const [options, setOptions] = useState<string[]>(['', '', '']);
   const [creating, setCreating] = useState(false);
+  const [canCreatePoll, setCanCreatePoll] = useState<boolean | null>(null);
+  const [groupLoading, setGroupLoading] = useState(true);
+
+  useEffect(() => {
+    if (!groupId || !user?.user_id) {
+      setCanCreatePoll(false);
+      setGroupLoading(false);
+      return;
+    }
+    apiService
+      .getGroupDetails(groupId)
+      .then((res: any) => {
+        const g = res?.data ?? res;
+        const isAnnouncement = !!g?.is_announcement_group;
+        const isOwner = g?.created_by === user?.user_id;
+        setCanCreatePoll(!isAnnouncement || isOwner);
+      })
+      .catch(() => setCanCreatePoll(false))
+      .finally(() => setGroupLoading(false));
+  }, [groupId, user?.user_id]);
 
   const handleAddOption = () => {
     if (options.length < 10) {
@@ -44,6 +64,10 @@ export default function CreatePollScreen() {
   };
 
   const handleCreatePoll = async () => {
+    if (canCreatePoll === false) {
+      Alert.alert('Not allowed', 'Only the group owner can create polls in this announcement group.');
+      return;
+    }
     if (!question.trim()) {
       Alert.alert('Error', 'Please enter a question');
       return;
@@ -70,6 +94,33 @@ export default function CreatePollScreen() {
       setCreating(false);
     }
   };
+
+  if (groupLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#1C1C1E" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (canCreatePoll === false) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+          </TouchableOpacity>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <Text style={{ fontSize: 16, color: '#8E8E93', textAlign: 'center' }}>
+            Only the group owner can create polls in this announcement group. You can view and vote on existing polls.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

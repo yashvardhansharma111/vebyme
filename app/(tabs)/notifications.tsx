@@ -463,6 +463,25 @@ export default function NotificationsScreen() {
     setShowGroupModal(true);
   };
 
+  const handleAddToCommunity = async (guests: Array<{ user_id: string; name: string; profile_image: string | null }>) => {
+    if (!user?.user_id || guests.length === 0) return;
+    try {
+      const res = await apiService.getOrCreateAnnouncementGroup();
+      const groupId = (res as any)?.data?.group_id ?? (res as any)?.group_id;
+      if (!groupId) {
+        Alert.alert('Error', 'Could not get announcement group');
+        return;
+      }
+      const memberIds = guests.map((g) => g.user_id).filter((id) => id !== user.user_id);
+      if (memberIds.length > 0) {
+        await apiService.addMembersToGroup(groupId, memberIds);
+      }
+      Alert.alert('Done', `${memberIds.length} user(s) added to your announcement group.`);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to add to community');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -520,8 +539,9 @@ export default function NotificationsScreen() {
                           isExpanded={isExpanded}
                           onExpand={() => handleEventCardPress(group.post_id)}
                           onCreateGroup={() => handleCreateGroupFromCard(group.post_id)}
+                          onAddToCommunity={handleAddToCommunity}
                           index={index}
-                          showInteractions={shouldShowInteractions} // Only show interactions in Level 3
+                          showInteractions={shouldShowInteractions}
                         />
                       );
                     })}

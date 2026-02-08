@@ -83,6 +83,8 @@ interface GroupDetails {
     profile_image: string;
   }>;
   is_closed: boolean;
+  is_announcement_group?: boolean;
+  created_by?: string;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -291,6 +293,10 @@ export default function GroupChatScreen() {
   const handleCreatePoll = () => {
     if (groupDetails?.is_closed) {
       Alert.alert('Chat Disabled', 'Messaging has been disabled by admin');
+      return;
+    }
+    if (groupDetails?.is_announcement_group && groupDetails?.created_by !== user?.user_id) {
+      Alert.alert('Announcement Group', 'Only the group owner can create polls here.');
       return;
     }
     router.push({
@@ -666,38 +672,47 @@ export default function GroupChatScreen() {
           </View>
         )}
 
-        {/* Input Area: input, image upload, microphone, send (paper plane in circle) */}
-        {!groupDetails?.is_closed ? (
-           <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-             <View style={styles.inputPill}>
-               <TextInput
-                 style={styles.input}
-                 placeholder="Send a message"
-                 placeholderTextColor="#999"
-                 value={inputText}
-                 onChangeText={handleTyping}
-                 multiline={false}
-               />
-               <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
-                 <Ionicons name="image-outline" size={24} color="#8E8E93" />
-               </TouchableOpacity>
-               <TouchableOpacity style={styles.iconButton} disabled={sending}>
-                 <Ionicons name="mic-outline" size={24} color="#8E8E93" />
-               </TouchableOpacity>
-             </View>
-             <TouchableOpacity
-               style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
-               onPress={handleSend}
-               disabled={!inputText.trim() || sending}
-             >
-               <Ionicons name="send" size={20} color="#FFF" />
-             </TouchableOpacity>
-           </View>
-        ) : (
-          <View style={styles.disabledBanner}>
-             <Text style={styles.disabledText}>Only admins can send messages</Text>
-          </View>
-        )}
+        {/* Input Area: for announcement groups only owner can send; others see read-only banner */}
+        {(() => {
+          const isAnnouncementReadOnly = !!(groupDetails?.is_announcement_group && groupDetails?.created_by !== user?.user_id);
+          const canSend = !groupDetails?.is_closed && !isAnnouncementReadOnly;
+          if (!canSend) {
+            return (
+              <View style={styles.disabledBanner}>
+                <Text style={styles.disabledText}>
+                  {groupDetails?.is_closed ? 'Only admins can send messages' : 'Only the group owner can send messages and create polls'}
+                </Text>
+              </View>
+            );
+          }
+          return (
+            <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+              <View style={styles.inputPill}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Send a message"
+                  placeholderTextColor="#999"
+                  value={inputText}
+                  onChangeText={handleTyping}
+                  multiline={false}
+                />
+                <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
+                  <Ionicons name="image-outline" size={24} color="#8E8E93" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} disabled={sending}>
+                  <Ionicons name="mic-outline" size={24} color="#8E8E93" />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+                onPress={handleSend}
+                disabled={!inputText.trim() || sending}
+              >
+                <Ionicons name="send" size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          );
+        })()}
       </KeyboardAvoidingView>
 
       {/* Share Plan Modal */}

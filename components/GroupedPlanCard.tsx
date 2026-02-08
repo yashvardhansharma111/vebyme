@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Avatar from './Avatar';
 import Tag from './Tag';
+import { apiService } from '@/services/api';
 
 interface Interaction {
   notification_id: string;
@@ -31,9 +32,10 @@ interface GroupedPlanCardProps {
   userCache: { [key: string]: { name: string; profile_image: string | null } };
   onExpand?: () => void;
   onCreateGroup?: () => void;
+  onAddToCommunity?: (guests: Array<{ user_id: string; name: string; profile_image: string | null }>) => void;
   isExpanded?: boolean;
-  index?: number; // For stacking offset effect
-  showInteractions?: boolean; // Only show interactions in Level 3
+  index?: number;
+  showInteractions?: boolean;
 }
 
 export default function GroupedPlanCard({
@@ -44,12 +46,43 @@ export default function GroupedPlanCard({
   userCache,
   onExpand,
   onCreateGroup,
+  onAddToCommunity,
   isExpanded = false,
   index = 0,
   showInteractions = false,
 }: GroupedPlanCardProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(isExpanded);
+  const [guests, setGuests] = useState<Array<{ user_id: string; name: string; profile_image: string | null }>>([]);
+  const [loadingGuests, setLoadingGuests] = useState(false);
+  const [showAddToCommunityModal, setShowAddToCommunityModal] = useState(false);
+  const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
+
+  const planId = post?.plan_id;
+
+  // Fetch guest list (all registered users) when card is expanded and we have a plan_id
+  useEffect(() => {
+    if (!(expanded && showInteractions && planId)) {
+      setGuests([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingGuests(true);
+    apiService
+      .getGuestList(planId)
+      .then((res: any) => {
+        const data = res?.data ?? res;
+        const list = data?.guests;
+        if (!cancelled && Array.isArray(list)) setGuests(list);
+      })
+      .catch(() => {
+        if (!cancelled) setGuests([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingGuests(false);
+      });
+    return () => { cancelled = true; };
+  }, [expanded, showInteractions, planId]);
 
   // Enable LayoutAnimation on Android
   useEffect(() => {
@@ -110,42 +143,43 @@ export default function GroupedPlanCard({
     }
   };
 
-  const handleCreateGroup = (e: any) => {
-    e.stopPropagation();
-    if (onCreateGroup) {
+  const handleAddToCommunityPress = (e: any) => {
+    e?.stopPropagation?.();
+    if (onAddToCommunity) {
+      setSelectedGuestIds(new Set(guests.map((g) => g.user_id)));
+      setShowAddToCommunityModal(true);
+    } else if (onCreateGroup) {
       onCreateGroup();
     }
   };
 
-  const getInteractionText = (type: string) => {
-    switch (type) {
-      case 'comment':
-        return 'commented';
-      case 'reaction':
-        return 'reacted';
-      case 'join':
-        return 'joined';
-      case 'repost':
-        return 'reposted';
-      default:
-        return 'interacted';
-    }
+  const toggleGuestSelection = (user_id: string) => {
+    setSelectedGuestIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(user_id)) next.delete(user_id);
+      else next.add(user_id);
+      return next;
+    });
   };
 
-  const getInteractionIcon = (type: string) => {
-    // Level 3: always chat icon (user can make group and chat with users)
-    if (showInteractions) return 'chatbubble-outline';
-    switch (type) {
-      case 'comment':
-        return 'chatbubble-outline';
-      case 'reaction':
-        return 'heart-outline';
-      case 'join':
-        return 'person-add-outline';
-      case 'repost':
-        return 'repeat-outline';
-      default:
-        return null;
+  const toggleSelectAll = () => {
+    if (guests.length === 0) return;
+    const allSelected = selectedGuestIds.size === guests.length;
+    setSelectedGuestIds(allSelected ? new Set() : new Set(guests.map((g) => g.user_id)));
+  };
+
+  const handleAddToAnnouncementGroup = () => {
+    const selected = guests.filter((g) => selectedGuestIds.has(g.user_id));
+    if (selected.length > 0 && onAddToCommunity) {
+      onAddToCommunity(selected);
+    }
+    setShowAddToCommunityModal(false);
+  };
+
+  const handleViewTicketDistribution = (e: any) => {
+    e?.stopPropagation?.();
+    if (planId) {
+      router.push({ pathname: '/analytics/event/[planId]', params: { planId } } as any);
     }
   };
 
@@ -223,54 +257,126 @@ export default function GroupedPlanCard({
           </View>
         )}
 
-        {/* Expanded Content: Individual Interactions (Level 3 only) */}
-        {expanded && showInteractions && (
-          <View style={styles.expandedContent}>
-            {[...interactions]
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .map((interaction) => {
-              const cachedUser = userCache[interaction.source_user_id];
-              const user = cachedUser || interaction.user;
-              const userName = user?.name || 'Unknown';
-              const userAvatar = user?.profile_image || null;
-              // Card interaction list: always use text/chat icon for all rows (commented, reacted, joined, etc.)
-              const iconName = 'chatbubble-outline';
-              
-              return (
-                <View key={interaction.notification_id} style={styles.interactionRow}>
-                  <Avatar uri={userAvatar} size={36} />
-                  <View style={styles.interactionContent}>
-                    <Text style={styles.interactionText}>
-                      <Text style={styles.interactionUserName}>{userName}</Text>
-                      {' '}
-                      <Text style={styles.interactionAction}>
-                        {getInteractionText(interaction.type)}
-                      </Text>
+        {/* View Ticket Distribution + Registered section (when expanded and we have a plan) */}
+        {expanded && showInteractions && planId && (
+          <>
+            <TouchableOpacity
+              style={styles.viewTicketDistributionButton}
+              onPress={handleViewTicketDistribution}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.viewTicketDistributionButtonText}>View Ticket Distribution</Text>
+            </TouchableOpacity>
+
+            <View style={styles.registeredSection}>
+              <Text style={styles.registeredSectionTitle}>Registered</Text>
+              {loadingGuests ? (
+                <View style={styles.guestsLoading}>
+                  <ActivityIndicator size="small" color="#8E8E93" />
+                </View>
+              ) : guests.length === 0 ? (
+                <Text style={styles.registeredEmpty}>No registrations yet</Text>
+              ) : (
+                guests.map((guest) => (
+                  <View key={guest.user_id} style={styles.registeredRow}>
+                    <Avatar uri={guest.profile_image} size={36} />
+                    <Text style={styles.registeredText}>
+                      <Text style={styles.registeredName}>{guest.name}</Text>
+                      <Text style={styles.registeredAction}> registered</Text>
                     </Text>
                   </View>
-                  <Ionicons
-                    name={iconName as any}
-                    size={18}
-                    color="#8E8E93"
-                    style={styles.interactionIcon}
-                  />
-                </View>
-              );
-            })}
-          </View>
+                ))
+              )}
+            </View>
+          </>
         )}
 
-        {/* Create Group Button (only when expanded in Level 3) */}
+        {/* Add to Community Button (only when expanded in Level 3) */}
         {expanded && showInteractions && (
           <TouchableOpacity
             style={styles.createGroupButton}
-            onPress={handleCreateGroup}
+            onPress={handleAddToCommunityPress}
             activeOpacity={0.8}
           >
-            <Text style={styles.createGroupButtonText}>Create group</Text>
+            <Text style={styles.createGroupButtonText}>Add to Community</Text>
           </TouchableOpacity>
         )}
       </TouchableOpacity>
+
+      {/* Add to Community Modal: show guest list, confirm adds them to announcement group */}
+      <Modal
+        visible={showAddToCommunityModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAddToCommunityModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.addToCommunityOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAddToCommunityModal(false)}
+        >
+          <TouchableOpacity style={styles.addToCommunityModal} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.addToCommunityModalHeader}>
+              <Text style={styles.addToCommunityModalTitle}>Add to Community</Text>
+              <TouchableOpacity onPress={() => setShowAddToCommunityModal(false)}>
+                <Ionicons name="close" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.addToCommunityGuestList} showsVerticalScrollIndicator={false}>
+              {guests.length === 0 ? (
+                <Text style={styles.registeredEmpty}>No registered users to add</Text>
+              ) : (
+                <>
+                  {guests.map((guest) => {
+                    const isSelected = selectedGuestIds.has(guest.user_id);
+                    return (
+                      <TouchableOpacity
+                        key={guest.user_id}
+                        style={styles.addToCommunityGuestRow}
+                        onPress={() => toggleGuestSelection(guest.user_id)}
+                        activeOpacity={0.7}
+                      >
+                        <Avatar uri={guest.profile_image} size={44} />
+                        <Text style={styles.addToCommunityGuestName} numberOfLines={1}>
+                          {guest.name}
+                        </Text>
+                        <View style={[styles.addToCommunityCheckbox, isSelected && styles.addToCommunityCheckboxSelected]}>
+                          {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity
+                    style={styles.addToCommunitySelectAllRow}
+                    onPress={toggleSelectAll}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.addToCommunitySelectAllText}>Select All</Text>
+                    <View
+                      style={[
+                        styles.addToCommunityCheckbox,
+                        guests.length > 0 && selectedGuestIds.size === guests.length && styles.addToCommunityCheckboxSelected,
+                      ]}
+                    >
+                      {guests.length > 0 && selectedGuestIds.size === guests.length && (
+                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.addToCommunityConfirmBtn, selectedGuestIds.size === 0 && styles.addToCommunityConfirmBtnDisabled]}
+              onPress={handleAddToAnnouncementGroup}
+              disabled={selectedGuestIds.size === 0}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addToCommunityConfirmBtnText}>Add to Announcement Group</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -378,38 +484,58 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     gap: 6,
   },
-  expandedContent: {
+  viewTicketDistributionButton: {
+    backgroundColor: '#E5E5EA',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
-    marginBottom: 12,
+  },
+  viewTicketDistributionButtonText: {
+    color: '#1C1C1E',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  registeredSection: {
+    marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F2F2F7',
   },
-  interactionRow: {
+  registeredSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 10,
+  },
+  guestsLoading: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  registeredEmpty: {
+    fontSize: 14,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+  },
+  registeredRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
     paddingVertical: 4,
-    paddingLeft: 0,
   },
-  interactionContent: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  interactionText: {
+  registeredText: {
     fontSize: 14,
     color: '#1C1C1E',
-    lineHeight: 20,
+    marginLeft: 12,
   },
-  interactionUserName: {
+  registeredName: {
     fontWeight: '600',
   },
-  interactionAction: {
+  registeredAction: {
     fontWeight: '400',
     color: '#8E8E93',
-  },
-  interactionIcon: {
-    marginLeft: 8,
   },
   createGroupButton: {
     backgroundColor: '#1C1C1E',
@@ -420,6 +546,96 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   createGroupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  addToCommunityOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  addToCommunityModal: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  addToCommunityModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  addToCommunityModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  addToCommunityModalSubtitle: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginBottom: 12,
+  },
+  addToCommunityGuestList: {
+    maxHeight: 240,
+    marginBottom: 16,
+  },
+  addToCommunityGuestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F2F7',
+  },
+  addToCommunityGuestName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginLeft: 12,
+  },
+  addToCommunityCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#C7C7CC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addToCommunityCheckboxSelected: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  addToCommunitySelectAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingVertical: 14,
+    paddingRight: 4,
+    marginTop: 4,
+  },
+  addToCommunitySelectAllText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginRight: 10,
+  },
+  addToCommunityConfirmBtn: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+  },
+  addToCommunityConfirmBtnDisabled: {
+    opacity: 0.5,
+  },
+  addToCommunityConfirmBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',

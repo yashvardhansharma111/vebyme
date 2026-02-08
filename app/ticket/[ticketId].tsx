@@ -41,6 +41,7 @@ interface TicketData {
     passes?: Array<{ pass_id: string; name: string; price?: number }>;
     category_main?: string;
     category_sub?: string[];
+    group_id?: string | null;
   };
   pass_id?: string;
   user: {
@@ -386,22 +387,35 @@ export default function TicketScreen() {
 
         {/* Action Buttons at Bottom */}
         <View style={styles.bottomActions}>
-          <TouchableOpacity style={styles.bottomActionButton} onPress={() => router.push(`/feed/post/${ticket.plan?.plan_id}`)}>
+          <TouchableOpacity
+            style={styles.bottomActionButton}
+            onPress={() => {
+              const planId = ticket?.plan?.plan_id;
+              if (planId) {
+                router.push({ pathname: '/business-plan/[planId]', params: { planId } } as any);
+              }
+            }}
+          >
             <Ionicons name="arrow-back" size={20} color="#1C1C1E" />
             <Text style={styles.bottomActionText}>View event</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.bottomActionButton, styles.bottomActionButtonPrimary]} 
+          <TouchableOpacity
+            style={[styles.bottomActionButton, styles.bottomActionButtonPrimary]}
             onPress={async () => {
               const planId = ticket?.plan?.plan_id;
+              const groupId = ticket?.plan?.group_id;
+              if (groupId) {
+                router.push(`/chat/group/${groupId}` as any);
+                return;
+              }
               if (!planId || !user?.user_id) return;
               try {
                 const res = await apiService.getPlanGroups(planId, user.user_id);
-                const groupId = res.data?.latest_group?.group_id;
-                if (groupId) {
-                  router.push(`/chat/group/${groupId}` as any);
+                const fallbackGroupId = (res as any)?.data?.latest_group?.group_id;
+                if (fallbackGroupId) {
+                  router.push(`/chat/group/${fallbackGroupId}` as any);
                 } else {
-                  Alert.alert('No chat', 'Join the event to access the chat.');
+                  Alert.alert('No chat', 'No event chat available for this ticket.');
                 }
               } catch (_) {
                 Alert.alert('Error', 'Could not open event chat.');
@@ -409,7 +423,7 @@ export default function TicketScreen() {
             }}
           >
             <Ionicons name="arrow-forward" size={20} color="#FFF" />
-            <Text style={[styles.bottomActionText, styles.bottomActionTextPrimary]}>Go to event chat</Text>
+            <Text style={[styles.bottomActionText, styles.bottomActionTextPrimary]}>Go to chat</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

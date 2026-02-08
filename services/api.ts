@@ -981,6 +981,13 @@ class ApiService {
     });
   }
 
+  /** Get or create the current (business) user's announcement group. Returns { group_id }. */
+  async getOrCreateAnnouncementGroup() {
+    return this.request<{ group_id: string }>('/chat/announcement-group/get-or-create', {
+      method: 'GET',
+    });
+  }
+
   // Ticket APIs
   async registerForEvent(plan_id: string, user_id: string, pass_id?: string, message?: string) {
     return this.request<any>('/ticket/register', {

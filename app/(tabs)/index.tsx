@@ -36,7 +36,7 @@ function ProfileAvatar() {
   );
 }
 
-const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports'];
+const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
 
 interface FeedPost {
   post_id: string;
@@ -272,7 +272,7 @@ export default function HomeScreen() {
 
       // Map filter to category if applicable
       const filters: any = {};
-      const categoryFilters = ['Clubs', 'Music', 'Cafe'];
+      const categoryFilters = ['Clubs', 'Music', 'Cafe', 'Travel'];
       if (activeFilter && categoryFilters.includes(activeFilter)) {
         filters.category_main = activeFilter.toLowerCase();
       }
