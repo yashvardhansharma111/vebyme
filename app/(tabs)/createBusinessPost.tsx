@@ -74,6 +74,8 @@ export default function CreateBusinessPostScreen() {
   const [timeEnabled, setTimeEnabled] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
+  const [startTimeText, setStartTimeText] = useState('');
+  const [endTimeText, setEndTimeText] = useState('');
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -141,7 +143,7 @@ export default function CreateBusinessPostScreen() {
           // Handle time
           if (planData.time) {
             setTimeEnabled(true);
-            // Parse time string (e.g., "2:30 PM")
+            setStartTimeText(planData.time);
             const timeMatch = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
             if (timeMatch) {
               let hours = parseInt(timeMatch[1]);
@@ -152,6 +154,20 @@ export default function CreateBusinessPostScreen() {
               const timeDate = new Date();
               timeDate.setHours(hours, minutes, 0, 0);
               setStartTime(timeDate);
+            }
+            if (planData.end_time) {
+              setEndTimeText(planData.end_time);
+              const endMatch = planData.end_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+              if (endMatch) {
+                let hours = parseInt(endMatch[1]);
+                const minutes = parseInt(endMatch[2]);
+                const ampm = endMatch[3].toUpperCase();
+                if (ampm === 'PM' && hours !== 12) hours += 12;
+                if (ampm === 'AM' && hours === 12) hours = 0;
+                const timeDate = new Date();
+                timeDate.setHours(hours, minutes, 0, 0);
+                setEndTime(timeDate);
+              }
             }
           }
 
@@ -317,6 +333,20 @@ export default function CreateBusinessPostScreen() {
     return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
   };
 
+  const parseTimeText = (text: string): Date | null => {
+    const timeMatch = text.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!timeMatch) return null;
+    let hours = parseInt(timeMatch[1], 10);
+    const minutes = Math.min(59, Math.max(0, parseInt(timeMatch[2], 10)));
+    const ampm = timeMatch[3].toUpperCase();
+    if (ampm === 'PM' && hours !== 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    hours = Math.min(23, Math.max(0, hours));
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date;
+  };
+
   const formatPreviewData = () => {
     return {
       plan_id: 'preview',
@@ -325,7 +355,10 @@ export default function CreateBusinessPostScreen() {
       media: media.length > 0 ? media.map((m) => ({ url: m.uri, type: m.type })) : [],
       location_text: location || undefined,
       date: selectedDate ? selectedDate : undefined,
-      time: timeEnabled && startTime ? formatTime(startTime) : undefined,
+      time: (() => {
+        const s = startTime || parseTimeText(startTimeText);
+        return timeEnabled && s ? formatTime(s) : undefined;
+      })(),
       category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
       passes: passes.filter(p => p.name && p.price >= 0),
       user: currentUser ? {
@@ -446,8 +479,11 @@ export default function CreateBusinessPostScreen() {
       if (selectedDate) {
         planData.date = selectedDate.toISOString();
       }
-      if (timeEnabled && startTime) {
-        planData.time = formatTime(startTime);
+      if (timeEnabled) {
+        const resolvedStart = startTime || parseTimeText(startTimeText);
+        const resolvedEnd = endTime || parseTimeText(endTimeText);
+        if (resolvedStart) planData.time = formatTime(resolvedStart);
+        if (resolvedEnd) planData.end_time = formatTime(resolvedEnd);
       }
       if (ticketsEnabled && passes.length > 0) {
         planData.passes = passes.filter(p => p.name && p.price >= 0).map(p => ({
@@ -693,10 +729,13 @@ export default function CreateBusinessPostScreen() {
             <>
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setShowStartTimePicker(true)}
+                onPress={() => {
+                  setStartTimeText(startTime ? formatTime(startTime) : startTimeText || '');
+                  setShowStartTimePicker(true);
+                }}
               >
-                <Text style={startTime ? styles.inputText : styles.inputPlaceholder}>
-                  {startTime ? formatTime(startTime) : '8:00 AM'}
+                <Text style={(startTime || startTimeText) ? styles.inputText : styles.inputPlaceholder}>
+                  {startTime ? formatTime(startTime) : startTimeText || '8:00 AM'}
                 </Text>
               </TouchableOpacity>
 
@@ -706,26 +745,23 @@ export default function CreateBusinessPostScreen() {
                   <TextInput
                     style={styles.dateInput}
                     placeholder="HH:MM AM/PM (e.g., 8:00 AM)"
-                    value={startTime ? formatTime(startTime) : ''}
+                    value={startTimeText}
                     onChangeText={(text) => {
-                      // Simple time parsing - can be improved
-                      const timeMatch = text.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                      if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const ampm = timeMatch[3].toUpperCase();
-                        if (ampm === 'PM' && hours !== 12) hours += 12;
-                        if (ampm === 'AM' && hours === 12) hours = 0;
-                        const date = new Date();
-                        date.setHours(hours, minutes);
-                        setStartTime(date);
-                      }
+                      setStartTimeText(text);
+                      const parsed = parseTimeText(text);
+                      if (parsed) setStartTime(parsed);
                     }}
                     placeholderTextColor="#999"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                   />
                   <TouchableOpacity
                     style={styles.datePickerButton}
-                    onPress={() => setShowStartTimePicker(false)}
+                    onPress={() => {
+                      const parsed = parseTimeText(startTimeText);
+                      if (parsed) setStartTime(parsed);
+                      setShowStartTimePicker(false);
+                    }}
                   >
                     <Text style={styles.datePickerButtonText}>Done</Text>
                   </TouchableOpacity>
@@ -734,10 +770,13 @@ export default function CreateBusinessPostScreen() {
 
               <TouchableOpacity
                 style={styles.input}
-                onPress={() => setShowEndTimePicker(true)}
+                onPress={() => {
+                  setEndTimeText(endTime ? formatTime(endTime) : endTimeText || '');
+                  setShowEndTimePicker(true);
+                }}
               >
-                <Text style={endTime ? styles.inputText : styles.inputPlaceholder}>
-                  {endTime ? formatTime(endTime) : 'End Time (optional)'}
+                <Text style={(endTime || endTimeText) ? styles.inputText : styles.inputPlaceholder}>
+                  {endTime ? formatTime(endTime) : endTimeText || 'End Time (optional)'}
                 </Text>
               </TouchableOpacity>
 
@@ -747,25 +786,23 @@ export default function CreateBusinessPostScreen() {
                   <TextInput
                     style={styles.dateInput}
                     placeholder="HH:MM AM/PM (e.g., 10:00 PM)"
-                    value={endTime ? formatTime(endTime) : ''}
+                    value={endTimeText}
                     onChangeText={(text) => {
-                      const timeMatch = text.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                      if (timeMatch) {
-                        let hours = parseInt(timeMatch[1]);
-                        const minutes = parseInt(timeMatch[2]);
-                        const ampm = timeMatch[3].toUpperCase();
-                        if (ampm === 'PM' && hours !== 12) hours += 12;
-                        if (ampm === 'AM' && hours === 12) hours = 0;
-                        const date = new Date();
-                        date.setHours(hours, minutes);
-                        setEndTime(date);
-                      }
+                      setEndTimeText(text);
+                      const parsed = parseTimeText(text);
+                      if (parsed) setEndTime(parsed);
                     }}
                     placeholderTextColor="#999"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                   />
                   <TouchableOpacity
                     style={styles.datePickerButton}
-                    onPress={() => setShowEndTimePicker(false)}
+                    onPress={() => {
+                      const parsed = parseTimeText(endTimeText);
+                      if (parsed) setEndTime(parsed);
+                      setShowEndTimePicker(false);
+                    }}
                   >
                     <Text style={styles.datePickerButtonText}>Done</Text>
                   </TouchableOpacity>
