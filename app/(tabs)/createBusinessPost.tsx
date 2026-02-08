@@ -11,6 +11,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -21,6 +22,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import BusinessCard from '@/components/BusinessCard';
 import CalendarPicker from '@/components/CalendarPicker';
 
@@ -92,6 +94,8 @@ export default function CreateBusinessPostScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [planId, setPlanId] = useState<string | null>(null);
+  const [showTicketPreview, setShowTicketPreview] = useState(false);
+  const [previewPassIndex, setPreviewPassIndex] = useState<number>(0);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -537,6 +541,27 @@ export default function CreateBusinessPostScreen() {
           hasFiles ? formData : undefined
         );
         if (response.success) {
+          if (shareToAnnouncementGroup) {
+            try {
+              const annRes = await apiService.getOrCreateAnnouncementGroup();
+              const groupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
+              if (groupId && user.user_id) {
+                const shareMedia = media.length > 0 ? media.map(m => ({ url: m.uri, type: m.type })) : [];
+                await apiService.sendMessage(groupId, user.user_id, 'plan', {
+                  plan_id: planId,
+                  title: planData.title,
+                  description: planData.description,
+                  media: shareMedia,
+                  tags: planData.category_sub || [],
+                  category_sub: planData.category_sub || [],
+                  category_main: planData.category_main,
+                  is_business: true,
+                });
+              }
+            } catch (shareErr: any) {
+              console.warn('Failed to share to announcement group:', shareErr);
+            }
+          }
           Alert.alert('Success', 'Business plan updated successfully!', [
             { 
               text: 'OK', 
@@ -556,6 +581,28 @@ export default function CreateBusinessPostScreen() {
           hasFiles ? formData : undefined
         );
         if (response.success) {
+          const createdPlanId = (response as any)?.data?.post_id ?? (response as any)?.post_id ?? null;
+          if (shareToAnnouncementGroup && createdPlanId) {
+            try {
+              const annRes = await apiService.getOrCreateAnnouncementGroup();
+              const groupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
+              if (groupId && user.user_id) {
+                const shareMedia = media.length > 0 ? media.map(m => ({ url: m.uri, type: m.type })) : [];
+                await apiService.sendMessage(groupId, user.user_id, 'plan', {
+                  plan_id: createdPlanId,
+                  title: planData.title,
+                  description: planData.description,
+                  media: shareMedia,
+                  tags: planData.category_sub || [],
+                  category_sub: planData.category_sub || [],
+                  category_main: planData.category_main,
+                  is_business: true,
+                });
+              }
+            } catch (shareErr: any) {
+              console.warn('Failed to share to announcement group:', shareErr);
+            }
+          }
           Alert.alert('Business plan created', 'Your business plan has been created.', [
             { text: 'OK', onPress: () => router.back() },
           ]);
@@ -940,6 +987,16 @@ export default function CreateBusinessPostScreen() {
                       </TouchableOpacity>
                     )}
                   </View>
+                  <TouchableOpacity
+                    style={styles.previewTicketButton}
+                    onPress={() => {
+                      setPreviewPassIndex(index);
+                      setShowTicketPreview(true);
+                    }}
+                  >
+                    <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
+                    <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
               <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
@@ -1041,6 +1098,80 @@ export default function CreateBusinessPostScreen() {
               thumbColor="#FFF"
             />
           </View>
+
+          {/* Ticket Preview Modal */}
+          <Modal
+            visible={showTicketPreview}
+            animationType="slide"
+            onRequestClose={() => setShowTicketPreview(false)}
+          >
+            <SafeAreaView style={styles.ticketPreviewModal}>
+              <View style={styles.ticketPreviewHeader}>
+                <TouchableOpacity onPress={() => setShowTicketPreview(false)}>
+                  <Ionicons name="arrow-back" size={24} color="#000" />
+                </TouchableOpacity>
+                <Text style={styles.ticketPreviewTitle}>Ticket Preview</Text>
+                <View style={{ width: 24 }} />
+              </View>
+              <ScrollView style={styles.ticketPreviewScroll} contentContainerStyle={styles.ticketPreviewContent}>
+                {passes[previewPassIndex] && (() => {
+                  const pass = passes[previewPassIndex];
+                  const mainImage = pass.media?.[0]?.uri ?? (media[0]?.uri);
+                  const eventDate = selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
+                  const eventTime = (startTime ? formatTime(startTime) : startTimeText) || 'TBD';
+                  const categoryTags = [...(selectedCategory ? [selectedCategory] : []), ...selectedSubcategories].slice(0, 3);
+                  return (
+                    <View style={styles.ticketPreviewCard}>
+                      {mainImage ? (
+                        <Image source={{ uri: mainImage }} style={styles.ticketPreviewImage} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.ticketPreviewImage, styles.ticketPreviewImagePlaceholder]}>
+                          <Ionicons name="image-outline" size={48} color="#8E8E93" />
+                        </View>
+                      )}
+                      <Text style={styles.ticketPreviewEventTitle}>{title || 'Event Title'}</Text>
+                      <LinearGradient
+                        colors={['#E0F2FE', '#D1FAE5', '#FEF3C7']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.ticketPreviewDetails}
+                      >
+                        <View style={styles.ticketPreviewDetailsRow}>
+                          <Text style={styles.ticketPreviewDetailText}>{eventDate}</Text>
+                          <Text style={styles.ticketPreviewDetailText}>{eventTime}</Text>
+                        </View>
+                        {location ? <Text style={styles.ticketPreviewLocation}>{location}</Text> : null}
+                        {categoryTags.length > 0 && (
+                          <View style={styles.ticketPreviewTagsRow}>
+                            {categoryTags.map((tag: string, idx: number) => (
+                              <View key={idx} style={styles.ticketPreviewTag}>
+                                <Text style={styles.ticketPreviewTagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </LinearGradient>
+                      <View style={styles.ticketPreviewQrSection}>
+                        <View style={styles.ticketPreviewQrPlaceholder}>
+                          <Ionicons name="qr-code-outline" size={80} color="#8E8E93" />
+                          <Text style={styles.ticketPreviewQrText}>Preview</Text>
+                        </View>
+                        <Text style={styles.ticketPreviewPassName}>{pass.name || 'Ticket'}</Text>
+                        <Text style={styles.ticketPreviewPrice}>₹{pass.price >= 0 ? pass.price : 0}</Text>
+                      </View>
+                    </View>
+                  );
+                })()}
+                <TouchableOpacity
+                  style={styles.ticketPreviewBackButton}
+                  onPress={() => setShowTicketPreview(false)}
+                >
+                  <Ionicons name="create-outline" size={20} color="#FFF" />
+                  <Text style={styles.ticketPreviewBackButtonText}>Back to Edit</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </SafeAreaView>
+          </Modal>
 
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
@@ -1361,6 +1492,160 @@ const styles = StyleSheet.create({
   addPassImageText: {
     fontSize: 13,
     color: '#666',
+  },
+  previewTicketButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  previewTicketButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  ticketPreviewModal: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  ticketPreviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  ticketPreviewTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#000',
+  },
+  ticketPreviewScroll: {
+    flex: 1,
+  },
+  ticketPreviewContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  ticketPreviewCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  ticketPreviewImage: {
+    width: '100%',
+    height: 200,
+  },
+  ticketPreviewImagePlaceholder: {
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ticketPreviewEventTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    textTransform: 'uppercase',
+  },
+  ticketPreviewDetails: {
+    padding: 20,
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  ticketPreviewDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  ticketPreviewDetailText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  ticketPreviewLocation: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
+  ticketPreviewTagsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  ticketPreviewTag: {
+    backgroundColor: '#1C1C1E',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  ticketPreviewTagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  ticketPreviewQrSection: {
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 20,
+  },
+  ticketPreviewQrPlaceholder: {
+    width: 160,
+    height: 160,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  ticketPreviewQrText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  ticketPreviewPassName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    marginBottom: 4,
+  },
+  ticketPreviewPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  ticketPreviewBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+  },
+  ticketPreviewBackButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
   addPassButton: {
     padding: 12,
