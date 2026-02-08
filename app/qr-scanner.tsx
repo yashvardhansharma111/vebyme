@@ -38,11 +38,36 @@ export default function QRScannerScreen() {
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const { user } = useAppSelector((state) => state.auth);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResultData | null>(null);
   const [scanning, setScanning] = useState(false);
   const [lastScannedHash, setLastScannedHash] = useState<string | null>(null);
 
   const handleClose = useCallback(() => router.back(), [router]);
+
+  const loadPlans = useCallback(async () => {
+    if (!user?.user_id) return;
+    try {
+      setPlansLoading(true);
+      const res = await apiService.getUserPlans(user.user_id, 50, 0);
+      const raw = res.data && Array.isArray(res.data) ? res.data : [];
+      const businessPlans = raw.filter((p: any) => p?.type === 'business' || p?.plan_type === 'BusinessPlan');
+      setPlans(businessPlans);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to load plans');
+    } finally {
+      setPlansLoading(false);
+    }
+  }, [user?.user_id]);
+
+  React.useEffect(() => {
+    if (!user?.user_id) return;
+    if (!selectedPlanId) {
+      loadPlans();
+    }
+  }, [loadPlans, selectedPlanId, user?.user_id]);
 
   const handleAttendeeList = useCallback(() => {
     const planId = scanResult?.plan?.plan_id;
@@ -55,7 +80,7 @@ export default function QRScannerScreen() {
 
   const handleBarCodeScanned = useCallback(
     async ({ data }: { data: string }) => {
-      if (!user?.user_id || scanning) return;
+      if (!user?.user_id || scanning || !selectedPlanId) return;
       const hash = data?.trim();
       if (!hash) return;
 
@@ -66,6 +91,12 @@ export default function QRScannerScreen() {
       try {
         const response = await apiService.scanQRCode(hash, user.user_id);
         const result = response?.data ?? response;
+        const scannedPlanId = (result?.plan ?? result?.event)?.plan_id as string | undefined;
+        if (scannedPlanId && scannedPlanId !== selectedPlanId) {
+          Alert.alert('Wrong event', 'This ticket is for a different plan. Please select the correct plan and try again.');
+          setScanResult(null);
+          return;
+        }
         setScanResult({
           plan: result?.plan ?? result?.event,
           attendee: result?.attendee ?? result?.user,
@@ -80,7 +111,7 @@ export default function QRScannerScreen() {
         setScanning(false);
       }
     },
-    [user?.user_id, scanning]
+    [user?.user_id, scanning, selectedPlanId]
   );
 
   const formatDate = (date: string | undefined) => {
@@ -121,6 +152,50 @@ export default function QRScannerScreen() {
           <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
             <Text style={styles.permissionBtnText}>Grant permission</Text>
           </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!selectedPlanId) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.nav}>
+          <TouchableOpacity onPress={handleClose} style={styles.navBtn}>
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Select Plan</Text>
+          <View style={styles.navBtn} />
+        </View>
+        <View style={styles.planPickerWrap}>
+          {plansLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color="#FFF" />
+              <Text style={styles.loadingPlansText}>Loading your plans...</Text>
+            </View>
+          ) : plans.length === 0 ? (
+            <View style={styles.center}>
+              <Text style={styles.loadingPlansText}>No business plans found</Text>
+            </View>
+          ) : (
+            <View style={styles.planList}>
+              {plans.map((p: any) => (
+                <TouchableOpacity
+                  key={p.plan_id}
+                  style={styles.planItem}
+                  onPress={() => {
+                    setSelectedPlanId(p.plan_id as string);
+                  }}
+                >
+                  <View style={styles.planInfo}>
+                    <Text style={styles.planTitle}>{p.title || 'Untitled Plan'}</Text>
+                    {!!p.location_text && <Text style={styles.planSubTitle}>{p.location_text}</Text>}
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#FFF" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -366,6 +441,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+  },
+  planPickerWrap: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  loadingPlansText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E5E5EA',
+    textAlign: 'center',
+  },
+  planList: {
+    paddingTop: 12,
+  },
+  planItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 10,
+  },
+  planInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  planTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  planSubTitle: {
+    marginTop: 4,
+    fontSize: 13,
+    color: '#E5E5EA',
   },
   permissionText: {
     fontSize: 16,

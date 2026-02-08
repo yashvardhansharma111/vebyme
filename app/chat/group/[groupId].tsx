@@ -19,7 +19,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import Avatar from '@/components/Avatar';
@@ -144,7 +143,7 @@ export default function GroupChatScreen() {
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [typingLabel, setTypingLabel] = useState<string | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -238,56 +237,8 @@ export default function GroupChatScreen() {
   };
 
   const handlePickImage = async () => {
-    if (groupDetails?.is_closed) {
-      Alert.alert('Chat Disabled', 'Messaging has been disabled by admin');
-      return;
-    }
-
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        allowsMultipleSelection: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets?.length > 0 && user?.user_id && groupId) {
-        try {
-          setSending(true);
-          const urls: string[] = [];
-          for (const asset of result.assets) {
-            const formData = new FormData();
-            // @ts-ignore
-            formData.append('file', {
-              uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
-              name: 'image.jpg',
-              type: 'image/jpeg',
-            });
-            const uploadResponse = await apiService.uploadImage(formData, user.access_token);
-            if (uploadResponse.data?.url) urls.push(uploadResponse.data.url);
-          }
-          if (urls.length > 0) {
-            await apiService.sendMessage(groupId, user.user_id, 'image', urls.length === 1 ? { url: urls[0] } : { urls });
-            await loadMessages();
-            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-          }
-        } catch (error: any) {
-          Alert.alert('Error', 'Failed to send image(s).');
-          console.error('Error sending image:', error);
-        } finally {
-          setSending(false);
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to pick image');
-      console.error('Error picking image:', error);
-    }
+    Alert.alert('Coming soon', 'Image upload will be implemented in future.');
+    return;
   };
 
   const handleCreatePoll = () => {
@@ -659,7 +610,7 @@ export default function GroupChatScreen() {
           data={displayMessages}
           renderItem={renderMessage}
           ListHeaderComponent={renderPlanCard}
-          keyExtractor={(item) => (item.merged ? item.message_id + '_merged' : item.message_id)}
+          keyExtractor={(item) => ('merged' in item && item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
@@ -698,9 +649,6 @@ export default function GroupChatScreen() {
                 />
                 <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
                   <Ionicons name="image-outline" size={24} color="#8E8E93" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} disabled={sending}>
-                  <Ionicons name="mic-outline" size={24} color="#8E8E93" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity

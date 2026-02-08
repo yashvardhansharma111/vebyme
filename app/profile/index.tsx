@@ -128,7 +128,11 @@ export default function MyProfileScreen() {
               <Text style={styles.bio}>{currentUser?.bio || 'No bio yet'}</Text>
             </View>
 
-            <TouchableOpacity style={styles.viewProfileButton}>
+            <TouchableOpacity
+              style={styles.viewProfileButton}
+              onPress={() => currentUser?.user_id && router.push((`/profile/${currentUser.user_id}`) as any)}
+              disabled={!currentUser?.user_id}
+            >
               <Ionicons name="person-outline" size={16} color="#FFF" style={{ marginRight: 8 }} />
               <Text style={styles.viewProfileText}>View Profile</Text>
             </TouchableOpacity>

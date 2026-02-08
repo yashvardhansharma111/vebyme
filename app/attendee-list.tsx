@@ -41,6 +41,9 @@ export default function AttendeeListScreen() {
   
   // If no planId in params, try to get from navigation state or use a default
   // For now, we'll require planId - in production, this could come from context
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,20 +52,43 @@ export default function AttendeeListScreen() {
   useEffect(() => {
     // If planId provided, load attendees
     // Otherwise, show message to select event
-    if (planId && planId !== 'current' && user?.user_id) {
-      loadAttendees();
-    } else if (!planId) {
-      // In production, show event selector or get from context
+    if (!user?.user_id) {
       setLoading(false);
+      return;
+    }
+
+    const initialPlanId = planId && planId !== 'current' ? planId : null;
+    if (initialPlanId) {
+      setSelectedPlanId(initialPlanId);
+      loadAttendees(initialPlanId);
+    } else {
+      setLoading(false);
+      loadPlans();
     }
   }, [planId, user]);
 
-  const loadAttendees = async () => {
-    if (!planId || !user?.user_id) return;
+  const loadPlans = async () => {
+    if (!user?.user_id) return;
+    try {
+      setPlansLoading(true);
+      const res = await apiService.getUserPlans(user.user_id, 50, 0);
+      const raw = res.data && Array.isArray(res.data) ? res.data : [];
+      const businessPlans = raw.filter((p: any) => p?.type === 'business' || p?.plan_type === 'BusinessPlan');
+      setPlans(businessPlans);
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to load plans');
+    } finally {
+      setPlansLoading(false);
+    }
+  };
+
+  const loadAttendees = async (targetPlanId?: string) => {
+    const effectivePlanId = targetPlanId ?? selectedPlanId;
+    if (!effectivePlanId || !user?.user_id) return;
     
     try {
       setLoading(true);
-      const response = await apiService.getAttendeeList(planId, user.user_id);
+      const response = await apiService.getAttendeeList(effectivePlanId, user.user_id);
       if (response.data) {
         setAttendees(response.data.attendees || []);
         setStatistics(response.data.statistics || { total: 0, checked_in: 0, pending: 0 });
@@ -114,7 +140,7 @@ export default function AttendeeListScreen() {
     );
   }
 
-  if (!planId || planId === 'current') {
+  if (!selectedPlanId) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -124,10 +150,39 @@ export default function AttendeeListScreen() {
           <Text style={styles.headerTitle}>Attendee List</Text>
           <View style={{ width: 24 }} />
         </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Please select an event to view attendees</Text>
-          <Text style={styles.emptySubtext}>Navigate to an event and use the QR scanner</Text>
-        </View>
+        {plansLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1C1C1E" />
+            <Text style={styles.loadingText}>Loading your plans...</Text>
+          </View>
+        ) : plans.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No business plans found</Text>
+            <Text style={styles.emptySubtext}>Create a business plan to see registrations.</Text>
+          </View>
+        ) : (
+          <ScrollView style={styles.listContainer} contentContainerStyle={styles.listContent}>
+            {plans.map((p: any) => (
+              <TouchableOpacity
+                key={p.plan_id}
+                style={styles.attendeeItem}
+                onPress={async () => {
+                  const id = p.plan_id as string;
+                  setSelectedPlanId(id);
+                  await loadAttendees(id);
+                }}
+              >
+                <View style={styles.attendeeInfo}>
+                  <Text style={styles.attendeeName}>{p.title || 'Untitled Plan'}</Text>
+                  <Text style={styles.attendeeTicket}>{p.location_text || ''}</Text>
+                </View>
+                <View style={styles.attendeeActions}>
+                  <Ionicons name="chevron-forward" size={18} color="#1C1C1E" />
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </SafeAreaView>
     );
   }

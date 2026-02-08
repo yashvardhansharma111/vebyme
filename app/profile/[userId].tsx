@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   useWindowDimensions,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -136,6 +137,13 @@ export default function OtherUserProfileScreen() {
   const instagramId = extractInstagramIdFromUrl(socialMedia.instagram) || socialMedia.instagram?.replace(/^@/, '') || '';
   const instagramUrl = getInstagramProfileUrl(socialMedia.instagram) || (instagramId ? `https://www.instagram.com/${instagramId}/` : null);
 
+  const openInstagram = () => {
+    if (!instagramUrl) return;
+    Linking.openURL(instagramUrl);
+  };
+
+  const instagramPreviewTiles = Array.from({ length: 9 }, (_, idx) => idx);
+
   // Always show Instagram and X rows (with logos); show handle or placeholder
   const socialCardEntries: { key: string; icon: string; handle: string; url: string | null; isX: boolean }[] = [
     { key: 'instagram', icon: 'logo-instagram', handle: instagramId || socialMedia.instagram || 'Not added', url: instagramUrl || (instagramId ? `https://instagram.com/${instagramId}` : null), isX: false },
@@ -210,7 +218,7 @@ export default function OtherUserProfileScreen() {
         {/* 2. Bottom section: solid #F2F2F2, content cards – order as in screenshot */}
         <View key="bottom-section" style={styles.bottomSection}>
           {/* Social card: always Instagram above, X below – show logos always; handle or "Not added" */}
-          <View key="social-card" style={[styles.sectionCard, { marginBottom: 15 }]}>
+          <View key="social-card" style={[styles.sectionCard, { marginBottom: 15 }]}> 
             {socialCardEntries.map((entry, index) => (
               <React.Fragment key={entry.key}>
                 {index > 0 && <View style={styles.hairlineDivider} />}
@@ -230,6 +238,28 @@ export default function OtherUserProfileScreen() {
                 </TouchableOpacity>
               </React.Fragment>
             ))}
+          </View>
+
+          {/* Instagram Preview (UI only; up to 9 tiles) */}
+          <View key="insta-preview" style={[styles.sectionCard, { marginBottom: 15 }]}> 
+            <View style={styles.instaHeaderRow}>
+              <View style={styles.instaHeaderLeft}>
+                <Ionicons name="logo-instagram" size={20} color="#252525" />
+                <Text style={styles.instaHeaderTitle}>Instagram</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.instaOpenBtn, !instagramUrl && styles.instaOpenBtnDisabled]}
+                onPress={openInstagram}
+                disabled={!instagramUrl}
+              >
+                <Text style={styles.instaOpenBtnText}>Open</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.instaGrid}>
+              {instagramPreviewTiles.map((i) => (
+                <View key={i} style={styles.instaTile} />
+              ))}
+            </View>
           </View>
 
           {/* Stats card: #plans (left) | #interactions (right) */}
@@ -527,6 +557,47 @@ const styles = StyleSheet.create({
     flex: 1,
     letterSpacing: -0.2,
     lineHeight: 20,
+  },
+  instaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  instaHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  instaHeaderTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#252525',
+  },
+  instaOpenBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: '#1C1C1E',
+  },
+  instaOpenBtnDisabled: {
+    opacity: 0.35,
+  },
+  instaOpenBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  instaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  instaTile: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.06)',
   },
   socialHandlePlaceholder: {
     color: 'rgba(71, 71, 71, 0.85)',

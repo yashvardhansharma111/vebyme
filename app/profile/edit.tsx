@@ -33,7 +33,6 @@ export default function EditProfileScreen() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [gender, setGender] = useState<string>('');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -196,8 +195,7 @@ export default function EditProfileScreen() {
           data: {
             name: name.trim(),
             bio: bio.trim(),
-            profile_image: profileImage,
-            ...(gender ? { gender: gender.toLowerCase() } : {}),
+            profile_image: profileImage ?? undefined,
           },
         })
       ).unwrap();
@@ -268,44 +266,13 @@ export default function EditProfileScreen() {
 
           <TouchableOpacity
             style={styles.genderRow}
-            onPress={() => setShowGenderPicker(true)}
+            activeOpacity={1}
           >
             <Text style={styles.genderLabel}>Gender</Text>
             <Text style={styles.genderValue}>{genderLabel}</Text>
-            <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {showGenderPicker && (
-        <Modal visible transparent animationType="fade">
-          <TouchableOpacity
-            style={styles.genderModalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowGenderPicker(false)}
-          >
-            <View style={styles.genderModalContent} onStartShouldSetResponder={() => true}>
-              <Text style={styles.genderModalTitle}>Gender</Text>
-              {['male', 'female', 'other'].map((g) => (
-                <TouchableOpacity
-                  key={g}
-                  style={styles.genderOption}
-                  onPress={() => {
-                    setGender(g);
-                    setShowGenderPicker(false);
-                  }}
-                >
-                  <Text style={styles.genderOptionText}>{g.charAt(0).toUpperCase() + g.slice(1)}</Text>
-                  {gender === g && <Ionicons name="checkmark" size={22} color="#1C1C1E" />}
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.genderCancel} onPress={() => setShowGenderPicker(false)}>
-                <Text style={styles.genderCancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
 
       {/* Save Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
@@ -461,24 +428,20 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   genderRow: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    alignSelf: 'stretch',
-    backgroundColor: '#FFF',
-    borderRadius: 14,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   genderLabel: { fontSize: 17, color: '#1C1C1E' },
   genderValue: { fontSize: 17, color: '#9CA3AF' },
-  genderModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   genderModalContent: {
     backgroundColor: '#FFF',
     borderRadius: 20,
