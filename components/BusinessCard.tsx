@@ -45,6 +45,7 @@ interface BusinessCardProps {
   onRegisterPress?: () => void;
   onRequireAuth?: () => void;
   onGuestListPress?: () => void;
+  onSharePress?: () => void;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -58,8 +59,9 @@ function BusinessCardBase({
   onRegisterPress,
   onRequireAuth,
   onRepostPress,
+  onSharePress,
   onGuestListPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
@@ -72,6 +74,10 @@ function BusinessCardBase({
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = async () => {
+    if (onSharePress) {
+      onSharePress();
+      return;
+    }
     try {
       if (!plan.plan_id) {
         Alert.alert('Error', 'Plan ID not found');
@@ -190,6 +196,7 @@ export default function BusinessCard({
   onPress,
   onRegisterPress,
   onRequireAuth,
+  onSharePress,
   onGuestListPress: onGuestListPressProp,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
@@ -288,6 +295,7 @@ export default function BusinessCard({
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
           onRepostPress={handleRepost}
+          onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
         />
         <GuestListModal
@@ -334,6 +342,7 @@ export default function BusinessCard({
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
           onRepostPress={handleRepost}
+          onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
         />
       </Swipeable>
