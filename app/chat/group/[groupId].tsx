@@ -708,8 +708,8 @@ export default function GroupChatScreen() {
                   onChangeText={handleTyping}
                   multiline={false}
                 />
-                <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
-                  <Ionicons name="image-outline" size={24} color="#8E8E93" />
+                <TouchableOpacity style={styles.iconButton} onPress={handleCreatePoll} disabled={sending}>
+                  <Ionicons name="bar-chart-outline" size={24} color="#8E8E93" />
                 </TouchableOpacity>
               </View>
               <TouchableOpacity
