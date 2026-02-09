@@ -39,8 +39,9 @@ interface BusinessPlan {
   }>;
   add_details?: Array<{
     detail_type: string;
-    title: string;
+    title?: string;
     description?: string;
+    heading?: string; // for additional_info: user heading
   }>;
   venue_required?: boolean;
   is_women_only?: boolean;
@@ -286,17 +287,24 @@ export default function BusinessPlanDetailScreen() {
             )}
           </View>
 
-          {/* Detail pills – Distance, Starting Point, Dress Code, F&B */}
+          {/* Detail pills – all categories: first field as heading, user value below; additional_info: user heading + description */}
           {plan.add_details && plan.add_details.length > 0 && (
             <View style={styles.detailPillsWrap}>
-              {plan.add_details.slice(0, 4).map((detail, index) => (
-                <View key={index} style={styles.detailPill}>
-                  <Text style={styles.detailPillLabel}>{detail.title || detail.detail_type}</Text>
-                  {detail.description ? (
-                    <Text style={styles.detailPillValue} numberOfLines={2}>{detail.description}</Text>
-                  ) : null}
-                </View>
-              ))}
+              {plan.add_details.map((detail, index) => {
+                const isAdditionalInfo = detail.detail_type === 'additional_info';
+                const heading = isAdditionalInfo
+                  ? (detail.heading ?? detail.title ?? 'Additional Info')
+                  : (detail.title ?? detail.detail_type);
+                const value = detail.description ?? '';
+                return (
+                  <View key={index} style={styles.detailPill}>
+                    <Text style={styles.detailPillLabel}>{heading}</Text>
+                    {value ? (
+                      <Text style={styles.detailPillValue} numberOfLines={isAdditionalInfo ? 4 : 2}>{value}</Text>
+                    ) : null}
+                  </View>
+                );
+              })}
             </View>
           )}
 

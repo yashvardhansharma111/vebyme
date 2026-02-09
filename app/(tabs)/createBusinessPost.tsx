@@ -4,8 +4,8 @@ import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { setPostCreated } from '@/store/slices/postCreatedSlice';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ActivityIndicator,
@@ -56,6 +56,7 @@ interface Pass {
   description: string;
   capacity?: number;
   media?: { uri: string; type: 'image' }[];
+  isExisting?: boolean; // true when loaded from plan (edit mode) – not removable/editable
 }
 
 export default function CreateBusinessPostScreen() {
@@ -97,6 +98,52 @@ export default function CreateBusinessPostScreen() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [showTicketPreview, setShowTicketPreview] = useState(false);
   const [previewPassIndex, setPreviewPassIndex] = useState<number>(0);
+  const isEditFlowRef = useRef(false);
+
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setDescription('');
+    setMedia([]);
+    setLocation('');
+    setSelectedDate(null);
+    setShowDatePicker(false);
+    setTimeEnabled(false);
+    setStartTime(null);
+    setEndTime(null);
+    setStartTimeText('');
+    setEndTimeText('');
+    setShowStartTimePicker(false);
+    setShowEndTimePicker(false);
+    setSelectedCategory('');
+    setSelectedSubcategories([]);
+    setTicketsEnabled(false);
+    setPasses([]);
+    setSelectedAdditionalSettings([]);
+    setAdditionalDetails({});
+    setVenueRequired(false);
+    setWomenOnly(false);
+    setHideGuestListFromViewers(false);
+    setShareToAnnouncementGroup(false);
+    setShowPreview(false);
+    setEditMode(false);
+    setPlanId(null);
+    setShowTicketPreview(false);
+    setPreviewPassIndex(0);
+    isEditFlowRef.current = false;
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      AsyncStorage.getItem('planForCreation').then((planDataStr) => {
+        if (cancelled) return;
+        if (planDataStr) return;
+        if (isEditFlowRef.current) return;
+        resetForm();
+      });
+      return () => { cancelled = true; };
+    }, [resetForm])
+  );
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -120,7 +167,7 @@ export default function CreateBusinessPostScreen() {
         if (planDataStr) {
           const planData = JSON.parse(planDataStr);
           const isEdit = planData.mode === 'edit';
-          
+          if (isEdit) isEditFlowRef.current = true;
           setEditMode(isEdit);
           if (isEdit) {
             setPlanId(planData.plan_id);
@@ -176,25 +223,27 @@ export default function CreateBusinessPostScreen() {
             }
           }
 
-          // Handle passes/tickets (normalize pass media to { uri, type })
+          // Handle passes/tickets (normalize pass media to { uri, type }); mark as existing so they can't be removed/edited
           if (planData.passes && planData.passes.length > 0) {
             setTicketsEnabled(true);
             setPasses(planData.passes.map((p: any) => ({
               ...p,
+              isExisting: true,
               media: p.media && p.media.length > 0
                 ? [{ uri: typeof p.media[0] === 'string' ? p.media[0] : p.media[0].url, type: 'image' as const }]
                 : undefined,
             })));
           }
 
-          // Handle additional details
+          // Handle additional details (additional_info may have heading + description)
           if (planData.add_details && planData.add_details.length > 0) {
             const settings: string[] = [];
             const details: { [key: string]: { title: string; description: string } } = {};
             planData.add_details.forEach((detail: any) => {
               settings.push(detail.detail_type);
+              const isAdditionalInfo = detail.detail_type === 'additional_info';
               details[detail.detail_type] = {
-                title: detail.title,
+                title: isAdditionalInfo ? (detail.heading ?? detail.title ?? '') : (detail.title ?? ''),
                 description: detail.description || '',
               };
             });
@@ -456,11 +505,16 @@ export default function CreateBusinessPostScreen() {
       }
 
       // Prepare add_details from additional settings
-      const addDetails = selectedAdditionalSettings.map(settingId => ({
-        detail_type: settingId,
-        title: additionalDetails[settingId]?.title || settingId,
-        description: additionalDetails[settingId]?.description || '',
-      }));
+      const addDetails = selectedAdditionalSettings.map(settingId => {
+        const isAdditionalInfo = settingId === 'additional_info';
+        const payload: { detail_type: string; title?: string; description?: string; heading?: string } = {
+          detail_type: settingId,
+          title: additionalDetails[settingId]?.title ?? (isAdditionalInfo ? '' : (ADDITIONAL_SETTINGS.find(s => s.id === settingId)?.label ?? settingId)),
+          description: additionalDetails[settingId]?.description ?? '',
+        };
+        if (isAdditionalInfo) payload.heading = additionalDetails[settingId]?.title ?? '';
+        return payload;
+      });
 
       // Use user_id as business_id (backend requirement)
       const businessId = currentUser.business_id || user.user_id;
@@ -566,6 +620,7 @@ export default function CreateBusinessPostScreen() {
               console.warn('Failed to share to announcement group:', shareErr);
             }
           }
+          isEditFlowRef.current = false;
           Alert.alert('Success', 'Business plan updated successfully!', [
             { 
               text: 'OK', 
@@ -615,6 +670,7 @@ export default function CreateBusinessPostScreen() {
             tags: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
             category_main: selectedCategory?.toLowerCase(),
           }));
+          isEditFlowRef.current = false;
           router.back();
         }
       }
@@ -959,71 +1015,85 @@ export default function CreateBusinessPostScreen() {
 
           {ticketsEnabled && (
             <View style={styles.passesSection}>
-              {passes.map((pass, index) => (
-                <View key={pass.pass_id} style={styles.passCard}>
-                  <View style={styles.passHeader}>
-                    <Text style={styles.passTitle}>Pass {index + 1}</Text>
-                    <TouchableOpacity onPress={() => removePass(index)}>
-                      <Ionicons name="close" size={20} color="#666" />
-                    </TouchableOpacity>
-                  </View>
-                  {/* Image and Preview Ticket only for Pass 1 */}
-                  {index === 0 && (
-                    <View style={styles.passImageRow}>
-                      <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
-                      {pass.media && pass.media.length > 0 ? (
-                        <View style={styles.passMediaPreview}>
-                          <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
-                          <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
-                            <Ionicons name="close" size={18} color="#FFF" />
-                          </TouchableOpacity>
-                        </View>
-                      ) : (
-                        <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
-                          <Ionicons name="image-outline" size={20} color="#666" />
-                          <Text style={styles.addPassImageText}>Add image</Text>
+              {passes.map((pass, index) => {
+                const isExistingTicket = editMode && pass.isExisting;
+                return (
+                  <View key={pass.pass_id} style={styles.passCard}>
+                    <View style={styles.passHeader}>
+                      <Text style={styles.passTitle}>Pass {index + 1}</Text>
+                      {!editMode && (
+                        <TouchableOpacity onPress={() => removePass(index)}>
+                          <Ionicons name="close" size={20} color="#666" />
                         </TouchableOpacity>
                       )}
                     </View>
-                  )}
-                  <TextInput
-                    style={styles.passInput}
-                    placeholder="Ticket Name"
-                    value={pass.name}
-                    onChangeText={(text) => updatePass(index, 'name', text)}
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    style={styles.passInput}
-                    placeholder="Ticket Fee (0 for free)"
-                    value={pass.price >= 0 ? pass.price.toString() : ''}
-                    onChangeText={(text) => updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
-                    keyboardType="numeric"
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    style={[styles.passInput, styles.passDescription]}
-                    placeholder="Description (Optional)"
-                    value={pass.description}
-                    onChangeText={(text) => updatePass(index, 'description', text)}
-                    multiline
-                    numberOfLines={3}
-                    placeholderTextColor="#999"
-                  />
-                  {index === 0 && (
-                    <TouchableOpacity
-                      style={styles.previewTicketButton}
-                      onPress={() => {
-                        setPreviewPassIndex(0);
-                        setShowTicketPreview(true);
-                      }}
-                    >
-                      <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
-                      <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
+                    {/* Image and Preview Ticket only for Pass 1 */}
+                    {index === 0 && !isExistingTicket && (
+                      <View style={styles.passImageRow}>
+                        <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
+                        {pass.media && pass.media.length > 0 ? (
+                          <View style={styles.passMediaPreview}>
+                            <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
+                            <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
+                              <Ionicons name="close" size={18} color="#FFF" />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
+                            <Ionicons name="image-outline" size={20} color="#666" />
+                            <Text style={styles.addPassImageText}>Add image</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                    {index === 0 && isExistingTicket && pass.media && pass.media.length > 0 && (
+                      <View style={styles.passImageRow}>
+                        <Text style={styles.passImageLabel}>Ticket image</Text>
+                        <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
+                      </View>
+                    )}
+                    <TextInput
+                      style={styles.passInput}
+                      placeholder="Ticket Name"
+                      value={pass.name}
+                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'name', text)}
+                      placeholderTextColor="#999"
+                      editable={!isExistingTicket}
+                    />
+                    <TextInput
+                      style={styles.passInput}
+                      placeholder="Ticket Fee (0 for free)"
+                      value={pass.price >= 0 ? pass.price.toString() : ''}
+                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
+                      keyboardType="numeric"
+                      placeholderTextColor="#999"
+                      editable={!isExistingTicket}
+                    />
+                    <TextInput
+                      style={[styles.passInput, styles.passDescription]}
+                      placeholder="Description (Optional)"
+                      value={pass.description}
+                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'description', text)}
+                      multiline
+                      numberOfLines={3}
+                      placeholderTextColor="#999"
+                      editable={!isExistingTicket}
+                    />
+                    {index === 0 && !isExistingTicket && (
+                      <TouchableOpacity
+                        style={styles.previewTicketButton}
+                        onPress={() => {
+                          setPreviewPassIndex(0);
+                          setShowTicketPreview(true);
+                        }}
+                      >
+                        <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
+                        <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })}
               <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
                 <Text style={styles.addPassText}>+ Add Type</Text>
               </TouchableOpacity>
@@ -1073,35 +1143,56 @@ export default function CreateBusinessPostScreen() {
 
             {selectedAdditionalSettings.map((settingId) => {
               const setting = ADDITIONAL_SETTINGS.find(s => s.id === settingId);
+              const isAdditionalInfo = settingId === 'additional_info';
               return (
                 <View key={settingId} style={styles.additionalDetailCard}>
                   <Text style={styles.additionalDetailLabel}>{setting?.label}</Text>
-                  <TextInput
-                    style={styles.additionalDetailInput}
-                    placeholder="Heading"
-                    value={additionalDetails[settingId]?.title || ''}
-                    onChangeText={(text) =>
-                      setAdditionalDetails({
-                        ...additionalDetails,
-                        [settingId]: { ...additionalDetails[settingId], title: text },
-                      })
-                    }
-                    placeholderTextColor="#999"
-                  />
-                  <TextInput
-                    style={[styles.additionalDetailInput, styles.additionalDetailDescription]}
-                    placeholder="Description"
-                    value={additionalDetails[settingId]?.description || ''}
-                    onChangeText={(text) =>
-                      setAdditionalDetails({
-                        ...additionalDetails,
-                        [settingId]: { ...additionalDetails[settingId], description: text },
-                      })
-                    }
-                    placeholderTextColor="#999"
-                    multiline
-                    numberOfLines={2}
-                  />
+                  {isAdditionalInfo ? (
+                    <>
+                      <TextInput
+                        style={styles.additionalDetailInput}
+                        placeholder="Heading"
+                        value={additionalDetails[settingId]?.title || ''}
+                        onChangeText={(text) =>
+                          setAdditionalDetails({
+                            ...additionalDetails,
+                            [settingId]: { ...additionalDetails[settingId], title: text },
+                          })
+                        }
+                        placeholderTextColor="#999"
+                      />
+                      <TextInput
+                        style={[styles.additionalDetailInput, styles.additionalDetailDescription]}
+                        placeholder="Description"
+                        value={additionalDetails[settingId]?.description || ''}
+                        onChangeText={(text) =>
+                          setAdditionalDetails({
+                            ...additionalDetails,
+                            [settingId]: { ...additionalDetails[settingId], description: text },
+                          })
+                        }
+                        placeholderTextColor="#999"
+                        multiline
+                        numberOfLines={2}
+                      />
+                    </>
+                  ) : (
+                    <TextInput
+                      style={styles.additionalDetailInput}
+                      placeholder={setting?.label ? `Enter ${setting.label}` : 'Value'}
+                      value={additionalDetails[settingId]?.description ?? additionalDetails[settingId]?.title ?? ''}
+                      onChangeText={(text) =>
+                        setAdditionalDetails({
+                          ...additionalDetails,
+                          [settingId]: {
+                            title: setting?.label ?? settingId,
+                            description: text,
+                          },
+                        })
+                      }
+                      placeholderTextColor="#999"
+                    />
+                  )}
                 </View>
               );
             })}

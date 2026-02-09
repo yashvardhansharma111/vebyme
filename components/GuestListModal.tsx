@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from './Avatar';
 import { apiService } from '@/services/api';
@@ -34,10 +35,16 @@ export default function GuestListModal({
   planId,
   onRegisterPress,
 }: GuestListModalProps) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleGuestPress = (userId: string) => {
+    onClose();
+    router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+  };
 
   useEffect(() => {
     if (visible && planId) {
@@ -106,7 +113,12 @@ export default function GuestListModal({
                 <Text style={styles.emptyText}>No one has joined yet.</Text>
               ) : (
                 guests.map((guest) => (
-                  <View key={guest.user_id} style={styles.guestRow}>
+                  <TouchableOpacity
+                    key={guest.user_id}
+                    style={styles.guestRow}
+                    onPress={() => handleGuestPress(guest.user_id)}
+                    activeOpacity={0.7}
+                  >
                     <Avatar uri={guest.profile_image} size={44} />
                     <View style={styles.guestInfo}>
                       <Text style={styles.guestName} numberOfLines={1}>
@@ -122,7 +134,7 @@ export default function GuestListModal({
                         </Text>
                       ) : null}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </ScrollView>
