@@ -24,6 +24,9 @@ interface FeedPost {
   type?: string;
 }
 
+const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
+const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel'];
+
 interface FormattedEvent {
   id: string;
   user: {
@@ -41,6 +44,7 @@ interface FormattedEvent {
 }
 
 export default function BusinessPostsScreen() {
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [businessPostsData, setBusinessPostsData] = useState<any[]>([]); // Store raw post data
   const [isLoading, setIsLoading] = useState(true);
@@ -181,11 +185,13 @@ export default function BusinessPostsScreen() {
       }
       setError(null);
 
-      // Fetch all posts and filter for business plans
-      const response = await apiService.getHomeFeed(user?.user_id, {}, { limit: 50, offset: 0 });
-      
+      const filters: any = {};
+      if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
+        filters.category_main = activeFilter.toLowerCase();
+      }
+      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 50, offset: 0 });
+
       if (response.data && Array.isArray(response.data)) {
-        // Filter only business plans
         const businessPlans = response.data.filter((post: any) => post.type === 'business');
         setBusinessPostsData(businessPlans);
         const formatted = await formatFeedData(businessPlans);
@@ -202,7 +208,7 @@ export default function BusinessPostsScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user, formatFeedData]);
+  }, [user, activeFilter, formatFeedData]);
 
   useEffect(() => {
     loadFeed();
@@ -242,6 +248,22 @@ export default function BusinessPostsScreen() {
               <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
             }
           >
+            {/* Filters – same as index */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
+              {FILTERS.map((filter, index) => {
+                const isActive = activeFilter === filter;
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={isActive ? styles.activeFilterChip : styles.filterChip}
+                    onPress={() => setActiveFilter(filter)}
+                  >
+                    <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
             {isLoading && events.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4A3B69" />
@@ -413,9 +435,15 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingBottom: 20,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingHorizontal: 0,
   },
+  filterScroll: { marginBottom: 20 },
+  filterContent: { paddingHorizontal: 20, gap: 12 },
+  activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
+  activeFilterText: { color: '#FFF', fontWeight: '600' },
+  filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
+  filterText: { color: '#1C1C1E', fontWeight: '600' },
   feed: {
     paddingBottom: 20,
   },

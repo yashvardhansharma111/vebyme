@@ -46,6 +46,9 @@ interface BusinessCardProps {
   onRequireAuth?: () => void;
   onGuestListPress?: () => void;
   onSharePress?: () => void;
+  /** Show a small arrow on the right; when tapped, calls onArrowPress (e.g. open business posts list) */
+  showArrowButton?: boolean;
+  onArrowPress?: () => void;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -61,7 +64,9 @@ function BusinessCardBase({
   onRepostPress,
   onSharePress,
   onGuestListPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
+  showArrowButton,
+  onArrowPress,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }>; showArrowButton?: boolean; onArrowPress?: () => void }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
@@ -99,6 +104,19 @@ function BusinessCardBase({
       onPress={onPress}
       activeOpacity={0.98}
     >
+      {/* Optional arrow button on the right – opens business posts list */}
+      {showArrowButton && onArrowPress && (
+        <TouchableOpacity
+          style={styles.arrowButton}
+          onPress={(e) => {
+            e?.stopPropagation?.();
+            onArrowPress();
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="chevron-forward" size={22} color="#666" />
+        </TouchableOpacity>
+      )}
       {/* Inner card (clipped) – image + white overlay only */}
       <View style={styles.cardInner}>
         <View style={styles.imageBehind}>
@@ -211,6 +229,8 @@ export default function BusinessCard({
   onRequireAuth,
   onSharePress,
   onGuestListPress: onGuestListPressProp,
+  showArrowButton,
+  onArrowPress,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -310,6 +330,8 @@ export default function BusinessCard({
           onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
+          showArrowButton={showArrowButton}
+          onArrowPress={onArrowPress}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -357,6 +379,8 @@ export default function BusinessCard({
           onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
+          showArrowButton={showArrowButton}
+          onArrowPress={onArrowPress}
         />
       </Swipeable>
       <GuestListModal
@@ -560,6 +584,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  arrowButton: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    marginTop: -20,
+    zIndex: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
   },
   leftActionContainer: {
     justifyContent: 'center',
