@@ -56,6 +56,14 @@ export default function LoginScreen() {
     }
   }, [error, dispatch]);
 
+  // Auto-focus first OTP input when on OTP step so keyboard opens
+  useEffect(() => {
+    if (step === 'otp') {
+      const t = setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      return () => clearTimeout(t);
+    }
+  }, [step]);
+
   const handleSendOTP = async () => {
     if (!phone.trim()) {
       Alert.alert('Error', 'Please enter your phone number');

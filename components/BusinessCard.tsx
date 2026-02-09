@@ -88,6 +88,7 @@ function BusinessCardBase({
   const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
   const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
   const locationLabel = plan.location_text?.trim();
+  // Only these 4 tags: price, distance, F&B, location – nothing else
   const cardTags: { type: 'price' | 'distance' | 'fb' | 'location'; label: string }[] = [];
   if (firstTicketPrice != null && firstTicketPrice > 0) cardTags.push({ type: 'price', label: `₹${firstTicketPrice}` });
   if (distanceLabel) cardTags.push({ type: 'distance', label: distanceLabel });
@@ -155,6 +156,7 @@ function BusinessCardBase({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tagsScrollContent}
             style={styles.tagsScroll}
+            nestedScrollEnabled
           >
             {tagsToShow.map((item, index) => (
               <View key={`${item.type}-${index}`} style={styles.tag}>
@@ -556,9 +558,11 @@ const styles = StyleSheet.create({
   tagsScroll: {
     marginBottom: 12,
     maxHeight: 36,
+    flexGrow: 0,
   },
   tagsScrollContent: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     gap: 8,
     paddingRight: 8,

@@ -189,8 +189,8 @@ export default function SharedPlanCard({
             <Text style={[styles.actionButtonText, compact && styles.actionButtonTextCompact]}>{actionLabel}</Text>
           </TouchableOpacity>
         </View>
+        </View>
       </TouchableOpacity>
-      </View>
 
       {/* Sender pill - half outside, half on top edge (left or right per message side) */}
       {showSender && (

@@ -17,7 +17,7 @@ import { apiService } from '@/services/api';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 
-type TabType = 'their_plans' | 'my_plans' | 'groups';
+type TabType = 'their_plans' | 'my_plans' | 'groups' | 'my_events' | 'unread';
 
 interface ChatItem {
   group_id: string;
@@ -42,6 +42,7 @@ interface ChatItem {
   is_group: boolean;
   group_name: string;
   is_announcement_group?: boolean;
+  unread_count?: number;
 }
 
 export default function ChatScreen() {
@@ -49,7 +50,7 @@ export default function ChatScreen() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
-  const [activeTab, setActiveTab] = useState<TabType>('their_plans');
+  const [activeTab, setActiveTab] = useState<TabType>(isBusinessUser ? 'my_plans' : 'their_plans');
   const [theirPlans, setTheirPlans] = useState<ChatItem[]>([]);
   const [myPlans, setMyPlans] = useState<ChatItem[]>([]);
   const [groups, setGroups] = useState<ChatItem[]>([]);
@@ -122,6 +123,17 @@ export default function ChatScreen() {
           }
         }
 
+        // Pin announcement group on top; sort all others by recency of latest message (newest first)
+        const announcementItems = finalGroups.filter((g: any) => g.is_announcement_group || g.group_name === 'Announcement Group');
+        const nonAnnouncement = finalGroups.filter((g: any) => !g.is_announcement_group && g.group_name !== 'Announcement Group');
+        const getTimestamp = (item: any) => {
+          const ts = item?.last_message?.timestamp;
+          if (!ts) return 0;
+          return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();
+        };
+        nonAnnouncement.sort((a: any, b: any) => getTimestamp(b) - getTimestamp(a));
+        finalGroups = [...announcementItems, ...nonAnnouncement];
+
         setGroups(finalGroups);
       }
     } catch (error: any) {
@@ -138,6 +150,17 @@ export default function ChatScreen() {
   };
 
   const getCurrentData = () => {
+    if (isBusinessUser) {
+      switch (activeTab) {
+        case 'my_plans':
+          // Organisers: show all groups (event chats + announcement) in "My events"
+          return groups;
+        case 'unread':
+          return groups.filter((g: ChatItem) => (g.unread_count ?? 0) > 0);
+        default:
+          return groups;
+      }
+    }
     switch (activeTab) {
       case 'their_plans':
         return theirPlans;
@@ -150,14 +173,18 @@ export default function ChatScreen() {
     }
   };
 
-  // UPDATED: Returns the actual length of the data arrays
   const getBadgeCount = (type: TabType) => {
-      switch(type) {
-          case 'their_plans': return theirPlans.length;
-          case 'my_plans': return myPlans.length;
-          case 'groups': return groups.length;
-          default: return 0;
-      }
+    if (isBusinessUser) {
+      if (type === 'my_plans') return groups.length;
+      if (type === 'unread') return groups.filter((g: ChatItem) => (g.unread_count ?? 0) > 0).length;
+      return 0;
+    }
+    switch (type) {
+      case 'their_plans': return theirPlans.length;
+      case 'my_plans': return myPlans.length;
+      case 'groups': return groups.length;
+      default: return 0;
+    }
   };
 
   const formatTime = (timestamp: Date | string) => {
@@ -266,55 +293,90 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>Chats</Text>
       </View>
 
-      {/* Tabs */}
+      {/* Tabs: business users see only My events + Unread; others see Their Plans, My Plans, Groups */}
       <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'their_plans' && styles.tabActive]}
-          onPress={() => setActiveTab('their_plans')}
-        >
-          <Text style={[styles.tabText, activeTab === 'their_plans' && styles.tabTextActive]}>
-            Their Plans
-          </Text>
-          {getBadgeCount('their_plans') > 0 && (
-            <View style={[styles.badge, activeTab === 'their_plans' && styles.badgeActive]}>
-              <Text style={[styles.badgeText, activeTab === 'their_plans' && styles.badgeTextActive]}>
-                  {getBadgeCount('their_plans')}
+        {isBusinessUser ? (
+          <>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'my_plans' && styles.tabActive]}
+              onPress={() => setActiveTab('my_plans')}
+            >
+              <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
+                My events
               </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'my_plans' && styles.tabActive]}
-          onPress={() => setActiveTab('my_plans')}
-        >
-          <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
-            My Plans
-          </Text>
-          {getBadgeCount('my_plans') > 0 && (
-            <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>
-              <Text style={[styles.badgeText, activeTab === 'my_plans' && styles.badgeTextActive]}>
-                  {getBadgeCount('my_plans')}
+              {getBadgeCount('my_plans') > 0 && (
+                <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'my_plans' && styles.badgeTextActive]}>
+                    {getBadgeCount('my_plans')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'unread' && styles.tabActive]}
+              onPress={() => setActiveTab('unread')}
+            >
+              <Text style={[styles.tabText, activeTab === 'unread' && styles.tabTextActive]}>
+                Unread
               </Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
-          onPress={() => setActiveTab('groups')}
-        >
-          <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
-            Groups
-          </Text>
-          {getBadgeCount('groups') > 0 && (
-            <View style={[styles.badge, activeTab === 'groups' && styles.badgeActive]}>
-              <Text style={[styles.badgeText, activeTab === 'groups' && styles.badgeTextActive]}>
-                  {getBadgeCount('groups')}
+              {getBadgeCount('unread') > 0 && (
+                <View style={[styles.badge, activeTab === 'unread' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'unread' && styles.badgeTextActive]}>
+                    {getBadgeCount('unread')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'their_plans' && styles.tabActive]}
+              onPress={() => setActiveTab('their_plans')}
+            >
+              <Text style={[styles.tabText, activeTab === 'their_plans' && styles.tabTextActive]}>
+                Their Plans
               </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+              {getBadgeCount('their_plans') > 0 && (
+                <View style={[styles.badge, activeTab === 'their_plans' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'their_plans' && styles.badgeTextActive]}>
+                    {getBadgeCount('their_plans')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'my_plans' && styles.tabActive]}
+              onPress={() => setActiveTab('my_plans')}
+            >
+              <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
+                My Plans
+              </Text>
+              {getBadgeCount('my_plans') > 0 && (
+                <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'my_plans' && styles.badgeTextActive]}>
+                    {getBadgeCount('my_plans')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
+              onPress={() => setActiveTab('groups')}
+            >
+              <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
+                Groups
+              </Text>
+              {getBadgeCount('groups') > 0 && (
+                <View style={[styles.badge, activeTab === 'groups' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'groups' && styles.badgeTextActive]}>
+                    {getBadgeCount('groups')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Chat List */}

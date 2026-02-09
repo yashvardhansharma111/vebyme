@@ -233,15 +233,23 @@ export default function AttendeeListScreen() {
             </Text>
           </View>
         ) : (
-          filteredAttendees.map((attendee) => (
+          filteredAttendees.map((attendee) => {
+            const userId = attendee.user_id || attendee.user?.user_id;
+            return (
             <View key={attendee.registration_id} style={styles.attendeeItem}>
-              <Avatar uri={attendee.user?.profile_image} size={48} />
-              <View style={styles.attendeeInfo}>
-                <Text style={styles.attendeeName}>{attendee.user?.name || 'Unknown User'}</Text>
-                {attendee.ticket_number && (
-                  <Text style={styles.attendeeTicket}>Ticket: {attendee.ticket_number}</Text>
-                )}
-              </View>
+              <TouchableOpacity
+                style={styles.attendeeProfileTouch}
+                onPress={() => userId && router.push({ pathname: '/profile/[userId]', params: { userId } } as any)}
+                activeOpacity={0.7}
+              >
+                <Avatar uri={attendee.user?.profile_image} size={48} />
+                <View style={styles.attendeeInfo}>
+                  <Text style={styles.attendeeName}>{attendee.user?.name || 'Unknown User'}</Text>
+                  {attendee.ticket_number && (
+                    <Text style={styles.attendeeTicket}>Ticket: {attendee.ticket_number}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
               <View style={styles.attendeeActions}>
                 {attendee.checked_in ? (
                   <>
@@ -265,7 +273,8 @@ export default function AttendeeListScreen() {
                 )}
               </View>
             </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </SafeAreaView>
@@ -372,6 +381,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  attendeeProfileTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   attendeeInfo: {
     flex: 1,
