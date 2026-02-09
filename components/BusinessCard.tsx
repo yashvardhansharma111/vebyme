@@ -54,6 +54,8 @@ interface BusinessCardProps {
   /** Show a small arrow on the right; when tapped, calls onArrowPress (e.g. open business posts list) */
   showArrowButton?: boolean;
   onArrowPress?: () => void;
+  /** When true, hide Register button (e.g. business user viewing their own event) */
+  hideRegisterButton?: boolean;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -72,7 +74,8 @@ function BusinessCardBase({
   hideActions = false,
   showArrowButton,
   onArrowPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean }) {
+  hideRegisterButton = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
@@ -167,9 +170,11 @@ function BusinessCardBase({
         )}
         {!hideActions && (
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-              <Text style={styles.registerButtonText}>Register</Text>
-            </TouchableOpacity>
+            {!hideRegisterButton && (
+              <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+                <Text style={styles.registerButtonText}>Register</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
               <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
             </TouchableOpacity>
@@ -223,6 +228,7 @@ export default function BusinessCard({
   interactedUsers: interactedUsersProp,
   isSwipeable = true,
   hideActions = false,
+  hideRegisterButton = false,
   containerStyle,
   onPress,
   onRegisterPress,
@@ -332,6 +338,7 @@ export default function BusinessCard({
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
+          hideRegisterButton={hideRegisterButton}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
         />
@@ -383,6 +390,7 @@ export default function BusinessCard({
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
+          hideRegisterButton={hideRegisterButton}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
         />

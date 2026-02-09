@@ -23,7 +23,10 @@ export interface SharedPlanCardPlan {
 
 interface SharedPlanCardProps {
   plan: SharedPlanCardPlan;
+  /** When user taps Register/Join or the card body – open plan detail */
   onJoinPress?: () => void;
+  /** When user taps the card (not just the button) – open plan preview/detail */
+  onCardPress?: () => void;
   onRepostPress?: () => void;
   onSharePress?: () => void;
   containerStyle?: ViewStyle;
@@ -75,6 +78,7 @@ function getPlanTags(plan: SharedPlanCardPlan): string[] {
 export default function SharedPlanCard({
   plan,
   onJoinPress,
+  onCardPress,
   onRepostPress,
   onSharePress,
   containerStyle,
@@ -95,14 +99,19 @@ export default function SharedPlanCard({
   const actionLabel = isBusiness ? 'Register' : 'Join';
   const showSender = senderName != null || senderTime != null;
 
+  const openPlan = onCardPress ?? onJoinPress;
   const handleAction = () => {
-    onJoinPress?.();
+    (onJoinPress ?? onCardPress)?.();
   };
 
   return (
     <View style={[styles.cardOuter, showSender && styles.cardOuterWithPill, containerStyle]}>
-      {/* White card - same as feed */}
-      <View style={[styles.card, compact && styles.cardCompact, showSender && (compact ? styles.cardWithPillCompact : styles.cardWithPill)]}>
+      {/* White card – tappable to open plan preview/detail */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={openPlan}
+        style={[styles.card, compact && styles.cardCompact, showSender && (compact ? styles.cardWithPillCompact : styles.cardWithPill)]}
+      >
         {/* Hero image (business) - or default placeholder when no image */}
         {isBusiness && (
           hasImage ? (
@@ -180,7 +189,7 @@ export default function SharedPlanCard({
             <Text style={[styles.actionButtonText, compact && styles.actionButtonTextCompact]}>{actionLabel}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
       </View>
 
       {/* Sender pill - half outside, half on top edge (left or right per message side) */}

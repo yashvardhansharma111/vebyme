@@ -301,6 +301,11 @@ export default function IndividualChatScreen() {
   const renderSharedPlanCard = (plan: Message['shared_plan'], item: Message) => {
     if (!plan) return null;
     const isMe = item.user_id === user?.user_id;
+    const openPlan = () => {
+      if (plan.plan_id) {
+        router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.plan_id } } as any);
+      }
+    };
     return (
       <SharedPlanCard
         plan={{
@@ -313,10 +318,8 @@ export default function IndividualChatScreen() {
           category_sub: plan.category_sub,
           is_business: plan.is_business,
         }}
-        onJoinPress={() =>
-          plan.plan_id &&
-          router.push((plan.is_business ? `/business-plan/${plan.plan_id}` : `/plan/${plan.plan_id}`) as any)
-        }
+        onJoinPress={openPlan}
+        onCardPress={openPlan}
         senderName={isMe ? 'You' : item.user?.name}
         senderTime={formatTimeHeader(item.timestamp)}
         senderAvatar={isMe ? undefined : item.user?.profile_image}

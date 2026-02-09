@@ -24,8 +24,29 @@ interface FeedPost {
   type?: string;
 }
 
-const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
-const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel'];
+const FILTERS = ['Clubs', 'Today', 'Tomorrow', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
+const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel', 'Comedy', 'Sports'];
+const TEMPORAL_FILTERS = ['Today', 'Tomorrow'];
+
+function isEventDateInRange(eventDate: string | Date | undefined, filter: string): boolean {
+  if (!eventDate) return false;
+  const d = typeof eventDate === 'string' ? new Date(eventDate) : new Date(eventDate.getTime());
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
+  const eventDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  if (filter === 'Today') return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
+  if (filter === 'Tomorrow') return eventDayStart >= tomorrowStart && eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000;
+  return false;
+}
+
+function sortPostsByTimestamp(posts: any[]): any[] {
+  return [...posts].sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tb - ta;
+  });
+}
 
 interface FormattedEvent {
   id: string;
@@ -183,23 +204,31 @@ export default function BusinessPostsScreen() {
     return formattedEvents;
   }, [fetchUserProfile]);
 
-  const loadFeed = useCallback(async (isRefresh = false) => {
+  const loadFeed = useCallback(async (isRefresh = false, filterOverride?: string | null) => {
+    const currentFilter = filterOverride !== undefined ? filterOverride : activeFilter;
     try {
       if (isRefresh) {
         setIsRefreshing(true);
-      } else {
+      } else if (filterOverride === undefined) {
         setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
       }
       setError(null);
 
       const filters: any = {};
-      if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
-        filters.category_main = activeFilter.toLowerCase();
+      if (currentFilter && CATEGORY_FILTERS.includes(currentFilter)) {
+        filters.category_main = currentFilter.toLowerCase();
       }
       const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 50, offset: 0 });
+      let data = response.data;
 
-      if (response.data && Array.isArray(response.data)) {
-        const businessPlans = response.data.filter((post: any) => post.type === 'business');
+      if (data && Array.isArray(data)) {
+        let businessPlans = data.filter((post: any) => post.type === 'business');
+        if (currentFilter && TEMPORAL_FILTERS.includes(currentFilter)) {
+          businessPlans = businessPlans.filter((p: any) => isEventDateInRange(p.date ?? p.timestamp, currentFilter));
+        }
+        businessPlans = sortPostsByTimestamp(businessPlans);
         setBusinessPostsData(businessPlans);
         const formatted = await formatFeedData(businessPlans);
         setEvents(formatted);
@@ -255,15 +284,18 @@ export default function BusinessPostsScreen() {
               <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
             }
           >
-            {/* Filters – same as index */}
+            {/* Filters – selected tag moves to front; tap filters immediately (Happening Near Me) */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-              {FILTERS.map((filter, index) => {
+              {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter) => {
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity
-                    key={index}
+                    key={filter}
                     style={isActive ? styles.activeFilterChip : styles.filterChip}
-                    onPress={() => setActiveFilter(filter)}
+                    onPress={() => {
+                      setActiveFilter(isActive ? null : filter);
+                      loadFeed(false, isActive ? null : filter);
+                    }}
                   >
                     <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
                   </TouchableOpacity>
@@ -312,37 +344,42 @@ export default function BusinessPostsScreen() {
                       attendeesCount={rawPost?.joins_count ?? 0}
                       interactedUsers={item.event?.interacted_users}
                       isSwipeable={true}
+                      hideRegisterButton={rawPost?.user_id === user?.user_id}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
                       }}
                       onRegisterPress={async () => {
-                        if (isAuthenticated && user?.user_id) {
-                          try {
-                            const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
-                            if (alreadyRegistered) {
-                              Alert.alert(
-                                'Already Registered',
-                                "You are already registered for this event. You can check your pass from your profile."
-                              );
-                              return;
-                            }
-                            const response = await apiService.registerForEvent(item.id, user.user_id);
-                            if (response.success && response.data?.ticket) {
-                              const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                              router.push({
-                                pathname: '/ticket/[ticketId]',
-                                params: { 
-                                  ticketId: response.data.ticket.ticket_id,
-                                  planId: item.id,
-                                  ticketData: ticketData
-                                }
-                              } as any);
-                            }
-                          } catch (error: any) {
-                            Alert.alert('Registration Failed', error.message || 'Failed to register for event');
-                          }
-                        } else {
+                        if (!isAuthenticated || !user?.user_id) {
                           setShowLoginModal(true);
+                          return;
+                        }
+                        if (rawPost?.user_id === user?.user_id) {
+                          Alert.alert('Cannot Register', "You can't register for your own event.");
+                          return;
+                        }
+                        try {
+                          const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                          if (alreadyRegistered) {
+                            Alert.alert(
+                              'Already Registered',
+                              "You are already registered for this event. You can check your pass from your profile."
+                            );
+                            return;
+                          }
+                          const response = await apiService.registerForEvent(item.id, user.user_id);
+                          if (response.success && response.data?.ticket) {
+                            const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                            router.push({
+                              pathname: '/ticket/[ticketId]',
+                              params: { 
+                                ticketId: response.data.ticket.ticket_id,
+                                planId: item.id,
+                                ticketData: ticketData
+                              }
+                            } as any);
+                          }
+                        } catch (error: any) {
+                          Alert.alert('Registration Failed', error.message || 'Failed to register for event');
                         }
                       }}
                       onRequireAuth={() => {

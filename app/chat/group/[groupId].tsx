@@ -573,20 +573,22 @@ export default function GroupChatScreen() {
                   category_sub: item.shared_plan.category_sub,
                   is_business: item.shared_plan.is_business,
                 }}
-                onJoinPress={() =>
-                  item.shared_plan?.plan_id &&
-                  router.push(
-                    (item.shared_plan.is_business
-                      ? `/business-plan/${item.shared_plan.plan_id}`
-                      : `/plan/${item.shared_plan.plan_id}`) as any
-                  )
-                }
-                  senderName={isMe ? 'You' : item.user?.name}
-                  senderTime={formatTimeHeader(item.timestamp)}
-                  senderAvatar={isMe ? undefined : item.user?.profile_image}
-                  pillPosition="left"
-                  compact
-                />
+                onJoinPress={() => {
+                  if (item.shared_plan?.plan_id) {
+                    router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
+                  }
+                }}
+                onCardPress={() => {
+                  if (item.shared_plan?.plan_id) {
+                    router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
+                  }
+                }}
+                senderName={isMe ? 'You' : item.user?.name}
+                senderTime={formatTimeHeader(item.timestamp)}
+                senderAvatar={isMe ? undefined : item.user?.profile_image}
+                pillPosition="left"
+                compact
+              />
             </View>
           ) : item.type === 'image' ? (
             <View style={styles.imageMessageWrap}>

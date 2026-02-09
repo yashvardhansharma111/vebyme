@@ -134,9 +134,16 @@ export default function BusinessPlanDetailScreen() {
 
   const { user } = useAppSelector((state) => state.auth);
 
+  const isOwnEvent = !!(plan && user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id));
+
   const handleRegister = async () => {
     if (!user?.user_id || !user?.access_token) {
       Alert.alert('Login Required', 'Please log in to register for this event');
+      return;
+    }
+
+    if (isOwnEvent) {
+      Alert.alert('Cannot Register', "You can't register for your own event.");
       return;
     }
 
@@ -401,9 +408,11 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Register</Text>
-          </TouchableOpacity>
+          {!isOwnEvent && (
+            <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
+              <Text style={styles.registerButtonText}>Register</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
 

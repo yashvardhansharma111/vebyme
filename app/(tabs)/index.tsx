@@ -37,8 +37,29 @@ function ProfileAvatar() {
   );
 }
 
-const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
-const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel'];
+const FILTERS = ['Clubs', 'Today', 'Tomorrow', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
+const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel', 'Comedy', 'Sports'];
+const TEMPORAL_FILTERS = ['Today', 'Tomorrow'];
+
+function isEventDateInRange(eventDate: string | Date | undefined, filter: string): boolean {
+  if (!eventDate) return false;
+  const d = typeof eventDate === 'string' ? new Date(eventDate) : new Date(eventDate.getTime());
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
+  const eventDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  if (filter === 'Today') return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
+  if (filter === 'Tomorrow') return eventDayStart >= tomorrowStart && eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000;
+  return false;
+}
+
+function sortPostsByTimestamp(posts: any[]): any[] {
+  return [...posts].sort((a, b) => {
+    const ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return tb - ta;
+  });
+}
 
 interface FeedPost {
   post_id: string;
@@ -270,46 +291,46 @@ export default function HomeScreen() {
     return formattedEvents;
   }, [fetchUserProfile]);
 
-  const loadFeed = useCallback(async (isRefresh = false) => {
+  const loadFeed = useCallback(async (isRefresh = false, filterOverride?: string | null) => {
+    const currentFilter = filterOverride !== undefined ? filterOverride : activeFilter;
     try {
       if (isRefresh) {
         setIsRefreshing(true);
-      } else {
+      } else if (filterOverride === undefined) {
         setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
       }
       setError(null);
 
-      // Map filter to category if applicable (no filter applied when app opens)
       const filters: any = {};
-      if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
-        filters.category_main = activeFilter.toLowerCase();
+      if (currentFilter && CATEGORY_FILTERS.includes(currentFilter)) {
+        filters.category_main = currentFilter.toLowerCase();
       }
-      // Note: 'Today', 'Comedy', 'Sports' filters could be implemented with temporal_tags or other logic
-      // For now, we'll just show all posts when these are selected
 
-      // Allow guests to view feed (user_id is optional)
       const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 30, offset: 0 });
-      
-      const data = response.data;
+      let data = response.data;
+
       if (data && Array.isArray(data)) {
+        if (currentFilter && TEMPORAL_FILTERS.includes(currentFilter)) {
+          data = data.filter((p: any) => isEventDateInRange(p.date ?? p.timestamp, currentFilter));
+        }
+        data = sortPostsByTimestamp(data);
+
         const formatted = await formatFeedData(data);
-        
-        // Separate business plans from regular plans
+
         const businessPlans = formatted.filter(item => {
           const post = data.find((p: any) => p.post_id === item.id);
           return post?.type === 'business';
         });
-        
-        // Store raw business post data for BusinessCard component
         const rawBusinessPosts = data.filter((p: any) => p.type === 'business');
         setBusinessPostsData(rawBusinessPosts);
-        
-        // Filter out business plans from main feed
+
         const regularPlans = formatted.filter(item => {
           const post = data.find((p: any) => p.post_id === item.id);
           return post?.type !== 'business';
         });
-        
+
         setBusinessEvents(businessPlans);
         setEvents(regularPlans);
       } else {
@@ -430,15 +451,18 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Filters – same as business-posts; no filter selected when app opens */}
+            {/* Filters – selected tag moves to front; tap filters immediately */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-              {FILTERS.map((filter, index) => {
+              {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter, index) => {
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity
-                    key={index}
+                    key={filter}
                     style={isActive ? styles.activeFilterChip : styles.filterChip}
-                    onPress={() => setActiveFilter(filter)}
+                    onPress={() => {
+                      setActiveFilter(isActive ? null : filter);
+                      loadFeed(false, isActive ? null : filter);
+                    }}
                   >
                     <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
                   </TouchableOpacity>
@@ -477,18 +501,26 @@ export default function HomeScreen() {
                     onPress={() => {
                       router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
                     }}
+                    hideRegisterButton={rawPost?.user_id === user?.user_id}
                     onRegisterPress={async () => {
-                      if (isAuthenticated && user?.user_id) {
-                        try {
-                          const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
-                          if (alreadyRegistered) {
-                            Alert.alert(
-                              'Already Registered',
-                              "You are already registered for this event. You can check your pass from your profile."
-                            );
-                            return;
-                          }
-                          const response = await apiService.registerForEvent(item.id, user.user_id);
+                      if (!isAuthenticated || !user?.user_id) {
+                        setShowLoginModal(true);
+                        return;
+                      }
+                      if (rawPost?.user_id === user?.user_id) {
+                        Alert.alert('Cannot Register', "You can't register for your own event.");
+                        return;
+                      }
+                      try {
+                        const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                        if (alreadyRegistered) {
+                          Alert.alert(
+                            'Already Registered',
+                            "You are already registered for this event. You can check your pass from your profile."
+                          );
+                          return;
+                        }
+                        const response = await apiService.registerForEvent(item.id, user.user_id);
                           if (response.success && response.data?.ticket) {
                             const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
                             router.push({
@@ -500,11 +532,8 @@ export default function HomeScreen() {
                               }
                             } as any);
                           }
-                        } catch (error: any) {
-                          Alert.alert('Registration Failed', error.message || 'Failed to register for event');
-                        }
-                      } else {
-                        setShowLoginModal(true);
+                      } catch (error: any) {
+                        Alert.alert('Registration Failed', error.message || 'Failed to register for event');
                       }
                     }}
                     onRequireAuth={() => {
