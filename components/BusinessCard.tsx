@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useState, useRef } from 'react';
 import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -76,9 +77,11 @@ function BusinessCardBase({
   onArrowPress,
   hideRegisterButton = false,
 }: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean }) {
+  const router = useRouter();
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
+  const organizerUserId = plan.user?.user_id;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
   const passes = plan.passes || [];
   const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
@@ -188,14 +191,24 @@ function BusinessCardBase({
       </View>
       </View>
 
-      {/* Organizer pill – top left: name + time, author avatar on the right of the name */}
-      <View style={styles.organizerPill} pointerEvents="none">
+      {/* Organizer pill – tappable to open organizer profile */}
+      <TouchableOpacity
+        style={styles.organizerPill}
+        activeOpacity={0.8}
+        onPress={(e) => {
+          e?.stopPropagation?.();
+          if (organizerUserId) {
+            router.push({ pathname: '/profile/[userId]', params: { userId: organizerUserId } } as any);
+          }
+        }}
+        disabled={!organizerUserId}
+      >
         <View style={styles.organizerInfo}>
           <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
           <Text style={styles.organizerTime} numberOfLines={1}>{timeText}</Text>
         </View>
         <Avatar uri={organizerAvatar} size={26} style={styles.organizerAvatarRight} />
-      </View>
+      </TouchableOpacity>
 
       {/* Attendees – always 3 circles (avatars or default DP), then +counter (FIGMA) */}
       {onGuestListPress && (

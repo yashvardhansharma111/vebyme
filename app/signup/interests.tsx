@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
@@ -96,6 +97,9 @@ export default function SignupInterestsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
+      </TouchableOpacity>
       <View style={styles.contentContainer}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -151,6 +155,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F2', // Light gray background
+  },
+  backButton: {
+    position: 'absolute',
+    top: 56,
+    left: 20,
+    zIndex: 10,
+    padding: 8,
   },
   contentContainer: {
     flex: 1,

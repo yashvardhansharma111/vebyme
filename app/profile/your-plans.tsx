@@ -204,7 +204,14 @@ export default function YourPlansScreen() {
             const isCancelling = cancellingPlanId === plan.plan_id;
 
             return (
-              <View key={plan.plan_id || `plan-${index}`} style={styles.planCard}>
+              <TouchableOpacity
+                key={plan.plan_id || `plan-${index}`}
+                style={styles.planCard}
+                activeOpacity={0.9}
+                onPress={() => {
+                  router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any);
+                }}
+              >
                 
                 {/* Repost Badge */}
                 {plan.is_repost && (
@@ -292,7 +299,7 @@ export default function YourPlansScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             );
           })
         )}

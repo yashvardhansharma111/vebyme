@@ -68,7 +68,6 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
       if (result.payload) {
         setOtpId(result.payload.otp_id);
         setStep('otp');
-        Alert.alert('Success', 'OTP sent successfully! Check console for OTP.');
       }
     }
   };
@@ -98,7 +97,6 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
     if (resendOTP.fulfilled.match(result)) {
       if (result.payload) {
         setOtpId(result.payload.otp_id);
-        Alert.alert('Success', 'OTP resent successfully!');
       }
     }
     setResendLoading(false);

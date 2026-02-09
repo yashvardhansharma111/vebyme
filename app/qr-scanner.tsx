@@ -13,7 +13,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Avatar from '@/components/Avatar';
 
 /** Scan API response – adjust to match your backend */
 interface ScanResultData {
@@ -44,6 +43,9 @@ export default function QRScannerScreen() {
   const [scanResult, setScanResult] = useState<ScanResultData | null>(null);
   const [scanning, setScanning] = useState(false);
   const [lastScannedHash, setLastScannedHash] = useState<string | null>(null);
+  const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const [checkedInCount, setCheckedInCount] = useState<number | null>(null);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const handleClose = useCallback(() => router.back(), [router]);
 
@@ -100,13 +102,13 @@ export default function QRScannerScreen() {
           setScanResult(null);
           return;
         }
-        setScanResult({
-          plan: result?.plan ?? result?.event,
-          attendee: result?.attendee ?? result?.user,
-          checked_in_count: result?.checked_in_count ?? result?.checked_in,
-          total: result?.total ?? result?.attendees_count,
-          already_checked_in: result?.already_checked_in,
-        });
+        const attendee = result?.attendee ?? result?.user;
+        const name = attendee?.name || 'User';
+        setCheckedInCount(result?.checked_in_count ?? result?.checked_in ?? null);
+        setTotalCount(result?.total ?? result?.attendees_count ?? null);
+        setSnackbarMessage(`${name} checked in`);
+        setTimeout(() => setSnackbarMessage(null), 2500);
+        setScanResult(null);
       } catch (error: any) {
         Alert.alert('Scan failed', error?.message ?? 'Invalid or already used ticket.');
         setScanResult(null);
@@ -116,19 +118,6 @@ export default function QRScannerScreen() {
     },
     [user?.user_id, scanning, selectedPlanId]
   );
-
-  const formatDate = (date: string | undefined) => {
-    if (!date) return '';
-    const d = new Date(date);
-    const day = d.getDate();
-    const ord = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
-    return `${day}${ord} ${d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`;
-  };
-
-  const scanAgain = () => {
-    setScanResult(null);
-    setLastScannedHash(null);
-  };
 
   if (!permission) {
     return (
@@ -204,11 +193,9 @@ export default function QRScannerScreen() {
     );
   }
 
-  const confirmed = !!scanResult && (scanResult.plan || scanResult.attendee);
-  const plan = scanResult?.plan;
-  const attendee = scanResult?.attendee;
-  const checkedIn = scanResult?.checked_in_count ?? 0;
-  const total = scanResult?.total ?? 0;
+  const confirmed = false;
+  const checkedIn = checkedInCount ?? 0;
+  const total = totalCount ?? 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -216,78 +203,39 @@ export default function QRScannerScreen() {
         <TouchableOpacity onPress={handleClose} style={styles.navBtn}>
           <Ionicons name="close" size={28} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.title}>{confirmed ? 'Scanner - Confirmed' : 'Scanner'}</Text>
+        <Text style={styles.title}>Scanner</Text>
         <TouchableOpacity style={styles.attendeeListBtn} onPress={handleAttendeeList}>
           <Ionicons name="person" size={18} color="#FFF" />
           <Text style={styles.attendeeListText}>Attendee List</Text>
         </TouchableOpacity>
       </View>
 
-      {confirmed && (
+      {total > 0 && (
         <View style={styles.statsRow}>
           <Text style={styles.statsText}>Checked In: {checkedIn}/{total}</Text>
         </View>
       )}
 
       <View style={styles.cameraWrap}>
-        {!confirmed ? (
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            onBarcodeScanned={scanning ? undefined : handleBarCodeScanned}
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          >
-            <View style={styles.scanFrame} />
-            {scanning && (
-              <View style={styles.scanningOverlay}>
-                <ActivityIndicator size="large" color="#FFF" />
-              </View>
-            )}
-          </CameraView>
-        ) : (
-          <View style={styles.cameraPlaceholder}>
-            <View style={styles.scanFrame} />
-          </View>
-        )}
+        <CameraView
+          style={styles.camera}
+          facing="back"
+          onBarcodeScanned={scanning ? undefined : handleBarCodeScanned}
+          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+        >
+          <View style={styles.scanFrame} />
+          {scanning && (
+            <View style={styles.scanningOverlay}>
+              <ActivityIndicator size="large" color="#FFF" />
+            </View>
+          )}
+        </CameraView>
       </View>
 
-      {confirmed && (
-        <View style={styles.details}>
-          {plan?.title && <Text style={styles.eventTitle}>{plan.title}</Text>}
-          {(plan?.date || plan?.time) && (
-            <View style={styles.detailRow}>
-              <Ionicons name="time-outline" size={18} color="#666" />
-              <Text style={styles.detailText}>
-                {formatDate(plan?.date)}
-                {plan?.time ? ` | ${plan.time} onwards` : ''}
-              </Text>
-            </View>
-          )}
-          {plan?.location_text && (
-            <View style={styles.detailRow}>
-              <Ionicons name="location-outline" size={18} color="#666" />
-              <Text style={styles.detailText}>{plan.location_text}</Text>
-            </View>
-          )}
-
-          {attendee && (
-            <View style={styles.attendeeRow}>
-              <View style={styles.attendeePill}>
-                <Avatar uri={attendee.profile_image} size={44} />
-                <View style={styles.attendeeInfo}>
-                  <Text style={styles.attendeeName}>{attendee.name || 'Attendee'}</Text>
-                  <Text style={styles.approvedLabel}>Approved</Text>
-                </View>
-              </View>
-              <View style={styles.checkCircle}>
-                <Ionicons name="checkmark" size={36} color="#FFF" />
-              </View>
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.scanAgainBtn} onPress={scanAgain}>
-            <Text style={styles.scanAgainText}>Scan another</Text>
-          </TouchableOpacity>
+      {snackbarMessage && (
+        <View style={styles.snackbar}>
+          <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+          <Text style={styles.snackbarText}>{snackbarMessage}</Text>
         </View>
       )}
     </SafeAreaView>
@@ -365,6 +313,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  snackbar: {
+    position: 'absolute',
+    bottom: 32,
+    left: 24,
+    right: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(52, 199, 89, 0.95)',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  snackbarText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
   },
   cameraPlaceholder: {
     flex: 1,

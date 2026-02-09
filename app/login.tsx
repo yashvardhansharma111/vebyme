@@ -14,6 +14,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors, borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { store } from '@/store/store';
@@ -75,7 +76,6 @@ export default function LoginScreen() {
       if (result.payload) {
         setOtpId(result.payload.otp_id);
         setStep('otp');
-        Alert.alert('Success', 'OTP sent successfully! Check console for OTP.');
       }
     }
   };
@@ -112,7 +112,6 @@ export default function LoginScreen() {
     if (resendOTP.fulfilled.match(result)) {
       if (result.payload) {
         setOtpId(result.payload.otp_id);
-        Alert.alert('Success', 'OTP resent successfully!');
       }
     }
     setResendLoading(false);
@@ -126,7 +125,11 @@ export default function LoginScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.contentContainer}>
-            
+            {step === 'otp' && (
+              <TouchableOpacity style={styles.backButton} onPress={() => setStep('phone')}>
+                <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            )}
             {/* --- TOP SECTION --- */}
             <View style={styles.topSection}>
               <View style={styles.header}>
@@ -248,6 +251,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 60,
     paddingBottom: 20,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 16,
+    left: 24,
+    zIndex: 10,
+    padding: 8,
   },
   topSection: {
     width: '100%',

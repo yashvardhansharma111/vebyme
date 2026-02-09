@@ -4,12 +4,13 @@ import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { useSnackbar } from '@/context/SnackbarContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   Share,
   StyleSheet,
@@ -63,10 +64,23 @@ export default function BusinessPlanDetailScreen() {
   const [selectedPass, setSelectedPass] = useState<string | null>(null);
   const [showGuestListModal, setShowGuestListModal] = useState(false);
   const [heroImageIndex, setHeroImageIndex] = useState(0);
+  const [showImageGallery, setShowImageGallery] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const galleryScrollRef = useRef<ScrollView>(null);
+  const screenWidth = Dimensions.get('window').width;
 
   useEffect(() => {
     loadPlan();
   }, [planId]);
+
+  useEffect(() => {
+    if (showImageGallery && galleryScrollRef.current) {
+      const t = setTimeout(() => {
+        galleryScrollRef.current?.scrollTo({ x: galleryIndex * screenWidth, animated: false });
+      }, 50);
+      return () => clearTimeout(t);
+    }
+  }, [showImageGallery, galleryIndex, screenWidth]);
 
   const loadPlan = async () => {
     try {
@@ -242,7 +256,7 @@ export default function BusinessPlanDetailScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Images - scrollable up to 5 */}
+        {/* Hero Images - scrollable up to 5; tap to open gallery */}
         <View style={styles.headerImageContainer}>
           <ScrollView
             horizontal
@@ -256,9 +270,17 @@ export default function BusinessPlanDetailScreen() {
             }}
           >
             {planMedia.map((item, index) => (
-              <View key={index} style={[styles.heroSlide, { width: Dimensions.get('window').width }]}>
+              <TouchableOpacity
+                key={index}
+                style={[styles.heroSlide, { width: Dimensions.get('window').width }]}
+                activeOpacity={1}
+                onPress={() => {
+                  setGalleryIndex(index);
+                  setShowImageGallery(true);
+                }}
+              >
                 <Image source={{ uri: item.url }} style={styles.headerImage} resizeMode="cover" />
-              </View>
+              </TouchableOpacity>
             ))}
           </ScrollView>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -283,14 +305,24 @@ export default function BusinessPlanDetailScreen() {
               </View>
             </TouchableOpacity>
           </View>
-          {/* Organizer pill – top left over hero */}
-          <View style={styles.organizerPill}>
+          {/* Organizer pill – tappable to open organizer profile */}
+          <TouchableOpacity
+            style={styles.organizerPill}
+            activeOpacity={0.8}
+            onPress={() => {
+              const userId = organizer?.user_id ?? plan?.user_id;
+              if (userId) {
+                router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+              }
+            }}
+            disabled={!(organizer?.user_id ?? plan?.user_id)}
+          >
             <Avatar uri={organizerAvatar} size={32} />
             <View style={styles.organizerInfo}>
               <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
               <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
             </View>
-          </View>
+          </TouchableOpacity>
           {/* Carousel dots */}
           {mediaCount > 1 && (
             <View style={styles.carouselDots}>
@@ -446,6 +478,49 @@ export default function BusinessPlanDetailScreen() {
           handleRegister();
         }}
       />
+
+      {/* Full-screen image gallery modal */}
+      <Modal
+        visible={showImageGallery}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowImageGallery(false)}
+      >
+        <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
+          <TouchableOpacity
+            style={styles.galleryCloseButton}
+            onPress={() => setShowImageGallery(false)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+          <ScrollView
+            ref={galleryScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.galleryScroll}
+            contentContainerStyle={styles.galleryScrollContent}
+            onMomentumScrollEnd={(e) => {
+              const index = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
+              setGalleryIndex(index);
+            }}
+          >
+            {planMedia.map((item, index) => (
+              <View key={index} style={[styles.gallerySlide, { width: screenWidth }]}>
+                <Image source={{ uri: item.url }} style={styles.galleryImage} resizeMode="contain" />
+              </View>
+            ))}
+          </ScrollView>
+          {mediaCount > 1 && (
+            <View style={styles.galleryDots}>
+              {planMedia.map((_, i) => (
+                <View key={i} style={[styles.galleryDot, i === galleryIndex && styles.galleryDotActive]} />
+              ))}
+            </View>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -582,6 +657,58 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  galleryOverlay: {
+    flex: 1,
+    backgroundColor: '#2C2C2E',
+  },
+  galleryCloseButton: {
+    position: 'absolute',
+    top: 12,
+    left: 20,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryScroll: {
+    flex: 1,
+  },
+  galleryScrollContent: {},
+  gallerySlide: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  galleryDots: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10,
+  },
+  galleryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  galleryDotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFF',
   },
   contentPanel: {
     backgroundColor: '#FFF',

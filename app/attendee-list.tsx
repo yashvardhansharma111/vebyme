@@ -30,6 +30,7 @@ interface Attendee {
   status: string;
   checked_in: boolean;
   checked_in_at: string | null;
+  checked_in_via?: 'qr' | 'manual' | null;
   price_paid: number;
   created_at: string;
 }
@@ -250,6 +251,9 @@ export default function AttendeeListScreen() {
                   {attendee.ticket_number && (
                     <Text style={styles.attendeeTicket}>Ticket: {attendee.ticket_number}</Text>
                   )}
+                  {attendee.checked_in && attendee.checked_in_via === 'manual' && (
+                    <Text style={styles.checkedManuallyText}>{'checked manually'}</Text>
+                  )}
                 </View>
               </TouchableOpacity>
               <View style={styles.attendeeActions}>
@@ -258,12 +262,14 @@ export default function AttendeeListScreen() {
                     <View style={styles.checkedInBadge}>
                       <Ionicons name="checkmark-circle" size={24} color="#10B981" />
                     </View>
-                    <TouchableOpacity
-                      style={styles.uncheckButton}
-                      onPress={() => handleCheckIn(attendee.registration_id, true)}
-                    >
-                      <Text style={styles.uncheckButtonText}>Uncheck</Text>
-                    </TouchableOpacity>
+                    {attendee.checked_in_via === 'manual' && (
+                      <TouchableOpacity
+                        style={styles.uncheckButton}
+                        onPress={() => handleCheckIn(attendee.registration_id, true)}
+                      >
+                        <Text style={styles.uncheckButtonText}>Uncheck</Text>
+                      </TouchableOpacity>
+                    )}
                   </>
                 ) : (
                   <TouchableOpacity
@@ -402,6 +408,12 @@ const styles = StyleSheet.create({
   attendeeTicket: {
     fontSize: 12,
     color: '#666',
+  },
+  checkedManuallyText: {
+    fontSize: 11,
+    color: '#8E8E93',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
   attendeeActions: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { apiService } from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +17,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
 import EventReviewCard, { EventReviewRating } from '@/components/EventReviewCard';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -63,6 +65,7 @@ export default function TicketScreen() {
   const [loading, setLoading] = useState(true);
   const [reviewedPlans, setReviewedPlans] = useState<Record<string, EventReviewRating>>({});
   const [selectedReview, setSelectedReview] = useState<EventReviewRating | null>(null);
+  const ticketCardRef = useRef<View>(null);
 
   const planIdFromTicket = ticket?.plan?.plan_id;
   const eventDate = ticket?.plan?.date ? new Date(ticket.plan.date) : null;
@@ -174,8 +177,25 @@ export default function TicketScreen() {
     }
   };
 
-  const handleAddToWallet = () => {
-    Alert.alert('Add to Wallet', 'This feature will be implemented');
+  const handleAddToWallet = async () => {
+    if (!ticketCardRef.current) return;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow access to save the ticket to your photos.');
+        return;
+      }
+      const uri = await captureRef(ticketCardRef, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+        width: 400,
+      });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('Saved', 'Ticket image saved to your photos.');
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Could not save ticket image.');
+    }
   };
 
   const formatDate = (date: string | Date | undefined): string => {
@@ -273,8 +293,8 @@ export default function TicketScreen() {
           <View style={{ width: 24 }} />
         </View>
 
-        {/* Ticket Card */}
-        <View style={styles.ticketCard}>
+        {/* Ticket Card - ref for capture to save as image */}
+        <View ref={ticketCardRef} style={styles.ticketCard} collapsable={false}>
           {/* Event Image - unique per plan (ticket_image or first media) */}
           {mainImage ? (
             <View style={styles.eventImageContainer}>

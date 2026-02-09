@@ -13,6 +13,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+interface TicketDistributionItem {
+  pass_id: string;
+  name: string;
+  count: number;
+  percent: number;
+}
+
 interface EventAnalyticsData {
   plan_id: string;
   title: string;
@@ -27,7 +34,10 @@ interface EventAnalyticsData {
   revenue: number;
   gender_distribution: { male: number; female: number; other: number };
   gender_distribution_percent: { male: number; female: number; other: number };
+  ticket_distribution?: TicketDistributionItem[];
 }
+
+const TICKET_COLORS = ['#22C55E', '#14B8A6', '#3B82F6', '#8B5CF6', '#F59E0B'];
 
 export default function EventAnalyticsScreen() {
   const router = useRouter();
@@ -43,12 +53,14 @@ export default function EventAnalyticsScreen() {
       if (res.success && res.data) setData(res.data as EventAnalyticsData);
       else setData(null);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to load analytics');
-      router.back();
+      if ((e as any)?.statusCode !== 404) {
+        Alert.alert('Error', e.message || 'Failed to load analytics');
+      }
+      setData(null);
     } finally {
       setLoading(false);
     }
-  }, [planId, router]);
+  }, [planId]);
 
   useEffect(() => {
     load();
@@ -61,7 +73,7 @@ export default function EventAnalyticsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Event analytics</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>Event analytics</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingBox}>
@@ -79,7 +91,7 @@ export default function EventAnalyticsScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Event analytics</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>Event analytics</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingBox}>
@@ -90,6 +102,10 @@ export default function EventAnalyticsScreen() {
   }
 
   const g = data.gender_distribution_percent;
+  const ticketDist = data.ticket_distribution || [];
+  const totalAttendees = data.registered_count;
+  const showupRatePercent = 0;
+  const revenueDisplay = Number(data.revenue) || 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -97,57 +113,126 @@ export default function EventAnalyticsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Event analytics</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>{data.title}</Text>
         <View style={{ width: 40 }} />
       </View>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.eventName} numberOfLines={2}>{data.title}</Text>
 
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Revenue Generated */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Metrics</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Showup rate</Text>
-            <Text style={styles.value}>{data.showup_rate_percent.toFixed(1)}%</Text>
+          <Text style={styles.cardHeading}>Revenue Generated</Text>
+          <View style={styles.revenueBox}>
+            <Text style={styles.revenueAmount}>₹ {revenueDisplay.toLocaleString('en-IN')}</Text>
           </View>
-          <Text style={styles.hint}># checked in / # registered</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>% First timers</Text>
-            <Text style={styles.value}>{data.first_timers_percent.toFixed(1)}%</Text>
-          </View>
-          <Text style={styles.hint}>First time on your events / total registered</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>% Returning</Text>
-            <Text style={styles.value}>{data.returning_percent.toFixed(1)}%</Text>
-          </View>
-          <Text style={styles.hint}>Registered &gt;1 time on your events / total registered</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Revenue</Text>
-            <Text style={styles.value}>₹{data.revenue.toFixed(0)}</Text>
-          </View>
-          <Text style={styles.hint}>Total from registrations</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Registered</Text>
-            <Text style={styles.value}>{data.registered_count}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Checked in</Text>
-            <Text style={styles.value}>{data.checked_in_count}</Text>
+          <Text style={styles.revenueHint}>0% ↑ from last month</Text>
+        </View>
+
+        {/* Attendee Statistics */}
+        <View style={styles.card}>
+          <Text style={styles.cardHeading}>Total Attendees: {totalAttendees}</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{showupRatePercent} %</Text>
+              <Text style={styles.statLabel}>Showup Rate</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{data.returning_percent.toFixed(0)} %</Text>
+              <Text style={styles.statLabel}>Returning</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{data.first_timers_percent.toFixed(0)} %</Text>
+              <Text style={styles.statLabel}>First Timers</Text>
+            </View>
           </View>
         </View>
 
+        {/* Ticket Distribution */}
+        {ticketDist.length > 0 && (
+          <View style={[styles.card, styles.cardGray]}>
+            <Text style={styles.cardHeading}>Ticket Distribution</Text>
+            <View style={styles.ticketDistributionRow}>
+              {ticketDist.map((item, index) => {
+                const totalPct = ticketDist.reduce((s, i) => s + i.percent, 0) || 1;
+                const flex = item.percent / totalPct;
+                return (
+                  <View
+                    key={item.pass_id}
+                    style={[
+                      styles.ticketBlock,
+                      {
+                        backgroundColor: TICKET_COLORS[index % TICKET_COLORS.length],
+                        flex,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.ticketBlockName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.ticketBlockPercent}>{item.percent.toFixed(0)} %</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Gender Distribution */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Gender distribution</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Male</Text>
-            <Text style={styles.value}>{g.male.toFixed(1)}%</Text>
+          <Text style={styles.cardHeading}>Gender Distribution</Text>
+          <View style={styles.genderBarWrap}>
+            {g.male > 0 && (
+              <View style={[styles.genderSegment, { backgroundColor: '#22C55E', width: `${g.male}%` }]}>
+                <Text style={styles.genderLabel}>Men</Text>
+                <Text style={styles.genderPercent}>{g.male.toFixed(0)} %</Text>
+              </View>
+            )}
+            {g.female > 0 && (
+              <View style={[styles.genderSegment, { backgroundColor: '#14B8A6', width: `${g.female}%` }]}>
+                <Text style={styles.genderLabel}>Women</Text>
+                <Text style={styles.genderPercent}>{g.female.toFixed(0)} %</Text>
+              </View>
+            )}
+            {g.other > 0 && (
+              <View style={[styles.genderSegment, { backgroundColor: '#3B82F6', width: `${g.other}%` }]}>
+                <Text style={styles.genderLabel}>Others</Text>
+                <Text style={styles.genderPercent}>{g.other.toFixed(0)} %</Text>
+              </View>
+            )}
+            {g.male === 0 && g.female === 0 && g.other === 0 && (
+              <Text style={styles.noDataText}>No gender data</Text>
+            )}
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Female</Text>
-            <Text style={styles.value}>{g.female.toFixed(1)}%</Text>
+        </View>
+
+        {/* Audience Feedback - placeholder */}
+        <View style={styles.card}>
+          <Text style={styles.cardHeading}>Audience Feedback</Text>
+          <Text style={styles.feedbackTagline}>Your runners are loving your experience</Text>
+          <Text style={styles.feedbackVotes}>0 votes</Text>
+          <View style={styles.feedbackRow}>
+            <View style={[styles.feedbackPill, styles.feedbackPillDark]}>
+              <Text style={styles.feedbackEmoji}>😊</Text>
+              <Text style={styles.feedbackPillLabel}>Amazing</Text>
+            </View>
+            <View style={styles.feedbackAvatars}>
+              <Text style={styles.feedbackPercent}>0 %</Text>
+            </View>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Others</Text>
-            <Text style={styles.value}>{g.other.toFixed(1)}%</Text>
+          <View style={styles.feedbackRow}>
+            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
+              <Text style={styles.feedbackEmoji}>🙂</Text>
+              <Text style={styles.feedbackPillLabel}>Good</Text>
+            </View>
+            <View style={styles.feedbackAvatars}>
+              <Text style={styles.feedbackPercent}>0 %</Text>
+            </View>
+          </View>
+          <View style={styles.feedbackRow}>
+            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
+              <Text style={styles.feedbackEmoji}>😐</Text>
+              <Text style={styles.feedbackPillLabel}>Average</Text>
+            </View>
+            <View style={styles.feedbackAvatars}>
+              <Text style={styles.feedbackPercent}>0 %</Text>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -168,17 +253,161 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5EA',
   },
   backBtn: { padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1C1C1E' },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '700', color: '#1C1C1E', marginLeft: 8 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 8, fontSize: 14, color: '#8E8E93' },
   emptyText: { fontSize: 16, color: '#8E8E93' },
   scroll: { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 40 },
-  eventName: { fontSize: 20, fontWeight: '800', color: '#1C1C1E', marginBottom: 16 },
-  card: { backgroundColor: '#FFF', borderRadius: 16, padding: 16, marginBottom: 16 },
-  cardTitle: { fontSize: 17, fontWeight: '700', color: '#1C1C1E', marginBottom: 12 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-  label: { fontSize: 15, color: '#3A3A3C' },
-  value: { fontSize: 15, fontWeight: '600', color: '#1C1C1E' },
-  hint: { fontSize: 12, color: '#8E8E93', marginTop: -4, marginBottom: 4 },
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+  },
+  cardGray: {
+    backgroundColor: '#E5E5EA',
+  },
+  cardHeading: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#3A3A3C',
+    marginBottom: 12,
+  },
+  revenueBox: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  revenueAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  revenueHint: {
+    fontSize: 13,
+    color: '#22C55E',
+    fontWeight: '600',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  statLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 4,
+  },
+  ticketDistributionRow: {
+    flexDirection: 'row',
+    gap: 4,
+    height: 72,
+  },
+  ticketBlock: {
+    borderRadius: 12,
+    padding: 10,
+    justifyContent: 'flex-end',
+  },
+  ticketBlockName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  ticketBlockPercent: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFF',
+    marginTop: 4,
+  },
+  genderBarWrap: {
+    flexDirection: 'row',
+    height: 44,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#E5E5EA',
+  },
+  genderSegment: {
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    minWidth: 2,
+  },
+  genderLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  genderPercent: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    alignSelf: 'center',
+    paddingVertical: 12,
+  },
+  feedbackTagline: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  feedbackVotes: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginBottom: 16,
+  },
+  feedbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  feedbackPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  feedbackPillDark: {
+    backgroundColor: '#1C1C1E',
+  },
+  feedbackPillLight: {
+    backgroundColor: '#E5E5EA',
+  },
+  feedbackEmoji: {
+    fontSize: 18,
+  },
+  feedbackPillLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  feedbackAvatars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  feedbackPercent: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
 });
