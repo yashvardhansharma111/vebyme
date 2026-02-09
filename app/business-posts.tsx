@@ -40,6 +40,7 @@ interface FormattedEvent {
     description: string;
     tags: string[];
     image: string;
+    interacted_users?: Array<{ id: string; avatar?: string | null }>;
   };
 }
 
@@ -154,6 +155,11 @@ export default function BusinessPostsScreen() {
       posts.map(async (post: any) => {
         const userData = await fetchUserProfile(post.user_id);
         const imageUrl = post.media && post.media.length > 0 ? post.media[0].url : 'https://picsum.photos/id/1011/200/300';
+        const rawInteracted = post.interacted_users || post.recent_interactors || [];
+        const interactedUsers = rawInteracted.slice(0, 3).map((u: any) => ({
+          id: u.user_id || u.id,
+          avatar: u.profile_image || u.avatar || null,
+        }));
 
         return {
           id: post.post_id,
@@ -168,6 +174,7 @@ export default function BusinessPostsScreen() {
             description: post.description || 'No description',
             tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
             image: imageUrl,
+            interacted_users: interactedUsers,
           },
         };
       })
@@ -299,9 +306,11 @@ export default function BusinessPostsScreen() {
                         date: rawPost?.date || rawPost?.timestamp || new Date(),
                         time: rawPost?.time || '',
                         passes: rawPost?.passes || [],
+                        add_details: rawPost?.add_details || [],
                       }}
                       user={item.user}
                       attendeesCount={rawPost?.joins_count ?? 0}
+                      interactedUsers={item.event?.interacted_users}
                       isSwipeable={true}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);

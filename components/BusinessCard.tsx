@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import { apiService, getWebBaseUrl } from '@/services/api';
@@ -19,6 +19,7 @@ interface BusinessCardProps {
     time?: string;
     category_main?: string;
     category_sub?: string[];
+    add_details?: Array<{ detail_type: string; title?: string; description?: string }>;
     passes?: Array<{
       pass_id: string;
       name: string;
@@ -40,6 +41,8 @@ interface BusinessCardProps {
     time: string;
   };
   attendeesCount?: number;
+  /** Up to 3 attendee avatars (e.g. from guest list or feed interacted_users) */
+  interactedUsers?: Array<{ id: string; avatar?: string | null }>;
   isSwipeable?: boolean;
   hideActions?: boolean;
   containerStyle?: any;
@@ -69,18 +72,25 @@ function BusinessCardBase({
   hideActions = false,
   showArrowButton,
   onArrowPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }>; hideActions?: boolean }) {
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const timeText = user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : '');
-  const tags = plan.category_sub || [];
-  const tagsToShow = tags.slice(0, 4);
-  const remainingTags = Math.max(0, tags.length - tagsToShow.length);
   const passes = plan.passes || [];
   const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
-  const minPrice = prices.length > 0 ? Math.min(...prices) : null;
-  const showInteracted = attendeesCount > 0 || (interactedUsers && interactedUsers.length > 0);
+  const firstTicketPrice = prices.length > 0 ? Math.min(...prices) : null;
+  const addDetails = plan.add_details || [];
+  const detailByType = (type: string) => addDetails.find((d) => d.detail_type === type);
+  const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
+  const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
+  const locationLabel = plan.location_text?.trim();
+  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location'; label: string }[] = [];
+  if (firstTicketPrice != null && firstTicketPrice > 0) cardTags.push({ type: 'price', label: `₹${firstTicketPrice}` });
+  if (distanceLabel) cardTags.push({ type: 'distance', label: distanceLabel });
+  if (fbLabel) cardTags.push({ type: 'fb', label: fbLabel });
+  if (locationLabel) cardTags.push({ type: 'location', label: locationLabel });
+  const tagsToShow = cardTags.slice(0, 4);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = async () => {
@@ -136,32 +146,24 @@ function BusinessCardBase({
         <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
           {plan.description}
         </Text>
-        {(minPrice != null || tags.length > 0) && (
-          <View style={styles.tagsContainer}>
-            {minPrice != null && (
-              <View style={styles.tag}>
-                <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
-                <Text style={styles.tagText}>₹{minPrice}</Text>
-              </View>
-            )}
-            {tagsToShow.map((tag: string, index: number) => (
-              <View key={index} style={styles.tag}>
-                <Ionicons
-                  name={tag.toLowerCase().includes('evening') ? 'cloud-outline' : 'checkmark-circle'}
-                  size={12}
-                  color="#3C3C43"
-                  style={styles.tagIcon}
-                />
-                <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
+        {tagsToShow.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.tagsScrollContent}
+            style={styles.tagsScroll}
+          >
+            {tagsToShow.map((item, index) => (
+              <View key={`${item.type}-${index}`} style={styles.tag}>
+                {item.type === 'price' ? (
+                  <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                ) : (
+                  <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
+                )}
+                <Text style={styles.tagText} numberOfLines={1}>{item.label}</Text>
               </View>
             ))}
-            {remainingTags > 0 && (
-              <View style={styles.tag}>
-                <Ionicons name="add" size={12} color="#3C3C43" style={styles.tagIcon} />
-                <Text style={styles.tagText} numberOfLines={1}>+{remainingTags}</Text>
-              </View>
-            )}
-          </View>
+          </ScrollView>
         )}
         {!hideActions && (
           <View style={styles.footer}>
@@ -179,42 +181,33 @@ function BusinessCardBase({
       </View>
       </View>
 
-      {/* User pill – hovers slightly outside card, small (~25% width) */}
+      {/* Organizer pill – top left: name + time, author avatar on the right of the name */}
       <View style={styles.organizerPill} pointerEvents="none">
-        <Avatar uri={organizerAvatar} size={26} />
         <View style={styles.organizerInfo}>
           <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
           <Text style={styles.organizerTime} numberOfLines={1}>{timeText}</Text>
         </View>
+        <Avatar uri={organizerAvatar} size={26} style={styles.organizerAvatarRight} />
       </View>
 
-      {/* Attendees pill – tap to open guest list modal */}
+      {/* Attendees – always 3 circles (avatars or default DP), then +counter (FIGMA) */}
       {onGuestListPress && (
         <TouchableOpacity
-          style={styles.interactedPillOnImage}
+          style={[styles.interactedPillOnImage, showArrowButton && styles.interactedPillOnImageWithArrow]}
           onPress={(e) => {
             e?.stopPropagation?.();
             onGuestListPress?.();
           }}
           activeOpacity={0.8}
         >
-          {showInteracted ? (
-            displayUsers.length > 0 ? (
-              displayUsers.map((u: any, idx: number) => (
-                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
-                  <Avatar uri={u.avatar} size={20} />
-                </View>
-              ))
-            ) : (
-              [1, 2, 3].map((i) => (
-                <View key={i} style={[styles.interactedAvatarWrap, { marginLeft: i === 1 ? 0 : -10, zIndex: 4 - i }]}>
-                  <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={20} />
-                </View>
-              ))
-            )
-          ) : (
-            <Ionicons name="people-outline" size={18} color="#1C1C1E" />
-          )}
+          {[0, 1, 2].map((idx) => {
+            const u = displayUsers[idx];
+            return (
+              <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
+                <Avatar uri={u?.avatar ?? undefined} size={20} />
+              </View>
+            );
+          })}
           {attendeesCount > 0 && <Text style={styles.interactedPlus}>+{attendeesCount}</Text>}
         </TouchableOpacity>
       )}
@@ -227,6 +220,7 @@ export default function BusinessCard({
   plan,
   user,
   attendeesCount,
+  interactedUsers: interactedUsersProp,
   isSwipeable = true,
   hideActions = false,
   containerStyle,
@@ -329,6 +323,7 @@ export default function BusinessCard({
           plan={plan}
           user={user}
           attendeesCount={attendeesCount}
+          interactedUsers={interactedUsersProp}
           containerStyle={containerStyle}
           onPress={onPress}
           onRegisterPress={onRegisterPress}
@@ -379,6 +374,7 @@ export default function BusinessCard({
           plan={plan}
           user={user}
           attendeesCount={attendeesCount}
+          interactedUsers={interactedUsersProp}
           containerStyle={containerStyle}
           onPress={onPress}
           onRegisterPress={onRegisterPress}
@@ -464,8 +460,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 18,
     maxWidth: '48%',
     shadowColor: '#000',
@@ -475,9 +471,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   organizerInfo: {
-    marginLeft: 6,
     flex: 1,
     minWidth: 0,
+  },
+  organizerAvatarRight: {
+    marginLeft: 8,
   },
   organizerName: {
     fontSize: 11,
@@ -491,7 +489,7 @@ const styles = StyleSheet.create({
   interactedPillOnImage: {
     position: 'absolute',
     top: 10,
-    right: 18,
+    right: 54,
     zIndex: 11,
     flexDirection: 'row',
     alignItems: 'center',
@@ -505,6 +503,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+  },
+  interactedPillOnImageWithArrow: {
+    right: 98,
   },
   interactedAvatarWrap: {
     width: 20,
@@ -544,11 +545,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: 8,
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  tagsScroll: {
     marginBottom: 12,
+    maxHeight: 36,
+  },
+  tagsScrollContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 8,
   },
   tag: {
     flexDirection: 'row',
@@ -570,7 +575,10 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'flex-start',
+    gap: 10,
+    minHeight: 44,
+    marginTop: 4,
   },
   registerButton: {
     flex: 1,
@@ -579,6 +587,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    minWidth: 0,
   },
   registerButtonText: {
     color: '#FFF',

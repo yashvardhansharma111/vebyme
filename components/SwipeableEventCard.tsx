@@ -26,13 +26,11 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
   const interactionCount = event?.interaction_count ?? 0;
-  const showInteracted = interactionCount > 0;
-  const displayCount = Math.min(3, interactedUsers.length);
-  const extraCount = displayCount > 0 ? Math.max(0, interactionCount - displayCount) : interactionCount;
+  const showPill = true;
 
   return (
     <View style={styles.cardContainer}>
-      {/* Card wrapper: pill overlays top-left (slightly outside), interacted top-right */}
+      {/* Card wrapper: pill overlays top-left (slightly outside), 3 avatars + counter top-right */}
       <View style={styles.cardWrapper}>
         {/* User pill: top-left, hovering slightly outside the card */}
         <TouchableOpacity
@@ -46,16 +44,19 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
             <Text style={styles.userTime}>{user.time}</Text>
           </View>
         </TouchableOpacity>
-        {showInteracted && (
+        {showPill && (
           <View style={styles.interactedPillPositioned}>
             <View style={styles.interactedPill}>
-              {interactedUsers.slice(0, 3).map((u: any, idx: number) => (
-                <View key={u.id || idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
-                  <Avatar uri={u.avatar} size={24} />
-                </View>
-              ))}
-              {(extraCount > 0 || displayCount === 0) && (
-                <Text style={styles.interactedPlus}>+{extraCount > 0 ? extraCount : interactionCount}</Text>
+              {[0, 1, 2].map((idx) => {
+                const u = interactedUsers[idx];
+                return (
+                  <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
+                    <Avatar uri={u?.avatar ?? undefined} size={24} />
+                  </View>
+                );
+              })}
+              {interactionCount > 0 && (
+                <Text style={styles.interactedPlus}>+{interactionCount}</Text>
               )}
             </View>
           </View>

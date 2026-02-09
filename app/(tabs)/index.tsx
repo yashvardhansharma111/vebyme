@@ -70,6 +70,7 @@ interface FormattedEvent {
     original_author_name?: string;
     original_post_title?: string;
     original_post_description?: string;
+    interacted_users?: Array<{ id: string; avatar?: string | null }>;
   };
 }
 
@@ -464,9 +465,11 @@ export default function HomeScreen() {
                       date: rawPost?.date || rawPost?.timestamp || new Date(),
                       time: rawPost?.time || '',
                       passes: rawPost?.passes || [],
+                      add_details: rawPost?.add_details || [],
                     }}
                     user={item.user}
                     attendeesCount={rawPost?.joins_count ?? 0}
+                    interactedUsers={item.event?.interacted_users}
                     isSwipeable={false}
                     containerStyle={styles.heroBusinessCard}
                     showArrowButton={true}

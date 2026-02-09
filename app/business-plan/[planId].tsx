@@ -1,4 +1,4 @@
-import { apiService } from '@/services/api';
+import { apiService, getWebBaseUrl } from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -112,6 +113,23 @@ export default function BusinessPlanDetailScreen() {
     if (!date) return '';
     const d = typeof date === 'string' ? new Date(date) : date;
     return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const formatTimeOnly = (time: string | undefined): string => {
+    if (!time) return '';
+    return time;
+  };
+
+  const handleSharePlan = async () => {
+    try {
+      const planUrl = `${getWebBaseUrl()}/go/post/${plan?.plan_id}`;
+      const message = `Check out this event: ${plan?.title}\n\n${planUrl}`;
+      await Share.share({ message, url: planUrl, title: plan?.title });
+    } catch (err: any) {
+      if (err?.message && !err.message.includes('cancel')) {
+        Alert.alert('Error', err.message);
+      }
+    }
   };
 
   const { user } = useAppSelector((state) => state.auth);
@@ -222,16 +240,23 @@ export default function BusinessPlanDetailScreen() {
               <Ionicons name="arrow-back" size={24} color="#000" />
             </View>
           </TouchableOpacity>
-          {user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id) && (
-            <TouchableOpacity
-              style={styles.analyticsButton}
-              onPress={() => router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any)}
-            >
-              <View style={styles.analyticsButtonCircle}>
-                <Ionicons name="stats-chart" size={22} color="#000" />
+          <View style={styles.headerRightRow}>
+            {user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id) && (
+              <TouchableOpacity
+                style={styles.headerIconButton}
+                onPress={() => router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any)}
+              >
+                <View style={styles.headerIconCircle}>
+                  <Ionicons name="stats-chart" size={22} color="#000" />
+                </View>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.headerIconButton} onPress={handleSharePlan}>
+              <View style={styles.headerIconCircle}>
+                <Ionicons name="paper-plane-outline" size={22} color="#000" />
               </View>
             </TouchableOpacity>
-          )}
+          </View>
           {/* Organizer pill – top left over hero */}
           <View style={styles.organizerPill}>
             <Avatar uri={organizerAvatar} size={32} />
@@ -255,34 +280,33 @@ export default function BusinessPlanDetailScreen() {
           <Text style={styles.title}>{plan.title}</Text>
           <Text style={styles.description}>{plan.description}</Text>
 
-          {Array.isArray(plan.category_sub) && plan.category_sub.length > 0 && (
-            <View style={styles.tagsContainer}>
-              {plan.category_sub.slice(0, 6).map((tag, idx) => (
-                <View key={`${tag}-${idx}`} style={styles.tag}>
-                  <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
-                </View>
-              ))}
-              {plan.category_sub.length > 6 && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagText} numberOfLines={1}>+{plan.category_sub.length - 6}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Location + Date side by side */}
-          <View style={styles.keyInfoRow}>
-            {plan.location_text && (
-              <View style={styles.keyInfoBlock}>
-                <Ionicons name="location" size={20} color="#666" />
-                <Text style={styles.keyInfoTitle}>{plan.location_text}</Text>
-                <Text style={styles.keyInfoSubtitle}>{plan.location_coordinates ? '3 Km away' : ' '}</Text>
-              </View>
-            )}
+          {/* Date, Time, Location – clear key info blocks */}
+          <View style={styles.keyInfoWrap}>
             {plan.date && (
               <View style={styles.keyInfoBlock}>
-                <Ionicons name="calendar-outline" size={20} color="#666" />
-                <Text style={styles.keyInfoTitle} numberOfLines={2}>{formatDayAndTime(plan.date, plan.time)}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
+                <View style={styles.keyInfoTextWrap}>
+                  <Text style={styles.keyInfoLabel}>Date</Text>
+                  <Text style={styles.keyInfoTitle}>{formatDate(plan.date)}</Text>
+                </View>
+              </View>
+            )}
+            {plan.time && (
+              <View style={styles.keyInfoBlock}>
+                <Ionicons name="time-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
+                <View style={styles.keyInfoTextWrap}>
+                  <Text style={styles.keyInfoLabel}>Time</Text>
+                  <Text style={styles.keyInfoTitle}>{formatTimeOnly(plan.time)}</Text>
+                </View>
+              </View>
+            )}
+            {plan.location_text && (
+              <View style={styles.keyInfoBlock}>
+                <Ionicons name="location-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
+                <View style={styles.keyInfoTextWrap}>
+                  <Text style={styles.keyInfoLabel}>Location</Text>
+                  <Text style={styles.keyInfoTitle} numberOfLines={2}>{plan.location_text}</Text>
+                </View>
               </View>
             )}
           </View>
@@ -461,13 +485,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  analyticsButton: {
+  headerRightRow: {
     position: 'absolute',
     top: 16,
     right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     zIndex: 10,
   },
-  analyticsButtonCircle: {
+  headerIconButton: {},
+  headerIconCircle: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -544,41 +572,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#444',
     lineHeight: 21,
-    marginBottom: 18,
+    marginBottom: 20,
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  tag: {
-    backgroundColor: '#F2F2F7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
-  },
-  keyInfoRow: {
-    flexDirection: 'row',
+  keyInfoWrap: {
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   keyInfoBlock: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#F2F2F7',
     borderRadius: 14,
-    padding: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  keyInfoIcon: {
+    marginRight: 12,
+  },
+  keyInfoTextWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  keyInfoLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 2,
+    textTransform: 'uppercase',
   },
   keyInfoTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1C1C1E',
-    marginTop: 8,
   },
   keyInfoSubtitle: {
     fontSize: 12,
