@@ -1,11 +1,11 @@
-import SwipeableEventCard from '@/components/SwipeableEventCard';
 import BusinessCard from '@/components/BusinessCard';
+import SwipeableEventCard from '@/components/SwipeableEventCard';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
@@ -38,6 +38,7 @@ function ProfileAvatar() {
 }
 
 const FILTERS = ['Clubs', 'Today', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
+const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel'];
 
 interface FeedPost {
   post_id: string;
@@ -65,11 +66,15 @@ interface FormattedEvent {
     description: string;
     tags: string[];
     image: string;
+    is_repost?: boolean;
+    original_author_name?: string;
+    original_post_title?: string;
+    original_post_description?: string;
   };
 }
 
 export default function HomeScreen() {
-  const [activeFilter, setActiveFilter] = useState('Clubs');
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [businessEvents, setBusinessEvents] = useState<FormattedEvent[]>([]);
   const [businessPostsData, setBusinessPostsData] = useState<any[]>([]); // Store raw post data for BusinessCard
@@ -94,6 +99,7 @@ export default function HomeScreen() {
 
   // User profile cache to avoid fetching same user multiple times
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -272,10 +278,9 @@ export default function HomeScreen() {
       }
       setError(null);
 
-      // Map filter to category if applicable
+      // Map filter to category if applicable (no filter applied when app opens)
       const filters: any = {};
-      const categoryFilters = ['Clubs', 'Music', 'Cafe', 'Travel'];
-      if (activeFilter && categoryFilters.includes(activeFilter)) {
+      if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
         filters.category_main = activeFilter.toLowerCase();
       }
       // Note: 'Today', 'Comedy', 'Sports' filters could be implemented with temporal_tags or other logic
@@ -284,22 +289,23 @@ export default function HomeScreen() {
       // Allow guests to view feed (user_id is optional)
       const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 30, offset: 0 });
       
-      if (response.data && Array.isArray(response.data)) {
-        const formatted = await formatFeedData(response.data);
+      const data = response.data;
+      if (data && Array.isArray(data)) {
+        const formatted = await formatFeedData(data);
         
         // Separate business plans from regular plans
         const businessPlans = formatted.filter(item => {
-          const post = response.data.find((p: any) => p.post_id === item.id);
+          const post = data.find((p: any) => p.post_id === item.id);
           return post?.type === 'business';
         });
         
         // Store raw business post data for BusinessCard component
-        const rawBusinessPosts = response.data.filter((p: any) => p.type === 'business');
+        const rawBusinessPosts = data.filter((p: any) => p.type === 'business');
         setBusinessPostsData(rawBusinessPosts);
         
         // Filter out business plans from main feed
         const regularPlans = formatted.filter(item => {
-          const post = response.data.find((p: any) => p.post_id === item.id);
+          const post = data.find((p: any) => p.post_id === item.id);
           return post?.type !== 'business';
         });
         
@@ -371,8 +377,9 @@ export default function HomeScreen() {
         />
 
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView 
-            contentContainerStyle={styles.scrollContainer} 
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
@@ -422,7 +429,7 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Filters */}
+            {/* Filters – same as business-posts; no filter selected when app opens */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
               {FILTERS.map((filter, index) => {
                 const isActive = activeFilter === filter;
@@ -430,10 +437,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={index}
                     style={isActive ? styles.activeFilterChip : styles.filterChip}
-                    onPress={() => {
-                      setActiveFilter(filter);
-                      // Feed will reload automatically via useEffect when activeFilter changes
-                    }}
+                    onPress={() => setActiveFilter(filter)}
                   >
                     <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
                   </TouchableOpacity>
@@ -441,110 +445,129 @@ export default function HomeScreen() {
               })}
             </ScrollView>
 
-            {/* Business Plans Horizontal Section – whole header opens business posts list */}
-            {businessEvents.length > 0 && (
-              <View style={styles.businessSection}>
-                <TouchableOpacity
-                  style={styles.businessSectionHeader}
-                  onPress={() => router.push('/business-posts')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.businessSectionTitle}>Happening near me</Text>
-                  <Ionicons name="arrow-forward" size={20} color="#FFF" />
-                </TouchableOpacity>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.businessScrollContent}
-                >
-                  {businessEvents.map((item, index) => {
-                    const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
-                    return (
-                      <BusinessCard
-                        key={item.id}
-                        plan={{
-                          plan_id: item.id,
-                          title: item.event.title,
-                          description: item.event.description,
-                          media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                          category_main: rawPost?.category_main || '',
-                          category_sub: item.event.tags || rawPost?.tags || [],
-                          location_text: rawPost?.location_text || '',
-                          date: rawPost?.date || rawPost?.timestamp || new Date(),
-                          time: rawPost?.time || '',
-                          passes: rawPost?.passes || [],
-                        }}
-                        user={item.user}
-                        attendeesCount={rawPost?.joins_count ?? 0}
-                        isSwipeable={false}
-                        containerStyle={styles.businessCardContainer}
-                        onPress={() => {
-                          router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
-                        }}
-                        onRegisterPress={async () => {
-                          if (isAuthenticated && user?.user_id) {
-                            try {
-                              const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
-                              if (alreadyRegistered) {
-                                Alert.alert(
-                                  'Already Registered',
-                                  "You are already registered for this event. You can check your pass from your profile."
-                                );
-                                return;
-                              }
-                              const response = await apiService.registerForEvent(item.id, user.user_id);
-                              if (response.success && response.data?.ticket) {
-                                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                                router.push({
-                                  pathname: '/ticket/[ticketId]',
-                                  params: { 
-                                    ticketId: response.data.ticket.ticket_id,
-                                    planId: item.id,
-                                    ticketData: ticketData
-                                  }
-                                } as any);
-                              }
-                            } catch (error: any) {
-                              Alert.alert('Registration Failed', error.message || 'Failed to register for event');
-                            }
-                          } else {
-                            setShowLoginModal(true);
-                          }
-                        }}
-                        onRequireAuth={() => {
-                          if (!isAuthenticated) {
-                            setShowLoginModal(true);
-                          }
-                        }}
-                        onSharePress={() => {
-                          if (!isAuthenticated) {
-                            setShowLoginModal(true);
+            {/* Single full-length business card (index hero) */}
+            {businessEvents.length > 0 && (() => {
+              const item = businessEvents[0];
+              const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+              return (
+                <View style={styles.heroCardWrap}>
+                  <BusinessCard
+                    key={item.id}
+                    plan={{
+                      plan_id: item.id,
+                      title: item.event.title,
+                      description: item.event.description,
+                      media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                      category_main: rawPost?.category_main || '',
+                      category_sub: item.event.tags || rawPost?.tags || [],
+                      location_text: rawPost?.location_text || '',
+                      date: rawPost?.date || rawPost?.timestamp || new Date(),
+                      time: rawPost?.time || '',
+                      passes: rawPost?.passes || [],
+                    }}
+                    user={item.user}
+                    attendeesCount={rawPost?.joins_count ?? 0}
+                    isSwipeable={false}
+                    containerStyle={styles.heroBusinessCard}
+                    showArrowButton={true}
+                    onArrowPress={() => router.push('/business-posts')}
+                    onPress={() => {
+                      router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
+                    }}
+                    onRegisterPress={async () => {
+                      if (isAuthenticated && user?.user_id) {
+                        try {
+                          const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                          if (alreadyRegistered) {
+                            Alert.alert(
+                              'Already Registered',
+                              "You are already registered for this event. You can check your pass from your profile."
+                            );
                             return;
                           }
-                          const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
-                          setSharedBusinessPlan({
-                            planId: item.id,
-                            title: item.event.title,
-                            description: item.event.description,
-                            media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                            tags: item.event.tags || rawPost?.tags,
-                            category_main: rawPost?.category_main,
-                          });
-                          setShowBusinessShareModal(true);
-                        }}
-                      />
-                    );
-                  })}
-                </ScrollView>
+                          const response = await apiService.registerForEvent(item.id, user.user_id);
+                          if (response.success && response.data?.ticket) {
+                            const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                            router.push({
+                              pathname: '/ticket/[ticketId]',
+                              params: {
+                                ticketId: response.data.ticket.ticket_id,
+                                planId: item.id,
+                                ticketData: ticketData
+                              }
+                            } as any);
+                          }
+                        } catch (error: any) {
+                          Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+                        }
+                      } else {
+                        setShowLoginModal(true);
+                      }
+                    }}
+                    onRequireAuth={() => {
+                      if (!isAuthenticated) setShowLoginModal(true);
+                    }}
+                    onSharePress={() => {
+                      if (!isAuthenticated) {
+                        setShowLoginModal(true);
+                        return;
+                      }
+                      setSharedBusinessPlan({
+                        planId: item.id,
+                        title: item.event.title,
+                        description: item.event.description,
+                        media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                        tags: item.event.tags || rawPost?.tags,
+                        category_main: rawPost?.category_main,
+                      });
+                      setShowBusinessShareModal(true);
+                    }}
+                  />
+                </View>
+              );
+            })()}
+
+            {isLoading && businessEvents.length === 0 && (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4A3B69" />
+                <Text style={styles.loadingText}>Loading...</Text>
+              </View>
+            )}
+            {!isLoading && businessEvents.length === 0 && !error && (
+              <View style={styles.heroCardWrap}>
+                <View style={styles.heroPlaceholderCard}>
+                  <Text style={styles.heroPlaceholderText}>No business plans right now</Text>
+                </View>
+              </View>
+            )}
+            {error && businessEvents.length === 0 && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={() => loadFeed()}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
               </View>
             )}
 
-            {/* Feed */}
-            <View style={styles.feed}>
+            {/* See what others are planning – scroll down to user posts on same page */}
+            <TouchableOpacity
+              style={styles.seeOthersButton}
+              onPress={() => {
+                const scrollDownBy = Dimensions.get('window').height * 0.6;
+                scrollViewRef.current?.scrollTo({ y: scrollDownBy, animated: true });
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.seeOthersButtonText}>See what others are planning</Text>
+              <Ionicons name="chevron-down" size={20} color="#FFF" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+
+            {/* User-generated posts (scroll down ~60% to see this section) */}
+            <View style={styles.userFeedSection}>
               {isLoading && events.length === 0 ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color="#4A3B69" />
-                  <Text style={styles.loadingText}>Loading feed...</Text>
+                  <Text style={styles.loadingText}>Loading posts...</Text>
                 </View>
               ) : error && events.length === 0 ? (
                 <View style={styles.errorContainer}>
@@ -555,7 +578,7 @@ export default function HomeScreen() {
                 </View>
               ) : events.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No posts found</Text>
+                  <Text style={styles.emptyText}>No posts yet</Text>
                   <Text style={styles.emptySubtext}>Be the first to create a post!</Text>
                 </View>
               ) : (
@@ -577,13 +600,33 @@ export default function HomeScreen() {
                       }
                     }}
                     onRequireAuth={() => {
-                      if (!isAuthenticated) {
-                        setShowLoginModal(true);
-                      }
+                      if (!isAuthenticated) setShowLoginModal(true);
                     }}
                   />
                 ))
               )}
+
+              {/* CTA at end of home feed */}
+              <View style={styles.ctaSection}>
+                <Text style={styles.ctaText}>Didn&apos;t find a plan,</Text>
+                <TouchableOpacity
+                  style={styles.createCtaButton}
+                  onPress={() => {
+                    if (!isAuthenticated) {
+                      setShowLoginModal(true);
+                      return;
+                    }
+                    if (currentUser?.is_business) {
+                      router.push('/(tabs)/createBusinessPost');
+                    } else {
+                      router.push('/(tabs)/createPost');
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.createCtaButtonText}>Create your own</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </SafeAreaView>
@@ -748,6 +791,65 @@ const styles = StyleSheet.create({
     width: 320,
     marginHorizontal: 0,
     marginRight: 16,
+  },
+  heroCardWrap: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  heroBusinessCard: {
+    width: '100%',
+    marginHorizontal: 0,
+  },
+  heroPlaceholderCard: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroPlaceholderText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  seeOthersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
+  },
+  seeOthersButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  userFeedSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  ctaSection: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 12,
+  },
+  createCtaButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
+  },
+  createCtaButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
   postCreatedOverlay: {
     flex: 1,
