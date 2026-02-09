@@ -46,6 +46,7 @@ const ADDITIONAL_SETTINGS = [
   { id: 'parking', label: 'Parking', icon: 'car' },
   { id: 'f&b', label: 'F&B', icon: 'restaurant' },
   { id: 'links', label: 'Links', icon: 'link' },
+  { id: 'google_drive_link', label: 'Google Drive link', icon: 'cloud-download-outline' },
   { id: 'additional_info', label: 'Additional Info', icon: 'information-circle' },
 ];
 

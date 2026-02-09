@@ -73,7 +73,9 @@ export default function AttendeeListScreen() {
       setPlansLoading(true);
       const res = await apiService.getUserPlans(user.user_id, 50, 0);
       const raw = res.data && Array.isArray(res.data) ? res.data : [];
-      const businessPlans = raw.filter((p: any) => p?.type === 'business' || p?.plan_type === 'BusinessPlan');
+      const businessPlans = raw.filter(
+        (p: any) => (p?.type === 'business' || p?.plan_type === 'BusinessPlan') && p?.post_status !== 'deleted'
+      );
       setPlans(businessPlans);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to load plans');

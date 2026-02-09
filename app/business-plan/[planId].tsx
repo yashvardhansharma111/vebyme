@@ -318,10 +318,12 @@ export default function BusinessPlanDetailScreen() {
             )}
           </View>
 
-          {/* Detail pills – all categories: first field as heading, user value below; additional_info: user heading + description */}
-          {plan.add_details && plan.add_details.length > 0 && (
+          {/* Detail pills – all categories except Google Drive link (shown in chat only); additional_info: user heading + description */}
+          {plan.add_details && plan.add_details.filter((d) => d.detail_type !== 'google_drive_link').length > 0 && (
             <View style={styles.detailPillsWrap}>
-              {plan.add_details.map((detail, index) => {
+              {plan.add_details
+                .filter((detail) => detail.detail_type !== 'google_drive_link')
+                .map((detail, index) => {
                 const isAdditionalInfo = detail.detail_type === 'additional_info';
                 const heading = isAdditionalInfo
                   ? (detail.heading ?? detail.title ?? 'Additional Info')

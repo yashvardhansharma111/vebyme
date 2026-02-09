@@ -53,7 +53,9 @@ export default function QRScannerScreen() {
       setPlansLoading(true);
       const res = await apiService.getUserPlans(user.user_id, 50, 0);
       const raw = res.data && Array.isArray(res.data) ? res.data : [];
-      const businessPlans = raw.filter((p: any) => p?.type === 'business' || p?.plan_type === 'BusinessPlan');
+      const businessPlans = raw.filter(
+        (p: any) => (p?.type === 'business' || p?.plan_type === 'BusinessPlan') && p?.post_status !== 'deleted'
+      );
       setPlans(businessPlans);
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to load plans');
@@ -70,13 +72,14 @@ export default function QRScannerScreen() {
   }, [loadPlans, selectedPlanId, user?.user_id]);
 
   const handleAttendeeList = useCallback(() => {
-    const planId = scanResult?.plan?.plan_id;
+    // Use selected plan so organiser always goes to attendee list for that plan (shows guest list), not plan picker again
+    const planId = selectedPlanId || scanResult?.plan?.plan_id;
     if (planId) {
       router.push({ pathname: '/attendee-list', params: { planId } } as any);
     } else {
       router.push('/attendee-list' as any);
     }
-  }, [router, scanResult?.plan?.plan_id]);
+  }, [router, selectedPlanId, scanResult?.plan?.plan_id]);
 
   const handleBarCodeScanned = useCallback(
     async ({ data }: { data: string }) => {
