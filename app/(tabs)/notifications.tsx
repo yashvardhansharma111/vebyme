@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
-import { fetchUnreadCount } from '@/store/slices/notificationsSlice';
+import { fetchUnreadCount, setUnreadCount } from '@/store/slices/notificationsSlice';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 import NotificationCard from '@/components/NotificationCard';
@@ -77,6 +77,8 @@ export default function NotificationsScreen() {
   const [loadingAnnouncementMembers, setLoadingAnnouncementMembers] = useState(false);
   const [viewMode, setViewMode] = useState<'summary' | 'eventsList' | 'eventDetail'>('summary');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [viewedCardIds, setViewedCardIds] = useState<Set<string>>(new Set());
+  const announcementMembersLoadedRef = useRef(false);
   const router = useRouter();
   const dispatch = useAppDispatch();
   
@@ -129,6 +131,42 @@ export default function NotificationsScreen() {
       setIsLoading(false);
     }
   }, [isAuthenticated, loadNotifications]);
+
+  // Clear notification badge when user opens the notifications tab
+  useFocusEffect(
+    useCallback(() => {
+      dispatch(setUnreadCount(0));
+    }, [dispatch])
+  );
+
+  // Load announcement group members when showing event cards (so Add to Community can show who's already in group)
+  useEffect(() => {
+    if (!isAuthenticated || viewMode === 'summary' || announcementMembersLoadedRef.current) return;
+    const hasCards = notifications.some((n) => n.post?.plan_id && n.interactions?.length > 0);
+    if (!hasCards) return;
+    announcementMembersLoadedRef.current = true;
+    apiService
+      .getOrCreateAnnouncementGroup()
+      .then((res: any) => {
+        const gid = res?.data?.group_id ?? res?.group_id;
+        if (!gid) return null;
+        return apiService.getGroupDetails(gid);
+      })
+      .then((details: any) => {
+        if (!details) return;
+        const data = details?.data ?? details;
+        const members = data?.members ?? [];
+        const ids = new Set<string>();
+        if (Array.isArray(members)) {
+          members.forEach((m: any) => {
+            const id = typeof m === 'string' ? m : (m?.user_id ?? m?.id);
+            if (id) ids.add(String(id));
+          });
+        }
+        setAnnouncementMemberIds(ids);
+      })
+      .catch(() => {});
+  }, [isAuthenticated, viewMode, notifications]);
 
   const fetchUserProfile = useCallback(async (user_id: string) => {
     if (userCache[user_id]) {
@@ -418,8 +456,15 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleCloseStack = () => {
+    setViewMode('summary');
+    setSelectedEventId(null);
+  };
+
   const handleEventCardPress = (postId: string) => {
     if (viewMode === 'eventsList') {
+      // Mark this card as viewed so the count badge disappears
+      setViewedCardIds((prev) => new Set(prev).add(postId));
       // Mark all interactions for this card as read when opening the event card
       const group = notifications.find((g) => g.post_id === postId);
       const ids = group?.interactions?.map((i) => i.notification_id).filter(Boolean) ?? [];
@@ -462,6 +507,11 @@ export default function NotificationsScreen() {
       const memberIds = guests.map((g) => g.user_id).filter((id) => id !== user.user_id);
       if (memberIds.length > 0) {
         await apiService.addMembersToGroup(groupId, memberIds);
+        setAnnouncementMemberIds((prev) => {
+          const next = new Set(prev);
+          memberIds.forEach((id) => next.add(id));
+          return next;
+        });
       }
       Alert.alert('Done', `${memberIds.length} user(s) added to your announcement group.`);
     } catch (error: any) {
@@ -475,9 +525,19 @@ export default function NotificationsScreen() {
         <View style={styles.headerLeft}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
-        <TouchableOpacity style={styles.editButton}>
-          <Ionicons name="create-outline" size={22} color="#FFD700" />
-        </TouchableOpacity>
+        {viewMode !== 'summary' ? (
+          <TouchableOpacity
+            style={styles.closeStackButton}
+            onPress={handleCloseStack}
+            accessibilityLabel="Close stack"
+          >
+            <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.editButton}>
+            <Ionicons name="create-outline" size={22} color="#FFD700" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -529,6 +589,8 @@ export default function NotificationsScreen() {
                           onAddToCommunity={handleAddToCommunity}
                           index={index}
                           showInteractions={shouldShowInteractions}
+                          hideCountBadge={viewedCardIds.has(group.post_id)}
+                          alreadyInAnnouncementGroupIds={announcementMemberIds}
                         />
                       );
                     })}
@@ -781,6 +843,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
     backgroundColor: 'rgba(255, 215, 0, 0.1)',
+  },
+  closeStackButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+    backgroundColor: '#E5E5EA',
   },
   scrollView: {
     flex: 1,

@@ -309,13 +309,27 @@ class ApiService {
           (error as any).statusCode = 404;
           throw error;
         }
+        // Don't log 404 for business event analytics (event may be deleted)
+        if (response.status === 404 && endpoint.includes('/analytics/business/event/')) {
+          const error = new Error(data.message || 'Event not found');
+          (error as any).isExpected = true;
+          (error as any).statusCode = 404;
+          throw error;
+        }
+        // Don't log 404 for ticket guest-list (event may be deleted)
+        if (response.status === 404 && endpoint.includes('/ticket/guest-list/')) {
+          const error = new Error(data.message || 'Event not found');
+          (error as any).isExpected = true;
+          (error as any).statusCode = 404;
+          throw error;
+        }
         
         // Categorize errors by status code
         const error = new Error(data.message || `Request failed with status ${response.status}`);
         (error as any).statusCode = response.status;
         
-        // Only log non-404 errors or 404s for non-profile endpoints
-        if (response.status !== 404 || !endpoint.includes('/user/profile/')) {
+        // Only log 404 for endpoints we don't treat as expected
+        if (response.status !== 404 || (!endpoint.includes('/user/profile/') && !endpoint.includes('/analytics/business/event/') && !endpoint.includes('/ticket/guest-list/'))) {
           if (response.status >= 500) {
             console.error('❌ Server Error:', response.status, data);
           } else if (response.status >= 400) {
@@ -329,12 +343,8 @@ class ApiService {
       console.log('✅ Request successful:', endpoint);
       return data;
     } catch (error: any) {
-      // Don't log expected 404 errors for user profiles
-      const isExpectedUserNotFound = 
-        ((error as any).isExpected || 
-         error.message?.includes('User not found') || 
-         error.message?.includes('404')) && 
-        endpoint.includes('/user/profile/');
+      // Don't log expected 404s (user profile, analytics event not found, etc.)
+      const isExpected404 = (error as any).isExpected === true;
       
       // Handle network errors
       if (error.message?.includes('Failed to fetch') || 
@@ -342,7 +352,7 @@ class ApiService {
           error.message?.includes('NetworkError') ||
           error.name === 'TypeError') {
         
-        if (!isExpectedUserNotFound) {
+        if (!isExpected404) {
           console.error('❌ Network Error:', error.message);
         }
         
@@ -361,7 +371,7 @@ class ApiService {
       
       // Handle timeout errors
       if (error.name === 'AbortError' || error.message?.includes('timeout') || error.message?.includes('Aborted')) {
-        if (!isExpectedUserNotFound) {
+        if (!isExpected404) {
           console.error('❌ Timeout Error:', error.message);
         }
         
@@ -377,7 +387,7 @@ class ApiService {
       }
       
       // Log other errors (except expected ones)
-      if (!isExpectedUserNotFound && !(error as any).isAuthError) {
+      if (!isExpected404 && !(error as any).isAuthError) {
         console.error('❌ API Request Error:', error);
         console.error('Error details:', {
           message: error.message,
@@ -1059,10 +1069,10 @@ class ApiService {
   }
 
   async getGuestList(plan_id: string) {
-    return this.request<{ guests: Array<{ user_id: string; name: string; profile_image: string | null; bio: string }>; total: number }>(
-      `/ticket/guest-list/${plan_id}`,
-      { method: 'GET' }
-    );
+    return this.request<{
+      guests: Array<{ user_id: string; name: string; profile_image: string | null; bio?: string; is_returning?: boolean }>;
+      total: number;
+    }>(`/ticket/guest-list/${plan_id}`, { method: 'GET' });
   }
 
   async manualCheckIn(registration_id: string, user_id: string, action: 'checkin' | 'checkout') {

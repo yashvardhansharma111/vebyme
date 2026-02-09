@@ -36,6 +36,10 @@ interface GroupedPlanCardProps {
   isExpanded?: boolean;
   index?: number;
   showInteractions?: boolean;
+  /** When true, hide the count badge (e.g. after user has opened/viewed this card) */
+  hideCountBadge?: boolean;
+  /** User IDs already in the announcement group (shown as selected and disabled in Add to Community) */
+  alreadyInAnnouncementGroupIds?: Set<string> | string[];
 }
 
 interface EventAnalyticsMini {
@@ -56,15 +60,25 @@ export default function GroupedPlanCard({
   isExpanded = false,
   index = 0,
   showInteractions = false,
+  hideCountBadge = false,
+  alreadyInAnnouncementGroupIds,
 }: GroupedPlanCardProps) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(isExpanded);
-  const [guests, setGuests] = useState<Array<{ user_id: string; name: string; profile_image: string | null }>>([]);
+  const [guests, setGuests] = useState<Array<{ user_id: string; name: string; profile_image: string | null; is_returning?: boolean }>>([]);
   const [loadingGuests, setLoadingGuests] = useState(false);
   const [analytics, setAnalytics] = useState<EventAnalyticsMini | null>(null);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [showAddToCommunityModal, setShowAddToCommunityModal] = useState(false);
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
+  const [interactionFilter, setInteractionFilter] = useState<'all' | 'first_timers' | 'returning'>('all');
+
+  const alreadyInGroupSet = React.useMemo(() => {
+    if (!alreadyInAnnouncementGroupIds) return new Set<string>();
+    return alreadyInAnnouncementGroupIds instanceof Set
+      ? alreadyInAnnouncementGroupIds
+      : new Set(alreadyInAnnouncementGroupIds);
+  }, [alreadyInAnnouncementGroupIds]);
 
   const planId = post?.plan_id;
 
@@ -159,6 +173,12 @@ export default function GroupedPlanCard({
   const postTitle = post?.title || 'Untitled Plan';
   const interactionCount = interactions.length;
 
+  const filteredGuests = React.useMemo(() => {
+    if (interactionFilter === 'all') return guests;
+    if (interactionFilter === 'first_timers') return guests.filter((g) => !g.is_returning);
+    return guests.filter((g) => g.is_returning);
+  }, [guests, interactionFilter]);
+
   // Truncate description for collapsed view
   const shortDescription = postText.length > 100 
     ? postText.substring(0, 100) + '...' 
@@ -193,7 +213,15 @@ export default function GroupedPlanCard({
     }
   };
 
+  const selectableGuests = React.useMemo(
+    () => guests.filter((g) => !alreadyInGroupSet.has(g.user_id) && !g.is_returning),
+    [guests, alreadyInGroupSet]
+  );
+
   const toggleGuestSelection = (user_id: string) => {
+    if (alreadyInGroupSet.has(user_id)) return;
+    const guest = guests.find((g) => g.user_id === user_id);
+    if (guest?.is_returning) return;
     setSelectedGuestIds((prev) => {
       const next = new Set(prev);
       if (next.has(user_id)) next.delete(user_id);
@@ -203,15 +231,28 @@ export default function GroupedPlanCard({
   };
 
   const toggleSelectAll = () => {
-    if (guests.length === 0) return;
-    const allSelected = selectedGuestIds.size === guests.length;
-    setSelectedGuestIds(allSelected ? new Set() : new Set(guests.map((g) => g.user_id)));
+    if (selectableGuests.length === 0) return;
+    const allSelectableSelected = selectableGuests.every((g) => selectedGuestIds.has(g.user_id));
+    setSelectedGuestIds((prev) => {
+      const next = new Set(prev);
+      if (allSelectableSelected) {
+        selectableGuests.forEach((g) => next.delete(g.user_id));
+      } else {
+        selectableGuests.forEach((g) => next.add(g.user_id));
+      }
+      return next;
+    });
   };
 
   const handleAddToAnnouncementGroup = () => {
-    const selected = guests.filter((g) => selectedGuestIds.has(g.user_id));
-    if (selected.length > 0 && onAddToCommunity) {
-      onAddToCommunity(selected);
+    const toAdd = guests.filter(
+      (g) =>
+        selectedGuestIds.has(g.user_id) &&
+        !alreadyInGroupSet.has(g.user_id) &&
+        !g.is_returning
+    );
+    if (toAdd.length > 0 && onAddToCommunity) {
+      onAddToCommunity(toAdd);
     }
     setShowAddToCommunityModal(false);
   };
@@ -233,10 +274,12 @@ export default function GroupedPlanCard({
         onPress={handleToggleExpand}
         activeOpacity={0.9}
       >
-        {/* Numeric Badge - on edge of card, slightly overlapping */}
-        <View style={styles.badgeContainer}>
-          <Text style={styles.badgeText}>{interactionCount}</Text>
-        </View>
+        {/* Numeric Badge - hidden after user has opened/viewed this card */}
+        {!hideCountBadge && (
+          <View style={styles.badgeContainer}>
+            <Text style={styles.badgeText}>{interactionCount}</Text>
+          </View>
+        )}
 
         {/* Plan Title + Date row (Level 3: date on right); extra right padding when avatars shown (Level 2) */}
         <View style={[styles.titleRow, !showInteractions && styles.titleRowWithAvatars]}>
@@ -253,23 +296,35 @@ export default function GroupedPlanCard({
           {postText}
         </Text>
 
-        {/* Analytics - Always visible on Level 2 (and also visible on Level 3) */}
+        {/* Analytics - Tappable to filter Registered / Add to Community by first-timers or returning */}
         {planId && (
           <View style={styles.analyticsRow}>
-            <View style={styles.analyticsItem}>
+            <TouchableOpacity
+              style={[styles.analyticsItem, interactionFilter === 'all' && styles.analyticsItemActive]}
+              onPress={() => setInteractionFilter('all')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.analyticsLabel}>Registrations</Text>
               <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.analyticsDivider} />
-            <View style={styles.analyticsItem}>
+            <TouchableOpacity
+              style={[styles.analyticsItem, interactionFilter === 'first_timers' && styles.analyticsItemActive]}
+              onPress={() => setInteractionFilter('first_timers')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.analyticsLabel}>First-timers</Text>
               <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
-            </View>
+            </TouchableOpacity>
             <View style={styles.analyticsDivider} />
-            <View style={styles.analyticsItem}>
+            <TouchableOpacity
+              style={[styles.analyticsItem, interactionFilter === 'returning' && styles.analyticsItemActive]}
+              onPress={() => setInteractionFilter('returning')}
+              activeOpacity={0.7}
+            >
               <Text style={styles.analyticsLabel}>Returning</Text>
               <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -334,10 +389,12 @@ export default function GroupedPlanCard({
                 <View style={styles.guestsLoading}>
                   <ActivityIndicator size="small" color="#8E8E93" />
                 </View>
-              ) : guests.length === 0 ? (
-                <Text style={styles.registeredEmpty}>No registrations yet</Text>
+              ) : filteredGuests.length === 0 ? (
+                <Text style={styles.registeredEmpty}>
+                  {guests.length === 0 ? 'No registrations yet' : `No ${interactionFilter === 'all' ? '' : interactionFilter === 'first_timers' ? 'first-timer ' : 'returning '}registrations`}
+                </Text>
               ) : (
-                guests.map((guest) => (
+                filteredGuests.map((guest) => (
                   <View key={guest.user_id} style={styles.registeredRow}>
                     <Avatar uri={guest.profile_image} size={36} />
                     <Text style={styles.registeredText}>
@@ -383,22 +440,27 @@ export default function GroupedPlanCard({
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.addToCommunityGuestList} showsVerticalScrollIndicator={false}>
-              {guests.length === 0 ? (
-                <Text style={styles.registeredEmpty}>No registered users to add</Text>
+              {filteredGuests.length === 0 ? (
+                <Text style={styles.registeredEmpty}>
+                  {guests.length === 0 ? 'No registered users to add' : `No ${interactionFilter === 'first_timers' ? 'first-timer' : interactionFilter === 'returning' ? 'returning' : ''} users to show`}
+                </Text>
               ) : (
                 <>
-                  {guests.map((guest) => {
-                    const isSelected = selectedGuestIds.has(guest.user_id);
+                  {filteredGuests.map((guest) => {
+                    const isDisabled = alreadyInGroupSet.has(guest.user_id) || !!guest.is_returning;
+                    const isSelected = isDisabled || selectedGuestIds.has(guest.user_id);
                     return (
                       <TouchableOpacity
                         key={guest.user_id}
-                        style={styles.addToCommunityGuestRow}
-                        onPress={() => toggleGuestSelection(guest.user_id)}
-                        activeOpacity={0.7}
+                        style={[styles.addToCommunityGuestRow, isDisabled && styles.addToCommunityGuestRowDisabled]}
+                        onPress={() => !isDisabled && toggleGuestSelection(guest.user_id)}
+                        activeOpacity={isDisabled ? 1 : 0.7}
+                        disabled={isDisabled}
                       >
                         <Avatar uri={guest.profile_image} size={44} />
-                        <Text style={styles.addToCommunityGuestName} numberOfLines={1}>
+                        <Text style={[styles.addToCommunityGuestName, isDisabled && styles.addToCommunityGuestNameDisabled]} numberOfLines={1}>
                           {guest.name}
+                          {guest.is_returning ? ' (returning)' : alreadyInGroupSet.has(guest.user_id) ? ' (in group)' : ''}
                         </Text>
                         <View style={[styles.addToCommunityCheckbox, isSelected && styles.addToCommunityCheckboxSelected]}>
                           {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
@@ -410,30 +472,41 @@ export default function GroupedPlanCard({
                     style={styles.addToCommunitySelectAllRow}
                     onPress={toggleSelectAll}
                     activeOpacity={0.7}
+                    disabled={selectableGuests.length === 0}
                   >
                     <Text style={styles.addToCommunitySelectAllText}>Select All</Text>
                     <View
                       style={[
                         styles.addToCommunityCheckbox,
-                        guests.length > 0 && selectedGuestIds.size === guests.length && styles.addToCommunityCheckboxSelected,
+                        selectableGuests.length > 0 &&
+                          selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) &&
+                          styles.addToCommunityCheckboxSelected,
                       ]}
                     >
-                      {guests.length > 0 && selectedGuestIds.size === guests.length && (
-                        <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                      )}
+                      {selectableGuests.length > 0 &&
+                        selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) && (
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        )}
                     </View>
                   </TouchableOpacity>
                 </>
               )}
             </ScrollView>
+            {(() => {
+              const toAddCount = guests.filter(
+                (g) => selectedGuestIds.has(g.user_id) && !alreadyInGroupSet.has(g.user_id) && !g.is_returning
+              ).length;
+              return (
             <TouchableOpacity
-              style={[styles.addToCommunityConfirmBtn, selectedGuestIds.size === 0 && styles.addToCommunityConfirmBtnDisabled]}
+              style={[styles.addToCommunityConfirmBtn, toAddCount === 0 && styles.addToCommunityConfirmBtnDisabled]}
               onPress={handleAddToAnnouncementGroup}
-              disabled={selectedGuestIds.size === 0}
+              disabled={toAddCount === 0}
               activeOpacity={0.8}
             >
               <Text style={styles.addToCommunityConfirmBtnText}>Add to Announcement Group</Text>
             </TouchableOpacity>
+              );
+            })()}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -540,6 +613,11 @@ const styles = StyleSheet.create({
     width: 1,
     height: 26,
     backgroundColor: '#E5E5EA',
+  },
+  analyticsItemActive: {
+    backgroundColor: '#E5E5EA',
+    borderRadius: 8,
+    paddingVertical: 4,
   },
   avatarsContainerTopRight: {
     position: 'absolute',
@@ -688,6 +766,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1C1C1E',
     marginLeft: 12,
+  },
+  addToCommunityGuestRowDisabled: {
+    opacity: 0.7,
+    backgroundColor: '#F2F2F7',
+  },
+  addToCommunityGuestNameDisabled: {
+    color: '#8E8E93',
   },
   addToCommunityCheckbox: {
     width: 22,
