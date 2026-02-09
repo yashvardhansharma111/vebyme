@@ -566,7 +566,9 @@ export default function CreateBusinessPostScreen() {
       if (venueRequired) {
         planData.venue_required = true;
       }
-      if (womenOnly) {
+      if (editMode && planId) {
+        planData.is_women_only = womenOnly;
+      } else if (womenOnly) {
         planData.is_women_only = true;
       }
       planData.allow_view_guest_list = !hideGuestListFromViewers;
@@ -1211,7 +1213,7 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Women Only</Text>
+            <Text style={styles.toggleLabel}>Women&apos;s only</Text>
             <Switch
               value={womenOnly}
               onValueChange={setWomenOnly}
@@ -1219,6 +1221,11 @@ export default function CreateBusinessPostScreen() {
               thumbColor="#FFF"
             />
           </View>
+          {womenOnly && (
+            <Text style={styles.womenOnlyInfo}>
+              Your event will be visible to everyone but only women will be able to register.
+            </Text>
+          )}
 
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Hide guest list from viewers</Text>
@@ -1499,6 +1506,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#000',
+  },
+  womenOnlyInfo: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+    lineHeight: 18,
   },
   section: {
     marginBottom: 24,

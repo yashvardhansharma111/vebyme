@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { clearPostCreated } from '@/store/slices/postCreatedSlice';
+import { useSnackbar } from '@/context/SnackbarContext';
 import LoginModal from '@/components/LoginModal';
 import ShareToChatModal from '@/components/ShareToChatModal';
 import { Colors } from '@/constants/theme';
@@ -118,6 +119,7 @@ export default function HomeScreen() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const postCreated = useAppSelector((state) => state.postCreated?.value ?? null);
+  const { showSnackbar } = useSnackbar();
 
   // User profile cache to avoid fetching same user multiple times
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
@@ -510,6 +512,13 @@ export default function HomeScreen() {
                       if (rawPost?.user_id === user?.user_id) {
                         Alert.alert('Cannot Register', "You can't register for your own event.");
                         return;
+                      }
+                      if (rawPost?.is_women_only) {
+                        const gender = (currentUser?.gender || '').toLowerCase();
+                        if (gender !== 'female') {
+                          showSnackbar('The post is for women only');
+                          return;
+                        }
                       }
                       try {
                         const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);

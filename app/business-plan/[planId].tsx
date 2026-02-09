@@ -1,5 +1,7 @@
 import { apiService, getWebBaseUrl } from '@/services/api';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { fetchCurrentUser } from '@/store/slices/profileSlice';
+import { useSnackbar } from '@/context/SnackbarContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -132,7 +134,16 @@ export default function BusinessPlanDetailScreen() {
     }
   };
 
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
+  const { showSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    if (user?.session_id && !currentUser) {
+      dispatch(fetchCurrentUser(user.session_id));
+    }
+  }, [user?.session_id, currentUser, dispatch]);
 
   const isOwnEvent = !!(plan && user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id));
 
@@ -145,6 +156,14 @@ export default function BusinessPlanDetailScreen() {
     if (isOwnEvent) {
       Alert.alert('Cannot Register', "You can't register for your own event.");
       return;
+    }
+
+    if (plan?.is_women_only) {
+      const gender = (currentUser?.gender || '').toLowerCase();
+      if (gender !== 'female') {
+        showSnackbar('The post is for women only');
+        return;
+      }
     }
 
     if (!selectedPass && plan?.passes && plan.passes.length > 0) {

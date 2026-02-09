@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { store } from '@/store/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { loadUser } from '@/store/slices/authSlice';
+import { SnackbarProvider } from '@/context/SnackbarContext';
 import { Colors } from '@/constants/theme';
 
 const VYBEME_SCHEME = 'vybeme://';
@@ -82,7 +83,9 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <Provider store={store}>
-      <RootLayoutNav />
+      <SnackbarProvider>
+        <RootLayoutNav />
+      </SnackbarProvider>
     </Provider>
   );
 }
