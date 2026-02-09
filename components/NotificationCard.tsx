@@ -41,8 +41,10 @@ export default function NotificationCard({
   onPress,
 }: NotificationCardProps) {
   const router = useRouter();
+
+  const displayInteractions = interactions.filter((i) => i.type !== 'comment');
   
-  const uniqueInteractions = interactions.filter((interaction, index, self) =>
+  const uniqueInteractions = displayInteractions.filter((interaction, index, self) =>
     index === self.findIndex((i) => i.source_user_id === interaction.source_user_id)
   );
   
@@ -53,7 +55,7 @@ export default function NotificationCard({
   
   const postText = post?.description || post?.title || 'Post interaction';
   const postTitle = post?.title || 'Untitled Plan';
-  const interactionCount = interactions.length;
+  const interactionCount = displayInteractions.length;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -106,7 +108,7 @@ export default function NotificationCard({
 
       {/* Interactions List */}
       <View style={styles.interactionsList}>
-        {interactions.slice(0, 3).map((interaction) => {
+        {displayInteractions.slice(0, 3).map((interaction) => {
           const cachedUser = userCache[interaction.source_user_id];
           const user = cachedUser || interaction.user;
           const userName = user?.name || 'Unknown';
@@ -116,7 +118,6 @@ export default function NotificationCard({
               <Avatar uri={userAvatar} size={28} />
               <Ionicons
                 name={
-                  interaction.type === 'comment' ? 'chatbubble-outline' :
                   interaction.type === 'reaction' ? 'heart-outline' :
                   interaction.type === 'join' ? 'person-add-outline' :
                   'repeat-outline'
@@ -126,8 +127,7 @@ export default function NotificationCard({
                 style={styles.interactionIcon}
               />
               <Text style={styles.interactionText}>
-                {userName} {interaction.type === 'comment' ? 'commented' : 
-                           interaction.type === 'reaction' ? 'reacted' :
+                {userName} {interaction.type === 'reaction' ? 'reacted' :
                            interaction.type === 'join' ? 'joined' : 'reposted'}
               </Text>
             </View>
