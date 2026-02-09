@@ -52,7 +52,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": "https://300c-2405-201-3016-9117-dda6-956d-d8c0-3545.ngrok-free.app",
+      "apiUrl": "https://api.vybeme.in",
       "webUrl": "https://app.vybeme.in",
       "router": {},
       "eas": {

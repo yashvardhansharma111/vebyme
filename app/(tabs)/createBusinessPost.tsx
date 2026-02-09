@@ -1,6 +1,7 @@
 import { apiService } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
+import { setPostCreated } from '@/store/slices/postCreatedSlice';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -374,7 +375,10 @@ export default function CreateBusinessPostScreen() {
   };
 
   const handlePreview = () => {
-    // Only validate required fields: Title, Description, Category, and Ticket fee (if tickets enabled)
+    if (media.length === 0) {
+      Alert.alert('Validation', 'Please add at least one image to preview the plan.');
+      return;
+    }
     if (!title.trim()) {
       Alert.alert('Validation', 'Title is required');
       return;
@@ -603,9 +607,15 @@ export default function CreateBusinessPostScreen() {
               console.warn('Failed to share to announcement group:', shareErr);
             }
           }
-          Alert.alert('Business plan created', 'Your business plan has been created.', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
+          dispatch(setPostCreated({
+            planId: createdPlanId,
+            title: title.trim(),
+            description: description.trim(),
+            media: media.map(m => ({ url: m.uri, type: m.type })),
+            tags: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
+            category_main: selectedCategory?.toLowerCase(),
+          }));
+          router.back();
         }
       }
     } catch (error: any) {
@@ -663,6 +673,7 @@ export default function CreateBusinessPostScreen() {
             } : undefined}
             attendeesCount={0}
             isSwipeable={false}
+            hideActions
           />
         </ScrollView>
       </SafeAreaView>
@@ -671,6 +682,13 @@ export default function CreateBusinessPostScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.createPostHeader}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.cancelButton}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <Text style={styles.createPostHeaderTitle}>Create Post</Text>
+        <View style={styles.cancelButton} />
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -906,7 +924,9 @@ export default function CreateBusinessPostScreen() {
                           if (isSelected) {
                             setSelectedSubcategories((prev) => prev.filter((s) => s !== sub));
                           } else {
-                            setSelectedSubcategories((prev) => [...prev, sub]);
+                            // Only one subcategory per category: replace any sub for this category with the selected one
+                            const subsForCategory = CATEGORY_SUBCATEGORIES[selectedCategory] || [];
+                            setSelectedSubcategories((prev) => [...prev.filter((s) => !subsForCategory.includes(s)), sub]);
                           }
                         }}
                       >
@@ -947,6 +967,25 @@ export default function CreateBusinessPostScreen() {
                       <Ionicons name="close" size={20} color="#666" />
                     </TouchableOpacity>
                   </View>
+                  {/* Image and Preview Ticket only for Pass 1 */}
+                  {index === 0 && (
+                    <View style={styles.passImageRow}>
+                      <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
+                      {pass.media && pass.media.length > 0 ? (
+                        <View style={styles.passMediaPreview}>
+                          <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
+                          <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
+                            <Ionicons name="close" size={18} color="#FFF" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
+                          <Ionicons name="image-outline" size={20} color="#666" />
+                          <Text style={styles.addPassImageText}>Add image</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
                   <TextInput
                     style={styles.passInput}
                     placeholder="Ticket Name"
@@ -971,32 +1010,18 @@ export default function CreateBusinessPostScreen() {
                     numberOfLines={3}
                     placeholderTextColor="#999"
                   />
-                  <View style={styles.passImageRow}>
-                    <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
-                    {pass.media && pass.media.length > 0 ? (
-                      <View style={styles.passMediaPreview}>
-                        <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
-                        <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
-                          <Ionicons name="close" size={18} color="#FFF" />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
-                        <Ionicons name="image-outline" size={20} color="#666" />
-                        <Text style={styles.addPassImageText}>Add image</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.previewTicketButton}
-                    onPress={() => {
-                      setPreviewPassIndex(index);
-                      setShowTicketPreview(true);
-                    }}
-                  >
-                    <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
-                    <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
-                  </TouchableOpacity>
+                  {index === 0 && (
+                    <TouchableOpacity
+                      style={styles.previewTicketButton}
+                      onPress={() => {
+                        setPreviewPassIndex(0);
+                        setShowTicketPreview(true);
+                      }}
+                    >
+                      <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
+                      <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
               <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
@@ -1053,7 +1078,7 @@ export default function CreateBusinessPostScreen() {
                   <Text style={styles.additionalDetailLabel}>{setting?.label}</Text>
                   <TextInput
                     style={styles.additionalDetailInput}
-                    placeholder={`${setting?.label} details`}
+                    placeholder="Heading"
                     value={additionalDetails[settingId]?.title || ''}
                     onChangeText={(text) =>
                       setAdditionalDetails({
@@ -1062,6 +1087,20 @@ export default function CreateBusinessPostScreen() {
                       })
                     }
                     placeholderTextColor="#999"
+                  />
+                  <TextInput
+                    style={[styles.additionalDetailInput, styles.additionalDetailDescription]}
+                    placeholder="Description"
+                    value={additionalDetails[settingId]?.description || ''}
+                    onChangeText={(text) =>
+                      setAdditionalDetails({
+                        ...additionalDetails,
+                        [settingId]: { ...additionalDetails[settingId], description: text },
+                      })
+                    }
+                    placeholderTextColor="#999"
+                    multiline
+                    numberOfLines={2}
                   />
                 </View>
               );
@@ -1203,6 +1242,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
+  },
+  createPostHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#F2F2F7',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#C5C5D0',
+  },
+  cancelButton: {
+    minWidth: 70,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#1C1C1E',
+  },
+  createPostHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   keyboardView: {
     flex: 1,
@@ -1704,6 +1765,9 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: '#F2F2F7',
     borderRadius: 8,
+  },
+  additionalDetailDescription: {
+    marginTop: 10,
   },
   productionTags: {
     flexDirection: 'row',

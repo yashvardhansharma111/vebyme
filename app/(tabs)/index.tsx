@@ -3,12 +3,13 @@ import BusinessCard from '@/components/BusinessCard';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Alert, Image, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
+import { clearPostCreated } from '@/store/slices/postCreatedSlice';
 import LoginModal from '@/components/LoginModal';
 import ShareToChatModal from '@/components/ShareToChatModal';
 import { Colors } from '@/constants/theme';
@@ -89,6 +90,7 @@ export default function HomeScreen() {
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+  const postCreated = useAppSelector((state) => state.postCreated?.value ?? null);
 
   // User profile cache to avoid fetching same user multiple times
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
@@ -325,6 +327,36 @@ export default function HomeScreen() {
   const onRefresh = useCallback(() => {
     loadFeed(true);
   }, [loadFeed]);
+
+  // When returning from create post with success, refresh feed so new post appears
+  useFocusEffect(
+    useCallback(() => {
+      if (postCreated) {
+        loadFeed(true);
+      }
+    }, [postCreated, loadFeed])
+  );
+
+  const handlePostCreatedEdit = useCallback(() => {
+    if (postCreated?.planId) {
+      dispatch(clearPostCreated());
+      router.push({ pathname: '/business-plan/[planId]', params: { planId: postCreated.planId } } as any);
+    }
+  }, [postCreated, dispatch, router]);
+
+  const handlePostCreatedShare = useCallback(() => {
+    if (!postCreated) return;
+    setSharedBusinessPlan({
+      planId: postCreated.planId,
+      title: postCreated.title,
+      description: postCreated.description ?? '',
+      media: postCreated.media ?? [],
+      tags: postCreated.tags,
+      category_main: postCreated.category_main,
+    });
+    setShowBusinessShareModal(true);
+    dispatch(clearPostCreated());
+  }, [postCreated, dispatch]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -592,6 +624,33 @@ export default function HomeScreen() {
           currentUserAvatar={currentUser?.profile_image ?? undefined}
         />
       )}
+
+      {/* Post creation popup – B2U Create Post Flow */}
+      <Modal
+        visible={!!postCreated}
+        transparent
+        animationType="fade"
+        onRequestClose={() => dispatch(clearPostCreated())}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.postCreatedOverlay}
+          onPress={() => dispatch(clearPostCreated())}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.postCreatedCard}>
+            <Text style={styles.postCreatedTitle}>{postCreated?.title ?? ''} is Live</Text>
+            <View style={styles.postCreatedActions}>
+              <TouchableOpacity style={styles.postCreatedEditButton} onPress={handlePostCreatedEdit}>
+                <Text style={styles.postCreatedEditButtonText}>Edit Event</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.postCreatedShareButton} onPress={handlePostCreatedShare}>
+                <Ionicons name="paper-plane-outline" size={20} color="#FFF" />
+                <Text style={styles.postCreatedShareButtonText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -689,5 +748,60 @@ const styles = StyleSheet.create({
     width: 320,
     marginHorizontal: 0,
     marginRight: 16,
+  },
+  postCreatedOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  postCreatedCard: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 20,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  postCreatedTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  postCreatedActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  postCreatedEditButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#1C1C1E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  postCreatedEditButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  postCreatedShareButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#1C1C1E',
+  },
+  postCreatedShareButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
   },
 });

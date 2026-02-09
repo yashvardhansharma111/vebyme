@@ -40,6 +40,7 @@ interface BusinessCardProps {
   };
   attendeesCount?: number;
   isSwipeable?: boolean;
+  hideActions?: boolean;
   containerStyle?: any;
   onPress?: () => void;
   onRegisterPress?: () => void;
@@ -61,7 +62,8 @@ function BusinessCardBase({
   onRepostPress,
   onSharePress,
   onGuestListPress,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }> }) {
+  hideActions = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string }>; hideActions?: boolean }) {
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
@@ -142,17 +144,19 @@ function BusinessCardBase({
             )}
           </View>
         )}
-        <View style={styles.footer}>
-          <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-            <Text style={styles.registerButtonText}>Register</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-            <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-            <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-          </TouchableOpacity>
-        </View>
+        {!hideActions && (
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+              <Text style={styles.registerButtonText}>Register</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
       </View>
 
@@ -205,6 +209,7 @@ export default function BusinessCard({
   user,
   attendeesCount,
   isSwipeable = true,
+  hideActions = false,
   containerStyle,
   onPress,
   onRegisterPress,
@@ -310,6 +315,7 @@ export default function BusinessCard({
           onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
+          hideActions={hideActions}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -357,6 +363,7 @@ export default function BusinessCard({
           onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
+          hideActions={hideActions}
         />
       </Swipeable>
       <GuestListModal
