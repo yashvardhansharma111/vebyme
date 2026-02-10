@@ -167,14 +167,25 @@ export default function LoginScreen() {
                         style={styles.otpInput}
                         value={otp[index] || ''}
                         keyboardType="number-pad"
-                        maxLength={1}
+                        maxLength={index === 0 ? 4 : 1}
                         selectTextOnFocus
                         onChangeText={(text) => {
+                          const digits = text.replace(/\D/g, '');
+                          if (digits.length > 1) {
+                            const pasted = digits.slice(0, 4);
+                            setOtp(pasted);
+                            if (pasted.length === 4) {
+                              inputRefs.current[3]?.focus();
+                            } else {
+                              inputRefs.current[pasted.length]?.focus();
+                            }
+                            return;
+                          }
                           const newOtp = otp.split('');
-                          newOtp[index] = text;
+                          newOtp[index] = digits;
                           setOtp(newOtp.join(''));
 
-                          if (text && index < 3) {
+                          if (digits && index < 3) {
                             inputRefs.current[index + 1]?.focus();
                           }
                         }}
