@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   stickyFilterWrap: {
-    backgroundColor: 'rgba(224,232,230,0.98)',
+    backgroundColor: 'transparent',
     paddingBottom: 8,
     zIndex: 10,
   },

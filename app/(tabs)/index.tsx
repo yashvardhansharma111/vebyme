@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
   headerAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
   guestAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   stickyFilterWrap: {
-    backgroundColor: 'rgba(224,232,230,0.98)',
+    backgroundColor: 'transparent',
     paddingBottom: 8,
     zIndex: 10,
   },
