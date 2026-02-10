@@ -8,9 +8,12 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '@/constants/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +23,9 @@ interface PlanAnalyticsMini {
   registered_count: number;
   first_timers_count: number;
   returning_count: number;
+  showup_rate_percent?: number;
+  returning_percent?: number;
+  first_timers_percent?: number;
 }
 
 function usePlanAnalytics(planId: string | undefined) {
@@ -38,10 +44,16 @@ function usePlanAnalytics(planId: string | undefined) {
       .then((res: any) => {
         const payload = res?.data ?? res;
         if (!cancelled && payload && typeof payload === 'object') {
+          const total = Number(payload.registered_count ?? 0) || 0;
+          const first = Number(payload.first_timers_count ?? 0) || 0;
+          const ret = Number(payload.returning_count ?? 0) || 0;
           setData({
-            registered_count: Number(payload.registered_count ?? 0) || 0,
-            first_timers_count: Number(payload.first_timers_count ?? 0) || 0,
-            returning_count: Number(payload.returning_count ?? 0) || 0,
+            registered_count: total,
+            first_timers_count: first,
+            returning_count: ret,
+            showup_rate_percent: Number(payload.showup_rate_percent ?? 0) || 0,
+            returning_percent: total ? Math.round((ret / total) * 100) : 0,
+            first_timers_percent: total ? Math.round((first / total) * 100) : 0,
           });
         }
       })
@@ -84,24 +96,25 @@ interface Plan {
   reshare_to_announcement_group?: boolean;
 }
 
-const TAG_ICONS: { [key: string]: string } = {
-  Weekend: 'calendar',
-  Evening: 'cloud',
-  Hitchhiking: 'thumbs-up',
-  Morning: 'sunny',
-  Night: 'moon',
-  Today: 'today',
-};
+function formatPlanDate(dateStr: string | undefined): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
+  const month = d.toLocaleDateString('en-US', { month: 'short' });
+  const weekday = d.toLocaleDateString('en-US', { weekday: 'long' });
+  return `${day}${suffix} ${month}, ${weekday}`;
+}
 
 function PlanCardWithAnalytics({
   plan,
-  displayTags,
   isCancelled,
   isCancelling,
   onCardPress,
   onDuplicate,
   onEdit,
   onCancel,
+  onLongPress,
 }: {
   plan: Plan;
   displayTags: string[];
@@ -111,100 +124,106 @@ function PlanCardWithAnalytics({
   onDuplicate: () => void;
   onEdit: () => void;
   onCancel: () => void;
+  onLongPress?: () => void;
 }) {
-  const router = useRouter();
   const { analytics, loading } = usePlanAnalytics(plan.plan_id);
+  const hasImage = plan.media && plan.media.length > 0;
+  const showupPct = analytics?.showup_rate_percent ?? 0;
+  const returningPct = analytics?.returning_percent ?? 0;
+  const firstTimersPct = analytics?.first_timers_percent ?? 0;
 
   return (
-    <TouchableOpacity
-      style={styles.planCard}
-      activeOpacity={0.9}
-      onPress={onCardPress}
-    >
-      {plan.is_repost && (
-        <View style={styles.repostBadge}>
-          <Text style={styles.repostText}>You Reposted</Text>
-        </View>
-      )}
-      {isCancelled && (
-        <View style={styles.cancelledBadge}>
-          <Text style={styles.cancelledText}>Cancelled</Text>
-        </View>
-      )}
-      <View style={styles.cardContentRow}>
-        <View style={styles.textColumn}>
-          <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-          <Text style={styles.planDescription} numberOfLines={3}>
-            {plan.description}
-            <Text style={styles.vybemeText}> vybeme!</Text>
-          </Text>
-          {displayTags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {displayTags.map((tag, tagIndex) => (
-                <View key={`${plan.plan_id}-tag-${tag}-${tagIndex}`} style={styles.tag}>
-                  <Ionicons name={(TAG_ICONS[tag] || 'ellipse') as any} size={12} color="#555" style={{ marginRight: 4 }} />
-                  <Text style={styles.tagText}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-        {plan.media && plan.media.length > 0 && (
-          <Image source={{ uri: plan.media[0].url }} style={styles.planImage} resizeMode="cover" />
+    <View style={styles.planCardWrapper}>
+      <Text style={styles.planDateText}>{formatPlanDate(plan.date)}</Text>
+      <TouchableOpacity
+        style={styles.planCard}
+        activeOpacity={0.95}
+        onPress={onCardPress}
+        onLongPress={onLongPress}
+        delayLongPress={400}
+      >
+        {isCancelled && (
+          <View style={styles.cancelledBadge}>
+            <Text style={styles.cancelledText}>Cancelled</Text>
+          </View>
         )}
-      </View>
-
-      {/* Basic analytics row (My Plans card preview) */}
-      {!isCancelled && (
-        <View style={styles.analyticsRow}>
-          <View style={styles.analyticsItem}>
-            <Text style={styles.analyticsLabel}>Registrations</Text>
-            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+        {plan.is_repost && (
+          <View style={styles.repostBadge}>
+            <Text style={styles.repostText}>You Reposted</Text>
           </View>
-          <View style={styles.analyticsDivider} />
-          <View style={styles.analyticsItem}>
-            <Text style={styles.analyticsLabel}>First-timers</Text>
-            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
-          </View>
-          <View style={styles.analyticsDivider} />
-          <View style={styles.analyticsItem}>
-            <Text style={styles.analyticsLabel}>Returning</Text>
-            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+        )}
+        <View style={styles.planCardImageWrap}>
+          {hasImage ? (
+            <Image source={{ uri: plan.media![0].url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+          ) : (
+            <View style={[StyleSheet.absoluteFillObject, styles.planCardImagePlaceholder]} />
+          )}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
+            style={styles.planCardOverlay}
+          />
+          <View style={styles.planCardTextBlock}>
+            <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title || 'Untitled Plan'}</Text>
+            <Text style={styles.planCardDesc} numberOfLines={3}>
+              {plan.description}
+              <Text style={styles.vybemeText}> vybeme!</Text>
+            </Text>
           </View>
         </View>
-      )}
-      <TouchableOpacity style={styles.viewTicketDistributionLink} onPress={onCardPress}>
-        <Text style={styles.viewTicketDistributionLinkText}>View Ticket Distribution</Text>
-        <Ionicons name="chevron-forward" size={16} color="#2563EB" />
+
+        {!isCancelled && (
+          <View style={styles.analyticsBox}>
+            <TouchableOpacity style={styles.totalAttendeesRow} onPress={onCardPress} activeOpacity={0.8}>
+              <Text style={styles.totalAttendeesLabel}>
+                Total Attendees: {loading ? '—' : String(analytics?.registered_count ?? 0)}
+              </Text>
+              <Ionicons name="chevron-forward" size={20} color="#1C1C1E" />
+            </TouchableOpacity>
+            <View style={styles.metricsRow}>
+              <View style={[styles.metricBox, styles.metricBoxDark]}>
+                <Text style={styles.metricBoxValueDark}>{loading ? '—' : `${showupPct} %`}</Text>
+                <Text style={styles.metricBoxLabelDark}>Showup Rate</Text>
+              </View>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricBoxValue}>{loading ? '—' : `${returningPct} %`}</Text>
+                <Text style={styles.metricBoxLabel}>Returning</Text>
+              </View>
+              <View style={styles.metricBox}>
+                <Text style={styles.metricBoxValue}>{loading ? '—' : `${firstTimersPct} %`}</Text>
+                <Text style={styles.metricBoxLabel}>First Timers</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {!isCancelled && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={[styles.actionButton, styles.duplicateButton]} onPress={onDuplicate}>
+              <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
+              <Text style={styles.actionButtonText}>Duplicate</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={onEdit}>
+              <Ionicons name="create-outline" size={16} color="#1C1C1E" />
+              <Text style={styles.actionButtonText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={onCancel}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <ActivityIndicator size="small" color="#FF3B30" />
+              ) : (
+                <>
+                  <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
+                  <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </TouchableOpacity>
-
-      {!isCancelled && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={[styles.actionButton, styles.duplicateButton]} onPress={onDuplicate}>
-            <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
-            <Text style={styles.actionButtonText}>Duplicate</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={onEdit}>
-            <Ionicons name="create-outline" size={16} color="#1C1C1E" />
-            <Text style={styles.actionButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={onCancel}
-            disabled={isCancelling}
-          >
-            {isCancelling ? (
-              <ActivityIndicator size="small" color="#FF3B30" />
-            ) : (
-              <>
-                <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
-                <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -215,6 +234,7 @@ export default function YourPlansScreen() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingPlanId, setCancellingPlanId] = useState<string | null>(null);
+  const [contextMenuPlan, setContextMenuPlan] = useState<Plan | null>(null);
 
   useEffect(() => {
     loadPlans();
@@ -379,11 +399,70 @@ export default function YourPlansScreen() {
                 onDuplicate={() => handleDuplicatePlan(plan)}
                 onEdit={() => handleEditPlan(plan)}
                 onCancel={() => handleCancelPlan(plan)}
+                onLongPress={() => setContextMenuPlan(plan)}
               />
             );
           })
         )}
       </ScrollView>
+
+      {/* Tap-and-hold context menu */}
+      <Modal
+        visible={!!contextMenuPlan}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setContextMenuPlan(null)}
+      >
+        <Pressable style={styles.contextMenuBackdrop} onPress={() => setContextMenuPlan(null)}>
+          <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+          <Pressable style={styles.contextMenuContainer} onPress={(e) => e.stopPropagation()}>
+            {contextMenuPlan && (
+              <>
+                <View style={styles.contextMenuCard}>
+                  <Text style={styles.contextMenuTitle} numberOfLines={2}>{contextMenuPlan.title || 'Untitled Plan'}</Text>
+                  <Text style={styles.contextMenuDesc} numberOfLines={2}>
+                    {contextMenuPlan.description || 'No description'}
+                  </Text>
+                </View>
+                <View style={styles.contextMenuActions}>
+                  <View style={styles.contextMenuRow}>
+                    <TouchableOpacity
+                      style={[styles.contextMenuBtn, styles.contextMenuBtnSmall]}
+                      onPress={() => {
+                        handleDuplicatePlan(contextMenuPlan);
+                        setContextMenuPlan(null);
+                      }}
+                    >
+                      <Text style={styles.contextMenuBtnText}>Duplicate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.contextMenuBtn, styles.contextMenuBtnSmall, styles.contextMenuBtnDanger]}
+                      onPress={() => {
+                        setContextMenuPlan(null);
+                        handleCancelPlan(contextMenuPlan);
+                      }}
+                    >
+                      <Text style={[styles.contextMenuBtnText, styles.contextMenuBtnTextDanger]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.contextMenuBtn, styles.contextMenuBtnPrimary]}
+                    onPress={() => {
+                      setContextMenuPlan(null);
+                      router.push({
+                        pathname: '/analytics/event/[planId]',
+                        params: { planId: contextMenuPlan.plan_id },
+                      } as any);
+                    }}
+                  >
+                    <Text style={styles.contextMenuBtnTextPrimary}>View Analytics</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -455,144 +534,140 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
 
-  // Plan Card
+  planCardWrapper: {
+    marginBottom: 24,
+  },
+  planDateText: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 10,
+    fontWeight: '600',
+  },
   planCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
-    // Shadow
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
     borderWidth: 1,
-    borderColor: '#F5F5F5',
+    borderColor: '#F1F5F9',
   },
-  repostBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#555555', // Dark gray for repost badge
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  planCardImageWrap: {
+    height: 200,
+    position: 'relative',
+  },
+  planCardImagePlaceholder: {
+    backgroundColor: '#94A3B8',
+  },
+  planCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    padding: 18,
+  },
+  planCardTextBlock: {
+    paddingBottom: 8,
+  },
+  planCardTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  planCardDesc: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.95)',
+    lineHeight: 22,
+  },
+  analyticsBox: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 16,
+    margin: 14,
+    marginTop: 12,
+    padding: 16,
+  },
+  totalAttendeesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
   },
-  repostText: {
-    fontSize: 12,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  
-  cardContentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  textColumn: {
-    flex: 1,
-    marginRight: 12,
-  },
-  
-  // Text Styles
-  planTitle: {
-    fontSize: 18,
-    fontWeight: '800', // Bold title
-    color: '#1C1C1E',
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  planDescription: {
-    fontSize: 14,
-    color: '#666666',
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  vybemeText: {
+  totalAttendeesLabel: {
+    fontSize: 16,
     fontWeight: '700',
     color: '#1C1C1E',
   },
-
-  // Tags
-  tagsRow: {
+  metricsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
-  tag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F2',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#333333',
-  },
-
-  // Image
-  planImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 16,
-  },
-
-  // Basic analytics on plan card preview
-  analyticsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+  metricBox: {
+    flex: 1,
+    backgroundColor: '#FFF',
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 14,
-    marginTop: 14,
-  },
-  analyticsItem: {
-    flex: 1,
+    paddingHorizontal: 10,
     alignItems: 'center',
   },
-  analyticsLabel: {
+  metricBoxDark: {
+    backgroundColor: '#1C1C1E',
+  },
+  metricBoxValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#1C1C1E',
+  },
+  metricBoxValueDark: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFF',
+  },
+  metricBoxLabel: {
     fontSize: 11,
     fontWeight: '600',
     color: '#64748B',
-    marginBottom: 2,
+    marginTop: 2,
   },
-  analyticsValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  analyticsDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: '#E2E8F0',
-  },
-  viewTicketDistributionLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 10,
-    paddingVertical: 6,
-  },
-  viewTicketDistributionLinkText: {
-    fontSize: 14,
+  metricBoxLabelDark: {
+    fontSize: 11,
     fontWeight: '600',
-    color: '#2563EB',
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
   },
-
-  // Cancelled Badge
-  cancelledBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    paddingHorizontal: 12,
+  repostBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: 12,
+    zIndex: 2,
+  },
+  repostText: {
+    fontSize: 12,
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  vybemeText: {
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.95)',
+  },
+  cancelledBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    zIndex: 2,
   },
   cancelledText: {
     fontSize: 12,
@@ -600,13 +675,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Action Buttons
   actionButtons: {
     flexDirection: 'row',
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
+    borderTopColor: '#F1F5F9',
     gap: 8,
   },
   actionButton: {
@@ -635,5 +711,81 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#FF3B30',
+  },
+
+  // Tap-and-hold context menu
+  contextMenuBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  contextMenuContainer: {
+    width: '100%',
+    maxWidth: 340,
+  },
+  contextMenuCard: {
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  contextMenuTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    marginBottom: 6,
+  },
+  contextMenuDesc: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 20,
+  },
+  contextMenuActions: {
+    gap: 10,
+  },
+  contextMenuRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  contextMenuBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  contextMenuBtnSmall: {
+    flex: 1,
+  },
+  contextMenuBtnDanger: {
+    backgroundColor: 'rgba(255,245,245,0.98)',
+  },
+  contextMenuBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  contextMenuBtnTextDanger: {
+    color: '#FF3B30',
+  },
+  contextMenuBtnPrimary: {
+    backgroundColor: '#1C1C1E',
+  },
+  contextMenuBtnTextPrimary: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFF',
   },
 });

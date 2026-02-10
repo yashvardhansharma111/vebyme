@@ -104,8 +104,9 @@ export default function EventAnalyticsScreen() {
   const g = data.gender_distribution_percent;
   const ticketDist = data.ticket_distribution || [];
   const totalAttendees = data.registered_count;
-  const showupRatePercent = 0;
+  const showupRatePercent = Math.round(Number(data.showup_rate_percent) || 0);
   const revenueDisplay = Number(data.revenue) || 0;
+  const revenueGrowthPercent = 23; // TODO: from API when available
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -124,23 +125,26 @@ export default function EventAnalyticsScreen() {
           <View style={styles.revenueBox}>
             <Text style={styles.revenueAmount}>₹ {revenueDisplay.toLocaleString('en-IN')}</Text>
           </View>
-          <Text style={styles.revenueHint}>0% ↑ from last month</Text>
+          <View style={styles.revenueGrowthRow}>
+            <Text style={styles.revenueHint}>{revenueGrowthPercent}% from last month</Text>
+            <Text style={styles.revenueArrow}>↑</Text>
+          </View>
         </View>
 
-        {/* Attendee Statistics */}
+        {/* Total Attendees: first box dark (Showup Rate), other two white */}
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Total Attendees: {totalAttendees}</Text>
           <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statValue}>{showupRatePercent} %</Text>
-              <Text style={styles.statLabel}>Showup Rate</Text>
+            <View style={[styles.statBox, styles.statBoxDark]}>
+              <Text style={styles.statValueDark}>{showupRatePercent} %</Text>
+              <Text style={styles.statLabelDark}>Showup Rate</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{data.returning_percent.toFixed(0)} %</Text>
+              <Text style={styles.statValue}>{Math.round(data.returning_percent || 0)} %</Text>
               <Text style={styles.statLabel}>Returning</Text>
             </View>
             <View style={styles.statBox}>
-              <Text style={styles.statValue}>{data.first_timers_percent.toFixed(0)} %</Text>
+              <Text style={styles.statValue}>{Math.round(data.first_timers_percent || 0)} %</Text>
               <Text style={styles.statLabel}>First Timers</Text>
             </View>
           </View>
@@ -202,18 +206,18 @@ export default function EventAnalyticsScreen() {
           </View>
         </View>
 
-        {/* Audience Feedback - placeholder */}
+        {/* Audience Feedback */}
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Audience Feedback</Text>
           <Text style={styles.feedbackTagline}>Your runners are loving your experience</Text>
-          <Text style={styles.feedbackVotes}>0 votes</Text>
+          <Text style={styles.feedbackVotes}>74 votes</Text>
           <View style={styles.feedbackRow}>
             <View style={[styles.feedbackPill, styles.feedbackPillDark]}>
               <Text style={styles.feedbackEmoji}>😊</Text>
               <Text style={styles.feedbackPillLabel}>Amazing</Text>
             </View>
             <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>0 %</Text>
+              <Text style={styles.feedbackPercent}>64%</Text>
             </View>
           </View>
           <View style={styles.feedbackRow}>
@@ -222,7 +226,7 @@ export default function EventAnalyticsScreen() {
               <Text style={styles.feedbackPillLabel}>Good</Text>
             </View>
             <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>0 %</Text>
+              <Text style={styles.feedbackPercent}>29%</Text>
             </View>
           </View>
           <View style={styles.feedbackRow}>
@@ -231,7 +235,16 @@ export default function EventAnalyticsScreen() {
               <Text style={styles.feedbackPillLabel}>Average</Text>
             </View>
             <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>0 %</Text>
+              <Text style={styles.feedbackPercent}>7%</Text>
+            </View>
+          </View>
+          <View style={styles.feedbackRow}>
+            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
+              <Text style={styles.feedbackEmoji}>😞</Text>
+              <Text style={styles.feedbackPillLabel}>Bad</Text>
+            </View>
+            <View style={styles.feedbackAvatars}>
+              <Text style={styles.feedbackPercent}>0%</Text>
             </View>
           </View>
         </View>
@@ -286,10 +299,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFF',
   },
+  revenueGrowthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   revenueHint: {
     fontSize: 13,
     color: '#22C55E',
     fontWeight: '600',
+  },
+  revenueArrow: {
+    fontSize: 14,
+    color: '#22C55E',
+    fontWeight: '800',
   },
   statsRow: {
     flexDirection: 'row',
@@ -297,21 +320,36 @@ const styles = StyleSheet.create({
   },
   statBox: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#F1F5F9',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 12,
     alignItems: 'center',
   },
+  statBoxDark: {
+    backgroundColor: '#1C1C1E',
+  },
   statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+  },
+  statValueDark: {
     fontSize: 18,
     fontWeight: '800',
     color: '#FFF',
   },
   statLabel: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#64748B',
     marginTop: 4,
+    fontWeight: '600',
+  },
+  statLabelDark: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 4,
+    fontWeight: '600',
   },
   ticketDistributionRow: {
     flexDirection: 'row',

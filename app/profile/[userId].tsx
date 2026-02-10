@@ -77,8 +77,10 @@ export default function OtherUserProfileScreen() {
   const [recentPlans, setRecentPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
 
+  const { width: screenWidth } = useWindowDimensions();
   const topSectionHeight = screenHeight * 0.6;
-  const blurHeight = topSectionHeight * 0.5; // blur on bottom 50% – too tall = washed look
+  const blurHeight = topSectionHeight * 0.5;
+  const recentPlanCardWidth = Math.min(screenWidth * 0.78, 320);
 
   useEffect(() => {
     if (userId) {
@@ -240,21 +242,22 @@ export default function OtherUserProfileScreen() {
             ))}
           </View>
 
-          {/* Instagram Preview (UI only; up to 9 tiles) */}
-          <View key="insta-preview" style={[styles.sectionCard, { marginBottom: 15 }]}> 
-            <View style={styles.instaHeaderRow}>
+          {/* Instagram Preview: tap username to open Instagram (no Open button) */}
+          <View key="insta-preview" style={[styles.sectionCard, { marginBottom: 15 }]}>
+            <TouchableOpacity
+              style={styles.instaHeaderRow}
+              onPress={openInstagram}
+              disabled={!instagramUrl}
+              activeOpacity={instagramUrl ? 0.7 : 1}
+            >
               <View style={styles.instaHeaderLeft}>
                 <Ionicons name="logo-instagram" size={20} color="#252525" />
-                <Text style={styles.instaHeaderTitle}>Instagram</Text>
+                <Text style={[styles.instaHeaderTitle, !instagramUrl && styles.instaHandleMuted]}>
+                  {instagramId || socialMedia.instagram || 'Not added'}
+                </Text>
               </View>
-              <TouchableOpacity
-                style={[styles.instaOpenBtn, !instagramUrl && styles.instaOpenBtnDisabled]}
-                onPress={openInstagram}
-                disabled={!instagramUrl}
-              >
-                <Text style={styles.instaOpenBtnText}>Open</Text>
-              </TouchableOpacity>
-            </View>
+              {instagramUrl ? <Ionicons name="open-outline" size={18} color="#8E8E93" /> : null}
+            </TouchableOpacity>
             <View style={styles.instaGrid}>
               {instagramPreviewTiles.map((i) => (
                 <View key={i} style={styles.instaTile} />
@@ -262,7 +265,7 @@ export default function OtherUserProfileScreen() {
             </View>
           </View>
 
-          {/* Stats card: #plans (left) | #interactions (right) */}
+          {/* Stats card: #plans (left) | #attendees (right) */}
           <View key="stats-card" style={[styles.sectionCard, styles.statsCard, { marginBottom: 15 }]}>
             <View style={styles.statHalf}>
               <Text style={styles.statNumber}>{stats?.plans_count ?? 0}</Text>
@@ -270,98 +273,76 @@ export default function OtherUserProfileScreen() {
             </View>
             <View style={styles.statsDivider} />
             <View style={styles.statHalf}>
-              <Text style={styles.statNumber}>{stats?.interactions_count ?? 0}</Text>
-              <Text style={styles.statLabel}>#interactions</Text>
+              <Text style={styles.statNumber}>{(stats as any)?.attendees_count ?? (stats as any)?.registered_count ?? 0}</Text>
+              <Text style={styles.statLabel}>#attendees</Text>
             </View>
           </View>
 
-          {/* Interests card */}
-          {interests.length > 0 && (
-            <View key="interests-card" style={[styles.sectionCard, { marginBottom: 15 }]}>
-              <Text style={styles.interestsLabel}>#interests</Text>
-              <View style={styles.interestsWrap}>
-                {interests.map((interest, index) => (
-                  <View key={index} style={styles.interestTag}>
-                    <Ionicons
-                      name={(INTEREST_ICONS[interest] || 'ellipse') as any}
-                      size={20}
-                      color="#3b3c3d"
-                      style={styles.interestTagIcon}
-                    />
-                    <Text style={styles.interestTagText}>{interest}</Text>
-                  </View>
-                ))}
-              </View>
+          {/* Recent Plans – horizontal scroll (FIGMA: Business User Profile / Previous Runs) */}
+          <View key="recent-plans-section" style={styles.recentPlansSection}>
+            <View style={styles.recentPlansHeaderRow}>
+              <Text style={styles.recentPlansSectionTitle}>Previous Runs</Text>
+              <Ionicons name="chevron-forward" size={22} color="#1C1C1E" />
             </View>
-          )}
-
-          {/* Recent Plans / All Plans */}
-          {loadingPlans ? (
-            <View key="plans-loading">
-              <ActivityIndicator size="small" color="#1C1C1E" style={{ paddingVertical: 20 }} />
-            </View>
-          ) : recentPlans.length === 0 ? (
-            <React.Fragment key="empty-plans">
-              <View style={styles.recentPlansHeader}>
-                <View style={styles.recentPlansPill}>
-                  <Text style={styles.recentPlansPillText}>Recent Plans</Text>
-                </View>
+            {loadingPlans ? (
+              <View style={styles.recentPlansHorizontalLoader}>
+                <ActivityIndicator size="small" color="#1C1C1E" />
               </View>
+            ) : recentPlans.length === 0 ? (
               <Text style={styles.emptyText}>No plans yet</Text>
-            </React.Fragment>
-          ) : (
-            <View key="recent-plans-wrapper" style={styles.recentPlansListWrapper}>
-              <View key="recent-plans-pill" style={styles.recentPlansPillStuck}>
-                <Text style={styles.recentPlansPillText}>Recent Plans</Text>
-              </View>
-              <React.Fragment key="recent-plans-list">
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.recentPlansHorizontalContent}
+                style={styles.recentPlansHorizontalScroll}
+              >
                 {recentPlans.map((plan, planIndex) => {
-                  const allTags = [
-                    ...(plan.temporal_tags || []),
-                    ...(plan.category_sub || []),
-                  ].slice(0, 3);
                   const hasImage = plan.media && plan.media.length > 0;
-                  const isFirstCard = planIndex === 0;
                   const planKey = plan.plan_id ?? (plan as any).planId ?? (plan as any).id ?? `plan-${planIndex}`;
-
                   return (
-                    <View key={planKey} style={[styles.planCard, isFirstCard && styles.planCardFirst]}>
-                      <View style={styles.planCardInner}>
-                        <View style={styles.planTextBlock}>
-                          <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-                          <Text style={styles.planDescription} numberOfLines={4}>
-                            {plan.description || 'No description'}
-                          </Text>
-                          {allTags.length > 0 && (
-                            <View style={styles.planTagsRow}>
-                              {allTags.map((tag: string, idx: number) => (
-                                <View key={idx} style={styles.planTagChip}>
-                                  <Ionicons
-                                    name={(TAG_ICONS[tag] || 'ellipse') as any}
-                                    size={12}
-                                    color="#222"
-                                    style={{ marginRight: 4 }}
-                                  />
-                                  <Text style={styles.planTagChipText}>{tag}</Text>
-                                </View>
-                              ))}
-                            </View>
-                          )}
-                        </View>
-                        {hasImage && (
-                          <Image
-                            source={{ uri: plan.media[0].url }}
-                            style={styles.planThumbnail}
-                            resizeMode="cover"
-                          />
-                        )}
+                    <TouchableOpacity
+                      key={planKey}
+                      style={[styles.recentPlanCard, { width: recentPlanCardWidth }]}
+                      activeOpacity={0.9}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/business-plan/[planId]',
+                          params: { planId: plan.plan_id },
+                        } as any)
+                      }
+                    >
+                      {hasImage ? (
+                        <Image
+                          source={{ uri: plan.media[0].url }}
+                          style={StyleSheet.absoluteFillObject}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[StyleSheet.absoluteFillObject, styles.recentPlanCardPlaceholder]} />
+                      )}
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.85)']}
+                        style={styles.recentPlanCardOverlay}
+                      />
+                      <View style={styles.recentPlanCardContent}>
+                        <Text style={styles.recentPlanCardTitle} numberOfLines={2}>
+                          {plan.title || 'Untitled Plan'}
+                        </Text>
+                        <Text style={styles.recentPlanCardDescription} numberOfLines={3}>
+                          {plan.description || 'No description'}
+                        </Text>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
-              </React.Fragment>
-            </View>
-          )}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={styles.reportButton} onPress={handleReport} activeOpacity={0.7}>
+              <Ionicons name="person-outline" size={20} color="#1C1C1E" />
+              <Text style={styles.reportButtonText}>Report</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Actions: Interacted = Remove Interaction + Report in one card + Chat. Non-interacted = Report only */}
           {hasInteracted ? (
@@ -574,19 +555,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#252525',
   },
-  instaOpenBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: '#1C1C1E',
-  },
-  instaOpenBtnDisabled: {
-    opacity: 0.35,
-  },
-  instaOpenBtnText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
+  instaHandleMuted: {
+    color: 'rgba(71, 71, 71, 0.7)',
   },
   instaGrid: {
     flexDirection: 'row',
@@ -678,85 +648,78 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     lineHeight: 19,
   },
-  recentPlansHeader: {
-    marginBottom: 16,
+  recentPlansSection: {
+    marginBottom: 20,
   },
-  recentPlansPill: {
-    alignSelf: 'stretch',
-  },
-  recentPlansListWrapper: {
-    position: 'relative',
-    marginBottom: 0,
-    paddingTop: 32,
-  },
-  recentPlansPillStuck: {
-    marginBottom: 16,
-  },
-  recentPlansPillText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#3b3c3d',
-    lineHeight: 24,
-  },
-  planCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 32,
-    padding: 20,
-    marginBottom: 15,
-    ...CARD_SHADOW,
-  },
-  planCardFirst: {
-    marginTop: 26,
-  },
-  planCardInner: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    gap: 24,
-  },
-  planTextBlock: {
-    flex: 1,
-    marginRight: 0,
-  },
-  planTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#263739',
-    letterSpacing: -1,
-    lineHeight: 34,
-    marginBottom: 4,
-  },
-  planDescription: {
-    fontSize: 18,
-    color: 'rgba(0, 0, 0, 0.7)',
-    lineHeight: 24,
-    marginBottom: 10,
-  },
-  planTagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  planTagChip: {
+  recentPlansHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f3f3f3',
-    paddingVertical: 16,
-    paddingHorizontal: 10,
-    borderRadius: 24,
-    gap: 4,
+    justifyContent: 'space-between',
+    marginBottom: 14,
   },
-  planTagChipText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#263739',
-    letterSpacing: -0.6,
-    lineHeight: 14,
+  recentPlansSectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1C1C1E',
   },
-  planThumbnail: {
-    width: 100,
-    height: 84,
+  recentPlansHorizontalScroll: {
+    marginHorizontal: -20,
+  },
+  recentPlansHorizontalContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 4,
+  },
+  recentPlansHorizontalLoader: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  recentPlanCard: {
+    height: 200,
     borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: 14,
+  },
+  recentPlanCardPlaceholder: {
+    backgroundColor: '#94A3B8',
+  },
+  recentPlanCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    padding: 18,
+  },
+  recentPlanCardContent: {
+    paddingBottom: 4,
+  },
+  recentPlanCardTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 6,
+    textShadowColor: 'rgba(0,0,0,0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  recentPlanCardDescription: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.95)',
+    lineHeight: 20,
+  },
+  reportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFF',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    marginTop: 16,
+    ...CARD_SHADOW,
+  },
+  reportButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   emptyText: {
     fontSize: 14,
