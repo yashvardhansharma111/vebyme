@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,51 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Colors } from '@/constants/theme'; // Assuming Colors has basic definitions
+import { Colors } from '@/constants/theme';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface PlanAnalyticsMini {
+  registered_count: number;
+  first_timers_count: number;
+  returning_count: number;
+}
+
+function usePlanAnalytics(planId: string | undefined) {
+  const [data, setData] = useState<PlanAnalyticsMini | null>(null);
+  const [loading, setLoading] = useState(!!planId);
+  useEffect(() => {
+    if (!planId) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    apiService
+      .getEventAnalytics(planId)
+      .then((res: any) => {
+        const payload = res?.data ?? res;
+        if (!cancelled && payload && typeof payload === 'object') {
+          setData({
+            registered_count: Number(payload.registered_count ?? 0) || 0,
+            first_timers_count: Number(payload.first_timers_count ?? 0) || 0,
+            returning_count: Number(payload.returning_count ?? 0) || 0,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setData(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [planId]);
+  return { analytics: data, loading };
+}
 
 interface Plan {
   plan_id: string;
@@ -53,9 +93,125 @@ const TAG_ICONS: { [key: string]: string } = {
   Today: 'today',
 };
 
+function PlanCardWithAnalytics({
+  plan,
+  displayTags,
+  isCancelled,
+  isCancelling,
+  onCardPress,
+  onDuplicate,
+  onEdit,
+  onCancel,
+}: {
+  plan: Plan;
+  displayTags: string[];
+  isCancelled: boolean;
+  isCancelling: boolean;
+  onCardPress: () => void;
+  onDuplicate: () => void;
+  onEdit: () => void;
+  onCancel: () => void;
+}) {
+  const router = useRouter();
+  const { analytics, loading } = usePlanAnalytics(plan.plan_id);
+
+  return (
+    <TouchableOpacity
+      style={styles.planCard}
+      activeOpacity={0.9}
+      onPress={onCardPress}
+    >
+      {plan.is_repost && (
+        <View style={styles.repostBadge}>
+          <Text style={styles.repostText}>You Reposted</Text>
+        </View>
+      )}
+      {isCancelled && (
+        <View style={styles.cancelledBadge}>
+          <Text style={styles.cancelledText}>Cancelled</Text>
+        </View>
+      )}
+      <View style={styles.cardContentRow}>
+        <View style={styles.textColumn}>
+          <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
+          <Text style={styles.planDescription} numberOfLines={3}>
+            {plan.description}
+            <Text style={styles.vybemeText}> vybeme!</Text>
+          </Text>
+          {displayTags.length > 0 && (
+            <View style={styles.tagsRow}>
+              {displayTags.map((tag, tagIndex) => (
+                <View key={`${plan.plan_id}-tag-${tag}-${tagIndex}`} style={styles.tag}>
+                  <Ionicons name={(TAG_ICONS[tag] || 'ellipse') as any} size={12} color="#555" style={{ marginRight: 4 }} />
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+        {plan.media && plan.media.length > 0 && (
+          <Image source={{ uri: plan.media[0].url }} style={styles.planImage} resizeMode="cover" />
+        )}
+      </View>
+
+      {/* Basic analytics row (My Plans card preview) */}
+      {!isCancelled && (
+        <View style={styles.analyticsRow}>
+          <View style={styles.analyticsItem}>
+            <Text style={styles.analyticsLabel}>Registrations</Text>
+            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+          </View>
+          <View style={styles.analyticsDivider} />
+          <View style={styles.analyticsItem}>
+            <Text style={styles.analyticsLabel}>First-timers</Text>
+            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
+          </View>
+          <View style={styles.analyticsDivider} />
+          <View style={styles.analyticsItem}>
+            <Text style={styles.analyticsLabel}>Returning</Text>
+            <Text style={styles.analyticsValue}>{loading ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+          </View>
+        </View>
+      )}
+      <TouchableOpacity style={styles.viewTicketDistributionLink} onPress={onCardPress}>
+        <Text style={styles.viewTicketDistributionLinkText}>View Ticket Distribution</Text>
+        <Ionicons name="chevron-forward" size={16} color="#2563EB" />
+      </TouchableOpacity>
+
+      {!isCancelled && (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={[styles.actionButton, styles.duplicateButton]} onPress={onDuplicate}>
+            <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
+            <Text style={styles.actionButtonText}>Duplicate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={onEdit}>
+            <Ionicons name="create-outline" size={16} color="#1C1C1E" />
+            <Text style={styles.actionButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={onCancel}
+            disabled={isCancelling}
+          >
+            {isCancelling ? (
+              <ActivityIndicator size="small" color="#FF3B30" />
+            ) : (
+              <>
+                <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
+                <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 export default function YourPlansScreen() {
   const router = useRouter();
   const { user } = useAppSelector((state) => state.auth);
+  const { currentUser } = useAppSelector((state) => state.profile);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancellingPlanId, setCancellingPlanId] = useState<string | null>(null);
@@ -177,8 +333,18 @@ export default function YourPlansScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Your Plans</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle}>My Plans</Text>
+        {currentUser?.is_business ? (
+          <TouchableOpacity
+            style={styles.headerAnalyticsButton}
+            onPress={() => router.push('/analytics/overall')}
+          >
+            <Ionicons name="stats-chart-outline" size={20} color="#2563EB" />
+            <Text style={styles.headerAnalyticsText}>Analytics</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
 
       <ScrollView 
@@ -194,112 +360,26 @@ export default function YourPlansScreen() {
           </View>
         ) : (
           plans.map((plan, index) => {
-            // Combine tags for display (Sub-categories + Temporal tags)
             const displayTags = [
               ...(plan.temporal_tags || []),
-              ...(plan.category_sub || [])
-            ].slice(0, 3); // Limit to 3 tags
-
+              ...(plan.category_sub || []),
+            ].slice(0, 3);
             const isCancelled = plan.post_status === 'deleted';
             const isCancelling = cancellingPlanId === plan.plan_id;
-
             return (
-              <TouchableOpacity
+              <PlanCardWithAnalytics
                 key={plan.plan_id || `plan-${index}`}
-                style={styles.planCard}
-                activeOpacity={0.9}
-                onPress={() => {
+                plan={plan}
+                displayTags={displayTags}
+                isCancelled={isCancelled}
+                isCancelling={isCancelling}
+                onCardPress={() => {
                   router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any);
                 }}
-              >
-                
-                {/* Repost Badge */}
-                {plan.is_repost && (
-                  <View style={styles.repostBadge}>
-                    <Text style={styles.repostText}>You Reposted</Text>
-                  </View>
-                )}
-
-                {/* Cancelled Badge */}
-                {isCancelled && (
-                  <View style={styles.cancelledBadge}>
-                    <Text style={styles.cancelledText}>Cancelled</Text>
-                  </View>
-                )}
-
-                <View style={styles.cardContentRow}>
-                  {/* Left Column: Text & Tags */}
-                  <View style={styles.textColumn}>
-                    <Text style={styles.planTitle}>{plan.title || 'Untitled Plan'}</Text>
-                    <Text style={styles.planDescription} numberOfLines={3}>
-                      {plan.description}
-                      <Text style={styles.vybemeText}> vybeme!</Text>
-                    </Text>
-
-                    {/* Tags Row */}
-                    {displayTags.length > 0 && (
-                      <View style={styles.tagsRow}>
-                        {displayTags.map((tag, tagIndex) => (
-                          <View key={`${plan.plan_id}-tag-${tag}-${tagIndex}`} style={styles.tag}>
-                            <Ionicons 
-                              name={(TAG_ICONS[tag] || 'ellipse') as any} 
-                              size={12} 
-                              color="#555" 
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text style={styles.tagText}>{tag}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Right Column: Image */}
-                  {plan.media && plan.media.length > 0 && (
-                    <Image
-                      source={{ uri: plan.media[0].url }}
-                      style={styles.planImage}
-                      resizeMode="cover"
-                    />
-                  )}
-                </View>
-
-                {/* Action Buttons */}
-                {!isCancelled && (
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.duplicateButton]}
-                      onPress={() => handleDuplicatePlan(plan)}
-                    >
-                      <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
-                      <Text style={styles.actionButtonText}>Duplicate</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.editButton]}
-                      onPress={() => handleEditPlan(plan)}
-                    >
-                      <Ionicons name="create-outline" size={16} color="#1C1C1E" />
-                      <Text style={styles.actionButtonText}>Edit</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.cancelButton]}
-                      onPress={() => handleCancelPlan(plan)}
-                      disabled={isCancelling}
-                    >
-                      {isCancelling ? (
-                        <ActivityIndicator size="small" color="#FF3B30" />
-                      ) : (
-                        <>
-                          <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
-                          <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </TouchableOpacity>
+                onDuplicate={() => handleDuplicatePlan(plan)}
+                onEdit={() => handleEditPlan(plan)}
+                onCancel={() => handleCancelPlan(plan)}
+              />
             );
           })
         )}
@@ -337,6 +417,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#1C1C1E',
+  },
+  headerAnalyticsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  headerAnalyticsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563EB',
   },
 
   content: {
@@ -446,6 +538,51 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 16,
+  },
+
+  // Basic analytics on plan card preview
+  analyticsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 14,
+  },
+  analyticsItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  analyticsLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  analyticsValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  analyticsDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: '#E2E8F0',
+  },
+  viewTicketDistributionLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 10,
+    paddingVertical: 6,
+  },
+  viewTicketDistributionLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563EB',
   },
 
   // Cancelled Badge

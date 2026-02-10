@@ -266,129 +266,110 @@ export default function TicketScreen() {
     return 'Ticket';
   })();
 
-  const categoryTags = [
-    ...(ticket.plan?.category_main ? [ticket.plan.category_main] : []),
-    ...(ticket.plan?.category_sub || []).slice(0, 2),
-  ].filter(Boolean);
+  // Activity items for the details card (icon + label), from categories or defaults
+  const activityItems = (() => {
+    const main = ticket.plan?.category_main;
+    const sub = ticket.plan?.category_sub || [];
+    const labels = [main, ...sub].filter(Boolean).slice(0, 4);
+    const iconMap: Record<string, string> = {
+      sports: 'football-outline',
+      music: 'musical-notes-outline',
+      food: 'cafe-outline',
+      cafe: 'cafe-outline',
+      fitness: 'barbell-outline',
+      run: 'walk-outline',
+      default: 'ellipse-outline',
+    };
+    if (labels.length === 0) labels.push('Event', 'Check-in', 'Pass', 'Entry');
+    return labels.map((label) => {
+      const key = (typeof label === 'string' ? label.toLowerCase() : '').replace(/\s+/g, '');
+      const icon = iconMap[key] || iconMap[key?.slice(0, 4)] || iconMap.default;
+      return { icon, label: String(label) };
+    });
+  })();
 
   return (
-    <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#8B5CF6', '#6366F1', '#10B981', '#F59E0B']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.backgroundGradient}
-      />
-      <ScrollView 
-        style={styles.scrollView} 
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <ScrollView
+        style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header - blue bar */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="arrow-back" size={24} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Booking Confirmed</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* Ticket Card - ref for capture to save as image */}
-        <View ref={ticketCardRef} style={styles.ticketCard} collapsable={false}>
-          {/* Event Image - unique per plan (ticket_image or first media) */}
-          {mainImage ? (
-            <View style={styles.eventImageContainer}>
-              <Image 
-                source={{ uri: mainImage }} 
-                style={styles.eventImage}
-                resizeMode="cover"
-              />
-              {/* Action Buttons (Overlay on Image) */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity style={styles.actionButton} onPress={handleAddToWallet}>
-                  <Ionicons name="download-outline" size={20} color="#FFF" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-                  <Ionicons name="share-outline" size={20} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.eventImageContainer}>
-              <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
-                <Ionicons name="image-outline" size={48} color="#8E8E93" />
-              </View>
-            </View>
-          )}
-
-          {/* Event Title */}
-          <Text style={styles.eventTitle}>{ticket.plan?.title || 'Event'}</Text>
-
-          {/* Event Details Section (Gradient Bottom) */}
-          <LinearGradient
-            colors={['#E0F2FE', '#D1FAE5', '#FEF3C7']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.detailsSection}
-          >
-            <View style={styles.detailsRow}>
-              <Text style={styles.detailDate}>{formatDate(ticket.plan?.date)}</Text>
-              <Text style={styles.detailTime}>{formatTime(ticket.plan?.time)}</Text>
-            </View>
-            {ticket.plan?.location_text && (
-              <Text style={styles.detailLocation}>{ticket.plan.location_text}</Text>
-            )}
-
-            {/* Info Pills - location and categories only */}
-            <View style={styles.infoPillsContainer}>
-              {ticket.plan?.location_text && (
-                <View style={styles.infoPillRow}>
-                  <View style={styles.infoPill}>
-                    <View style={styles.infoPillIcon}>
-                      <Ionicons name="location" size={12} color="#FFF" />
-                    </View>
-                    <Text style={styles.infoPillText} numberOfLines={1}>{ticket.plan.location_text}</Text>
-                  </View>
-                </View>
-              )}
-              {categoryTags.length > 0 && (
-                <View style={styles.infoPillRow}>
-                  {categoryTags.map((tag: string, idx: number) => (
-                    <View key={idx} style={styles.infoPill}>
-                      <View style={styles.infoPillIcon}>
-                        <Ionicons name="pricetag" size={12} color="#FFF" />
-                      </View>
-                      <Text style={styles.infoPillText}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </LinearGradient>
-
-          {/* QR Code: encode qr_code_hash so scanner can send it to /ticket/scan for check-in */}
-          <View style={styles.qrCodeSection}>
-            <View style={styles.qrCodeContainer}>
-              {ticket.qr_code_hash ? (
-                <QRCode
-                  value={ticket.qr_code_hash}
-                  size={200}
-                  color="#1C1C1E"
-                  backgroundColor="#FFF"
-                />
-              ) : (
-                <View style={styles.qrCodePlaceholder}>
-                  <Ionicons name="qr-code-outline" size={120} color="#1C1C1E" />
-                  <Text style={styles.qrCodeData}>QR unavailable</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.ticketType}>{passName}</Text>
-            <Text style={styles.ticketNumber}>{ticket.ticket_number}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>Ticket</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={handleAddToWallet} style={styles.headerIconBtn}>
+              <Ionicons name="download-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleShare} style={styles.headerIconBtn}>
+              <Ionicons name="share-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Post-event review – show after event date has passed */}
+        {/* Banner: event image with bottom overlay (title, date, time, location) */}
+        <View ref={ticketCardRef} collapsable={false}>
+          <View style={styles.bannerContainer}>
+            {mainImage ? (
+              <Image source={{ uri: mainImage }} style={styles.bannerImage} resizeMode="cover" />
+            ) : (
+              <View style={[styles.bannerImage, styles.bannerPlaceholder]}>
+                <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.6)" />
+              </View>
+            )}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.bannerOverlay}
+            >
+              <Text style={styles.bannerTitle}>{ticket.plan?.title || 'Event'}</Text>
+              <View style={styles.bannerMetaRow}>
+                <Text style={styles.bannerDate}>{formatDate(ticket.plan?.date)}</Text>
+                <Text style={styles.bannerTime}>{formatTime(ticket.plan?.time)}</Text>
+              </View>
+              {ticket.plan?.location_text ? (
+                <Text style={styles.bannerLocation} numberOfLines={1}>{ticket.plan.location_text}</Text>
+              ) : null}
+            </LinearGradient>
+          </View>
+
+          {/* White frosted details card: activities (left) + QR & pass (right) */}
+          <View style={styles.detailsCard}>
+            <View style={styles.detailsCardLeft}>
+              {activityItems.map((item, idx) => (
+                <View key={idx} style={styles.activityRow}>
+                  <View style={styles.activityIconWrap}>
+                    <Ionicons name={item.icon as any} size={18} color="#1C1C1E" />
+                  </View>
+                  <Text style={styles.activityLabel} numberOfLines={1}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.detailsCardRight}>
+              <View style={styles.qrWrap}>
+                {ticket.qr_code_hash ? (
+                  <QRCode
+                    value={ticket.qr_code_hash}
+                    size={120}
+                    color="#1C1C1E"
+                    backgroundColor="#FFF"
+                  />
+                ) : (
+                  <View style={styles.qrPlaceholder}>
+                    <Ionicons name="qr-code-outline" size={64} color="#8E8E93" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.passType}>{passName}</Text>
+              <Text style={styles.passId}>{ticket.ticket_number}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Post-event review */}
         {showReviewCard && (
           <View style={styles.reviewSection}>
             <EventReviewCard
@@ -405,47 +386,14 @@ export default function TicketScreen() {
           </View>
         )}
 
-        {/* Action Buttons at Bottom */}
-        <View style={styles.bottomActions}>
-          <TouchableOpacity
-            style={styles.bottomActionButton}
-            onPress={() => {
-              const planId = ticket?.plan?.plan_id;
-              if (planId) {
-                router.push({ pathname: '/business-plan/[planId]', params: { planId } } as any);
-              }
-            }}
-          >
-            <Ionicons name="arrow-back" size={20} color="#1C1C1E" />
-            <Text style={styles.bottomActionText}>View event</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bottomActionButton, styles.bottomActionButtonPrimary]}
-            onPress={async () => {
-              const planId = ticket?.plan?.plan_id;
-              const groupId = ticket?.plan?.group_id;
-              if (groupId) {
-                router.push(`/chat/group/${groupId}` as any);
-                return;
-              }
-              if (!planId || !user?.user_id) return;
-              try {
-                const res = await apiService.getPlanGroups(planId, user.user_id);
-                const fallbackGroupId = (res as any)?.data?.latest_group?.group_id;
-                if (fallbackGroupId) {
-                  router.push(`/chat/group/${fallbackGroupId}` as any);
-                } else {
-                  Alert.alert('No chat', 'No event chat available for this ticket.');
-                }
-              } catch (_) {
-                Alert.alert('Error', 'Could not open event chat.');
-              }
-            }}
-          >
-            <Ionicons name="arrow-forward" size={20} color="#FFF" />
-            <Text style={[styles.bottomActionText, styles.bottomActionTextPrimary]}>Go to chat</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Done button */}
+        <TouchableOpacity
+          style={styles.doneButton}
+          onPress={() => router.back()}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.doneButtonText}>Done</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -456,19 +404,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
-  backgroundGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    opacity: 0.1,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
     paddingBottom: 40,
   },
   loadingContainer: {
@@ -494,162 +433,166 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#2563EB',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#FFF',
+    flex: 1,
+    textAlign: 'center',
   },
-  reviewSection: {
-    marginTop: 20,
+  headerLeft: {
+    minWidth: 80,
   },
-  ticketCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 24,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minWidth: 80,
+    justifyContent: 'flex-end',
   },
-  eventImageContainer: {
+  headerIconBtn: {
+    padding: 6,
+  },
+  bannerContainer: {
     width: '100%',
-    height: 250,
+    height: 280,
     position: 'relative',
-    marginBottom: 0,
   },
-  eventImage: {
+  bannerImage: {
     width: '100%',
     height: '100%',
   },
-  eventImagePlaceholder: {
-    backgroundColor: '#E5E5EA',
+  bannerPlaceholder: {
+    backgroundColor: '#94A3B8',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionButtons: {
+  bannerOverlay: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  eventTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 30,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 60,
     paddingHorizontal: 20,
-    textTransform: 'uppercase',
+    paddingBottom: 20,
   },
-  qrCodeSection: {
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 30,
+  bannerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#FFF',
+    marginBottom: 8,
   },
-  qrCodeContainer: {
-    backgroundColor: '#FFF',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    minHeight: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  qrCodePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrCodeData: {
-    marginTop: 12,
-    fontSize: 10,
-    color: '#999',
-    textAlign: 'center',
-  },
-  ticketType: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
-  },
-  ticketNumber: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    letterSpacing: 1,
-  },
-  detailsSection: {
-    padding: 20,
-    borderRadius: 16,
-  },
-  detailsRow: {
+  bannerMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  detailDate: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  detailTime: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  detailLocation: {
+  bannerDate: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '600',
   },
-  infoPillsContainer: {
-    gap: 8,
+  bannerTime: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.95)',
+    fontWeight: '600',
   },
-  infoPillRow: {
+  bannerLocation: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+  },
+  detailsCard: {
     flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
+    backgroundColor: '#FFF',
+    marginHorizontal: 16,
+    marginTop: -24,
+    borderRadius: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    overflow: 'hidden',
   },
-  infoPill: {
+  detailsCardLeft: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 14,
+  },
+  activityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    gap: 10,
   },
-  infoPillIcon: {
-    width: 20,
-    height: 20,
+  activityIconWrap: {
+    width: 36,
+    height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  infoPillText: {
+  activityLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    flex: 1,
+  },
+  detailsCardRight: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 140,
+  },
+  qrWrap: {
+    backgroundColor: '#FFF',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+  },
+  qrPlaceholder: {
+    width: 120,
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passType: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  passId: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#1C1C1E',
+    letterSpacing: 1,
+  },
+  reviewSection: {
+    marginTop: 24,
+    marginHorizontal: 16,
+  },
+  doneButton: {
+    marginHorizontal: 16,
+    marginTop: 24,
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneButtonText: {
+    fontSize: 17,
+    fontWeight: '700',
     color: '#FFF',
   },
   backButton: {
@@ -662,35 +605,5 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '600',
     fontSize: 14,
-  },
-  bottomActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  bottomActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FFF',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  bottomActionButtonPrimary: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
-  },
-  bottomActionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  bottomActionTextPrimary: {
-    color: '#FFF',
   },
 });

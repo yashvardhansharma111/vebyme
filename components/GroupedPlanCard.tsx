@@ -298,34 +298,45 @@ export default function GroupedPlanCard({
 
         {/* Analytics - Tappable to filter Registered / Add to Community by first-timers or returning */}
         {planId && (
-          <View style={styles.analyticsRow}>
+          <>
+            <View style={styles.analyticsRow}>
+              <TouchableOpacity
+                style={[styles.analyticsItem, interactionFilter === 'all' && styles.analyticsItemActive]}
+                onPress={() => setInteractionFilter('all')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.analyticsLabel}>Registrations</Text>
+                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+              </TouchableOpacity>
+              <View style={styles.analyticsDivider} />
+              <TouchableOpacity
+                style={[styles.analyticsItem, interactionFilter === 'first_timers' && styles.analyticsItemActive]}
+                onPress={() => setInteractionFilter('first_timers')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.analyticsLabel}>First-timers</Text>
+                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
+              </TouchableOpacity>
+              <View style={styles.analyticsDivider} />
+              <TouchableOpacity
+                style={[styles.analyticsItem, interactionFilter === 'returning' && styles.analyticsItemActive]}
+                onPress={() => setInteractionFilter('returning')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.analyticsLabel}>Returning</Text>
+                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+              </TouchableOpacity>
+            </View>
+            {/* View Ticket Distribution - always visible for accessibility (Notifications → Plan Card → View Ticket Distribution) */}
             <TouchableOpacity
-              style={[styles.analyticsItem, interactionFilter === 'all' && styles.analyticsItemActive]}
-              onPress={() => setInteractionFilter('all')}
-              activeOpacity={0.7}
+              style={styles.viewTicketDistributionInline}
+              onPress={handleViewTicketDistribution}
+              activeOpacity={0.8}
             >
-              <Text style={styles.analyticsLabel}>Registrations</Text>
-              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+              <Text style={styles.viewTicketDistributionInlineText}>View Ticket Distribution</Text>
+              <Ionicons name="chevron-forward" size={16} color="#2563EB" />
             </TouchableOpacity>
-            <View style={styles.analyticsDivider} />
-            <TouchableOpacity
-              style={[styles.analyticsItem, interactionFilter === 'first_timers' && styles.analyticsItemActive]}
-              onPress={() => setInteractionFilter('first_timers')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.analyticsLabel}>First-timers</Text>
-              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
-            </TouchableOpacity>
-            <View style={styles.analyticsDivider} />
-            <TouchableOpacity
-              style={[styles.analyticsItem, interactionFilter === 'returning' && styles.analyticsItemActive]}
-              onPress={() => setInteractionFilter('returning')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.analyticsLabel}>Returning</Text>
-              <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
-            </TouchableOpacity>
-          </View>
+          </>
         )}
 
         {/* Stacked Avatars - Level 2 only (top-right); do NOT show in Level 3 */}
@@ -664,6 +675,19 @@ const styles = StyleSheet.create({
   viewTicketDistributionButtonText: {
     color: '#1C1C1E',
     fontSize: 15,
+    fontWeight: '600',
+  },
+  viewTicketDistributionInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  viewTicketDistributionInlineText: {
+    color: '#2563EB',
+    fontSize: 14,
     fontWeight: '600',
   },
   registeredSection: {
