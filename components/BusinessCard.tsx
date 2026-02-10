@@ -1,7 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+
+const CARD_FIXED_HEIGHT = 400;
+const CARD_IMAGE_PERCENT = 0.7;
+const CARD_WHITE_PERCENT = 0.3;
+const FLOATING_BUTTON_SIZE = 48;
+const TEXT_INSET = 7;
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import { apiService, getWebBaseUrl } from '@/services/api';
@@ -57,6 +63,8 @@ interface BusinessCardProps {
   onArrowPress?: () => void;
   /** When true, hide Register button (e.g. business user viewing their own event) */
   hideRegisterButton?: boolean;
+  /** When true, pills stick above the card (same hack as event card) for list layouts */
+  pillsAboveCard?: boolean;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -76,7 +84,8 @@ function BusinessCardBase({
   showArrowButton,
   onArrowPress,
   hideRegisterButton = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean }) {
+  pillsAboveCard = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; pillsAboveCard?: boolean }) {
   const router = useRouter();
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
@@ -124,76 +133,83 @@ function BusinessCardBase({
       onPress={onPress}
       activeOpacity={0.98}
     >
-      {/* Optional arrow button on the right – opens business posts list */}
+      {/* 1. Image top 70% – when pillsAboveCard, marginTop leaves room for pills above */}
+      <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove]}>
+        <View style={styles.imageSection}>
+          {mainImage ? (
+            <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
+          ) : (
+            <View style={[styles.imageNatural, styles.imagePlaceholder]}>
+              <Ionicons name="image-outline" size={48} color="#8E8E93" />
+            </View>
+          )}
+        </View>
+        {/* 2. White bottom 30% */}
+        <View style={styles.whiteSection} />
+
+        {/* 3. Text section – stuck to bottom, 2px from bottom/left/right */}
+        <View style={styles.textBottom} pointerEvents="box-none">
+          <View style={styles.textBottomInner}>
+            <Text style={styles.title}>{plan.title}</Text>
+            <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+              {plan.description}
+            </Text>
+            {tagsToShow.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.tagsScrollContent}
+                style={styles.tagsScroll}
+                nestedScrollEnabled
+              >
+                {tagsToShow.map((item, index) => (
+                  <View key={`${item.type}-${index}`} style={styles.tag}>
+                    {item.type === 'price' ? (
+                      <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                    ) : (
+                      <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
+                    )}
+                    <Text style={styles.tagText} numberOfLines={1}>{item.label}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            {!hideActions && (
+              <View style={styles.footer}>
+                {!hideRegisterButton && (
+                  <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
+                    <Text style={styles.registerButtonText}>Register</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+                  <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+                  <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Button on right – 50% inside card, 50% outside, vertical center */}
       {showArrowButton && onArrowPress && (
         <TouchableOpacity
-          style={styles.arrowButton}
+          style={styles.floatingRightButton}
           onPress={(e) => {
             e?.stopPropagation?.();
             onArrowPress();
           }}
           activeOpacity={0.8}
         >
-          <Ionicons name="chevron-forward" size={22} color="#666" />
+          <Ionicons name="chevron-forward" size={24} color="#1C1C1E" />
         </TouchableOpacity>
       )}
-      {/* Inner card (clipped) – image + white overlay only */}
-      <View style={styles.cardInner}>
-        <View style={styles.imageBehind}>
-          {mainImage ? (
-            <Image source={{ uri: mainImage }} style={styles.imageBehindImg} resizeMode="cover" />
-          ) : (
-            <View style={[styles.imageBehindImg, styles.imageBehindPlaceholder]}>
-              <Ionicons name="image-outline" size={48} color="#8E8E93" />
-            </View>
-          )}
-        </View>
-        <View style={styles.contentOverlay}>
-        <Text style={styles.title}>{plan.title}</Text>
-        <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
-          {plan.description}
-        </Text>
-        {tagsToShow.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.tagsScrollContent}
-            style={styles.tagsScroll}
-            nestedScrollEnabled
-          >
-            {tagsToShow.map((item, index) => (
-              <View key={`${item.type}-${index}`} style={styles.tag}>
-                {item.type === 'price' ? (
-                  <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
-                ) : (
-                  <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
-                )}
-                <Text style={styles.tagText} numberOfLines={1}>{item.label}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-        {!hideActions && (
-          <View style={styles.footer}>
-            {!hideRegisterButton && (
-              <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-                <Text style={styles.registerButtonText}>Register</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-              <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-              <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-      </View>
 
       {/* Organizer pill – tappable to open organizer profile */}
       <TouchableOpacity
-        style={styles.organizerPill}
+        style={[styles.organizerPill, pillsAboveCard && styles.organizerPillAbove]}
         activeOpacity={0.8}
         onPress={(e) => {
           e?.stopPropagation?.();
@@ -213,7 +229,11 @@ function BusinessCardBase({
       {/* Attendees – always 3 circles (avatars or default DP), then +counter (FIGMA) */}
       {onGuestListPress && (
         <TouchableOpacity
-          style={[styles.interactedPillOnImage, showArrowButton && styles.interactedPillOnImageWithArrow]}
+          style={[
+            styles.interactedPillOnImage,
+            showArrowButton && styles.interactedPillOnImageWithArrow,
+            pillsAboveCard && styles.interactedPillAbove,
+          ]}
           onPress={(e) => {
             e?.stopPropagation?.();
             onGuestListPress?.();
@@ -252,6 +272,7 @@ export default function BusinessCard({
   onGuestListPress: onGuestListPressProp,
   showArrowButton,
   onArrowPress,
+  pillsAboveCard = false,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -356,6 +377,7 @@ export default function BusinessCard({
           hideRegisterButton={hideRegisterButton}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
+          pillsAboveCard={pillsAboveCard}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -408,6 +430,7 @@ export default function BusinessCard({
           hideRegisterButton={hideRegisterButton}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
+          pillsAboveCard={pillsAboveCard}
         />
       </Swipeable>
       <GuestListModal
@@ -442,41 +465,77 @@ const styles = StyleSheet.create({
   cardWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
-    height: 400,
+    height: CARD_FIXED_HEIGHT,
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
   },
   cardInner: {
-    position: 'absolute',
-    top: 25,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 20,
+    flex: 1,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+    backgroundColor: '#FFF',
   },
-  imageBehind: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 20,
+  cardInnerWithPillsAbove: {
+    marginTop: 44,
   },
-  imageBehindImg: {
+  imageSection: {
+    width: '100%',
+    flex: CARD_IMAGE_PERCENT,
+    overflow: 'hidden',
+  },
+  imageNatural: {
     width: '100%',
     height: '100%',
-    borderRadius: 20,
   },
-  imageBehindPlaceholder: {
+  imagePlaceholder: {
     backgroundColor: '#E5E5EA',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  whiteSection: {
+    flex: CARD_WHITE_PERCENT,
+    backgroundColor: '#FFF',
+  },
+  textBottom: {
+    position: 'absolute',
+    left: TEXT_INSET,
+    right: TEXT_INSET,
+    bottom: TEXT_INSET,
+    justifyContent: 'flex-end',
+  },
+  textBottomInner: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  floatingRightButton: {
+    position: 'absolute',
+    right: -FLOATING_BUTTON_SIZE / 2,
+    top: '50%',
+    marginTop: -FLOATING_BUTTON_SIZE / 2,
+    width: FLOATING_BUTTON_SIZE,
+    height: FLOATING_BUTTON_SIZE,
+    borderRadius: FLOATING_BUTTON_SIZE / 2,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 11,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
   organizerPill: {
     position: 'absolute',
-    top: 0,
+    top: -10,
     left: 10,
     zIndex: 10,
     flexDirection: 'row',
@@ -492,6 +551,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 4,
+  },
+  organizerPillAbove: {
+    top: 16,
+    left: -6,
+    backgroundColor: '#FFF',
+  },
+  interactedPillAbove: {
+    top: 26,
   },
   organizerInfo: {
     flex: 1,
@@ -511,9 +578,9 @@ const styles = StyleSheet.create({
   },
   interactedPillOnImage: {
     position: 'absolute',
-    top: 10,
-    right: 54,
-    zIndex: 11,
+    top: -10,
+    right: 20,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.95)',
@@ -528,7 +595,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   interactedPillOnImageWithArrow: {
-    right: 98,
+    right: 56,
   },
   interactedAvatarWrap: {
     width: 20,
@@ -542,19 +609,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#1C1C1E',
-  },
-  contentOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    minHeight: '52%',
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 18,
   },
   title: {
     fontSize: 20,
@@ -606,13 +660,12 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   registerButton: {
-    flex: 1,
     height: 44,
+    paddingHorizontal: 24,
     backgroundColor: '#1C1C1E',
-    borderRadius: 12,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 0,
   },
   registerButtonText: {
     color: '#FFF',
@@ -626,24 +679,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  arrowButton: {
-    position: 'absolute',
-    right: 12,
-    top: '50%',
-    marginTop: -20,
-    zIndex: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 3,
   },
   leftActionContainer: {
     justifyContent: 'center',

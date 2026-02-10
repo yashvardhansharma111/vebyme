@@ -259,11 +259,11 @@ export default function BusinessPostsScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
+        {/* Full-page gradient: light gray top → green → white */}
         <LinearGradient
-          colors={['#4A3B69', '#6B5B8E', '#F2F2F7']} 
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 0.3 }}
-          style={styles.topGradient}
+          colors={['#E0E0E0', '#B8D4BE', '#FFFFFF']}
+          locations={[0, 0.5, 1]}
+          style={styles.pageGradient}
         />
 
         <SafeAreaView style={styles.safeArea}>
@@ -324,11 +324,13 @@ export default function BusinessPostsScreen() {
               </View>
             ) : (
               <View style={styles.feed}>
-                {events.map((item) => {
+                {events.map((item, index) => {
                   const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
                   return (
                     <BusinessCard
                       key={item.id}
+                      containerStyle={styles.businessCardInList}
+                      pillsAboveCard
                       plan={{
                         plan_id: item.id,
                         title: item.event.title,
@@ -452,14 +454,21 @@ export default function BusinessPostsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
   },
-  topGradient: {
+  pageGradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    height: 200,
+    bottom: 0,
+  },
+  businessCardInList: {
+    /* Same hack as event card: feed has paddingTop so pills sticking above card have room */
+  },
+  feed: {
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   safeArea: {
     flex: 1,
@@ -499,9 +508,6 @@ const styles = StyleSheet.create({
   activeFilterText: { color: '#FFF', fontWeight: '600' },
   filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   filterText: { color: '#1C1C1E', fontWeight: '600' },
-  feed: {
-    paddingBottom: 20,
-  },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',

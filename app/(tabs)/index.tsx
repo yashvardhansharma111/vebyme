@@ -7,6 +7,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { clearPostCreated } from '@/store/slices/postCreatedSlice';
@@ -318,18 +320,19 @@ export default function HomeScreen() {
           data = data.filter((p: any) => isEventDateInRange(p.date ?? p.timestamp, currentFilter));
         }
         data = sortPostsByTimestamp(data);
+        const feedData = data ?? [];
 
-        const formatted = await formatFeedData(data);
+        const formatted = await formatFeedData(feedData);
 
         const businessPlans = formatted.filter(item => {
-          const post = data.find((p: any) => p.post_id === item.id);
+          const post = feedData.find((p: any) => p.post_id === item.id);
           return post?.type === 'business';
         });
-        const rawBusinessPosts = data.filter((p: any) => p.type === 'business');
+        const rawBusinessPosts = feedData.filter((p: any) => p.type === 'business');
         setBusinessPostsData(rawBusinessPosts);
 
         const regularPlans = formatted.filter(item => {
-          const post = data.find((p: any) => p.post_id === item.id);
+          const post = feedData.find((p: any) => p.post_id === item.id);
           return post?.type !== 'business';
         });
 
@@ -391,13 +394,11 @@ export default function HomeScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        
-        {/* 1. TOP GRADIENT (Purple -> Transparent) */}
+        {/* Same gradient as business-posts: light gray top → green → white */}
         <LinearGradient
-          colors={['#4A3B69', '#6B5B8E', '#F2F2F7']} 
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 0.6 }} // Stops earlier so it doesn't cover whole screen
-          style={styles.topGradient}
+          colors={['#E0E0E0', '#B8D4BE', '#FFFFFF']}
+          locations={[0, 0.5, 1]}
+          style={styles.pageGradient}
         />
 
         <SafeAreaView style={styles.safeArea}>
@@ -570,7 +571,7 @@ export default function HomeScreen() {
 
             {isLoading && businessEvents.length === 0 && (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#4A3B69" />
+                <ActivityIndicator size="large" color="#22C55E" />
                 <Text style={styles.loadingText}>Loading...</Text>
               </View>
             )}
@@ -590,12 +591,11 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {/* See what others are planning – scroll down to user posts on same page */}
+            {/* See what others are planning – scroll down 60% to user posts */}
             <TouchableOpacity
               style={styles.seeOthersButton}
               onPress={() => {
-                const scrollDownBy = Dimensions.get('window').height * 0.6;
-                scrollViewRef.current?.scrollTo({ y: scrollDownBy, animated: true });
+                scrollViewRef.current?.scrollTo({ y: SCREEN_HEIGHT * 0.6, animated: true });
               }}
               activeOpacity={0.8}
             >
@@ -672,14 +672,12 @@ export default function HomeScreen() {
           </ScrollView>
         </SafeAreaView>
 
-        {/* 2. BOTTOM GRADIENT (Transparent -> Dark Fade) */}
-        {/* This sits absolutely at the bottom to create the vignette behind tabs */}
+        {/* Bottom vignette behind tabs */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.2)']} 
+          colors={['transparent', 'rgba(0,0,0,0.06)']}
           style={styles.bottomGradient}
-          pointerEvents="none" // Allows touching through the gradient
+          pointerEvents="none"
         />
-        
       </View>
       <LoginModal
         visible={showLoginModal}
@@ -742,14 +740,14 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7', 
+    backgroundColor: '#E8ECF1',
   },
-  topGradient: {
+  pageGradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    height: 400,
+    bottom: 0,
   },
   bottomGradient: {
     position: 'absolute',

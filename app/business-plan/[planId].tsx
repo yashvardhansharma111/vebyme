@@ -10,7 +10,9 @@ import {
   Alert,
   Dimensions,
   Image,
+  ImageBackground,
   Modal,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -18,10 +20,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar from '@/components/Avatar';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const HERO_ASPECT = 4 / 3; // natural-ish image ratio
+const HERO_HEIGHT = SCREEN_WIDTH * HERO_ASPECT;
+const HERO_OVERLAP_PERCENT = 0.1; // white space covers lower 10% of image
+const CONTENT_PADDING_H = 5;
 import GuestListModal from '@/components/GuestListModal';
+
+// Ticket background assets for pass cards
+const TICKET_BGS = [
+  require('@/assets/images/ticket1 bg.png'),
+  require('@/assets/images/ticket2 bg.png'),
+  require('@/assets/images/ticket3 bg.png'),
+];
 
 interface BusinessPlan {
   plan_id: string;
@@ -32,6 +46,7 @@ interface BusinessPlan {
   location_coordinates?: { lat: number; long: number };
   date?: string | Date;
   time?: string;
+  created_at?: string; // when the plan was posted
   category_sub?: string[];
   passes?: Array<{
     pass_id: string;
@@ -131,6 +146,19 @@ export default function BusinessPlanDetailScreen() {
     return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
   };
 
+  /** Post date for center pill: "Monday, 2:37pm" */
+  const formatPostedDate = (createdAt: string | undefined, eventDate: string | Date | undefined): string => {
+    if (createdAt) {
+      const d = typeof createdAt === 'string' ? new Date(createdAt) : new Date(createdAt);
+      return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+    if (eventDate) {
+      const d = typeof eventDate === 'string' ? new Date(eventDate) : eventDate;
+      return d.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+    return 'Recent';
+  };
+
   const formatTimeOnly = (time: string | undefined): string => {
     if (!time) return '';
     return time;
@@ -148,6 +176,7 @@ export default function BusinessPlanDetailScreen() {
     }
   };
 
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
@@ -253,37 +282,32 @@ export default function BusinessPlanDetailScreen() {
   const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
   const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
 
+  const heroImageUri = planMedia[0]?.url || 'https://picsum.photos/id/1011/800/1200';
+
+  const detailPills = plan.add_details?.filter((d) => d.detail_type !== 'google_drive_link') ?? [];
+  const overlayHeight = HERO_HEIGHT * HERO_OVERLAP_PERCENT;
+  const distanceSubtitle = plan.add_details?.find((d) => d.detail_type === 'distance')?.title
+    || plan.add_details?.find((d) => d.detail_type === 'distance')?.description
+    || null;
+
+  /** Human-readable label for category pill (e.g. distance -> Distance, f&b -> F&B) */
+  const categoryLabel = (detail: { detail_type: string; title?: string; heading?: string }) => {
+    if (detail.title) return detail.title;
+    const t = detail.detail_type;
+    if (t === 'f&b') return 'F&B';
+    return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
+  };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Images - scrollable up to 5; tap to open gallery */}
-        <View style={styles.headerImageContainer}>
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.heroScroll}
-            contentContainerStyle={styles.heroScrollContent}
-            onMomentumScrollEnd={(e) => {
-              const index = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
-              setHeroImageIndex(index);
-            }}
-          >
-            {planMedia.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.heroSlide, { width: Dimensions.get('window').width }]}
-                activeOpacity={1}
-                onPress={() => {
-                  setGalleryIndex(index);
-                  setShowImageGallery(true);
-                }}
-              >
-                <Image source={{ uri: item.url }} style={styles.headerImage} resizeMode="cover" />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Back and share – below safe area with padding so they're reachable */}
+        <View style={[styles.headerRow, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity style={styles.backButtonTouch} onPress={() => router.back()}>
             <View style={styles.backButtonCircle}>
               <Ionicons name="arrow-back" size={24} color="#000" />
             </View>
@@ -305,103 +329,119 @@ export default function BusinessPlanDetailScreen() {
               </View>
             </TouchableOpacity>
           </View>
-          {/* Organizer pill – tappable to open organizer profile */}
-          <TouchableOpacity
-            style={styles.organizerPill}
-            activeOpacity={0.8}
-            onPress={() => {
-              const userId = organizer?.user_id ?? plan?.user_id;
-              if (userId) {
-                router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
-              }
-            }}
-            disabled={!(organizer?.user_id ?? plan?.user_id)}
-          >
-            <Avatar uri={organizerAvatar} size={32} />
-            <View style={styles.organizerInfo}>
-              <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
-              <Text style={styles.organizerTime}>{formatOrganizerTime(plan.date)}</Text>
-            </View>
-          </TouchableOpacity>
-          {/* Carousel dots */}
-          {mediaCount > 1 && (
-            <View style={styles.carouselDots}>
-              {planMedia.map((_, i) => (
-                <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
-              ))}
-            </View>
-          )}
         </View>
 
-        {/* White content card – overlaps bottom of hero */}
-        <View style={styles.contentPanel}>
+        {/* Hero – image(s) horizontally scrollable if multiple */}
+        <View style={[styles.heroWrap, { height: HERO_HEIGHT }]}>
+          {mediaCount > 1 ? (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setHeroImageIndex(i);
+              }}
+              style={styles.heroScroll}
+              contentContainerStyle={styles.heroScrollContent}
+            >
+              {planMedia.map((item, i) => (
+                <Image key={i} source={{ uri: item.url }} style={styles.heroImageSlide} resizeMode="cover" />
+              ))}
+            </ScrollView>
+          ) : (
+            <Image source={{ uri: heroImageUri }} style={styles.heroImage} resizeMode="cover" />
+          )}
+
+          <View style={styles.topSafe}>
+            {/* Center pill – width only as long as content */}
+            <View style={styles.organizerPillWrap}>
+              <TouchableOpacity
+                style={styles.organizerPillCenter}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const userId = organizer?.user_id ?? plan?.user_id;
+                  if (userId) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+                }}
+                disabled={!(organizer?.user_id ?? plan?.user_id)}
+              >
+                <Avatar uri={organizerAvatar} size={36} />
+                <View style={styles.organizerInfo}>
+                  <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
+                  <Text style={styles.organizerTime} numberOfLines={1}>{formatPostedDate(plan.created_at, plan.date)}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {mediaCount > 1 && (
+              <View style={styles.carouselDots}>
+                {planMedia.map((_, i) => (
+                  <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
+                ))}
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.heroTapArea}
+            activeOpacity={1}
+            onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
+          />
+        </View>
+
+        {/* White overlay + content – bg is image + white; text section on top of overlay */}
+        <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 16 }]}>
           <Text style={styles.title}>{plan.title}</Text>
           <Text style={styles.description}>{plan.description}</Text>
 
-          {/* Date, Time, Location – clear key info blocks */}
-          <View style={styles.keyInfoWrap}>
-            {plan.date && (
-              <View style={styles.keyInfoBlock}>
-                <Ionicons name="calendar-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
-                <View style={styles.keyInfoTextWrap}>
-                  <Text style={styles.keyInfoLabel}>Date</Text>
-                  <Text style={styles.keyInfoTitle}>{formatDate(plan.date)}</Text>
-                </View>
-              </View>
-            )}
-            {plan.time && (
-              <View style={styles.keyInfoBlock}>
-                <Ionicons name="time-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
-                <View style={styles.keyInfoTextWrap}>
-                  <Text style={styles.keyInfoLabel}>Time</Text>
-                  <Text style={styles.keyInfoTitle}>{formatTimeOnly(plan.time)}</Text>
-                </View>
-              </View>
-            )}
+          {/* Venue + date/time – one gray rounded section */}
+          <View style={styles.venueDateCard}>
             {plan.location_text && (
-              <View style={styles.keyInfoBlock}>
-                <Ionicons name="location-outline" size={20} color="#1C1C1E" style={styles.keyInfoIcon} />
-                <View style={styles.keyInfoTextWrap}>
-                  <Text style={styles.keyInfoLabel}>Location</Text>
-                  <Text style={styles.keyInfoTitle} numberOfLines={2}>{plan.location_text}</Text>
+              <View style={styles.venueDateRow}>
+                <Ionicons name="location" size={18} color="#1C1C1E" style={styles.venueDateIcon} />
+                <View style={styles.venueDateTextWrap}>
+                  <Text style={styles.venueDateTitle}>{plan.location_text}</Text>
+                  {distanceSubtitle ? <Text style={styles.venueDateSubtitle}>{distanceSubtitle}</Text> : null}
+                </View>
+              </View>
+            )}
+            {(plan.date || plan.time) && (
+              <View style={styles.venueDateRow}>
+                <Ionicons name="calendar-outline" size={18} color="#1C1C1E" style={styles.venueDateIcon} />
+                <View style={styles.venueDateTextWrap}>
+                  <Text style={styles.venueDateTitle}>
+                    {formatDate(plan.date)}
+                    {plan.time ? ` | ${plan.time} onwards` : ''}
+                  </Text>
                 </View>
               </View>
             )}
           </View>
 
-          {/* Detail pills – all categories except Google Drive link (shown in chat only); additional_info: user heading + description */}
-          {plan.add_details && plan.add_details.filter((d) => d.detail_type !== 'google_drive_link').length > 0 && (
-            <View style={styles.detailPillsWrap}>
-              {plan.add_details
-                .filter((detail) => detail.detail_type !== 'google_drive_link')
-                .map((detail, index) => {
-                const isAdditionalInfo = detail.detail_type === 'additional_info';
-                const heading = isAdditionalInfo
+          {/* Category pills – title above (e.g. Distance), value below (e.g. 5km) */}
+          {detailPills.length > 0 && (
+            <View style={styles.categoryPillsWrap}>
+              {detailPills.slice(0, 4).map((detail, index) => {
+                const heading = detail.detail_type === 'additional_info'
                   ? (detail.heading ?? detail.title ?? 'Additional Info')
-                  : (detail.title ?? detail.detail_type);
+                  : categoryLabel(detail);
                 const value = detail.description ?? '';
                 return (
-                  <View key={index} style={styles.detailPill}>
-                    <Text style={styles.detailPillLabel}>{heading}</Text>
-                    {value ? (
-                      <Text style={styles.detailPillValue} numberOfLines={isAdditionalInfo ? 4 : 2}>{value}</Text>
-                    ) : null}
+                  <View key={index} style={styles.categoryPill}>
+                    <Text style={styles.categoryPillHeading}>{heading}</Text>
+                    {value ? <Text style={styles.categoryPillValue} numberOfLines={2}>{value}</Text> : null}
                   </View>
                 );
               })}
             </View>
           )}
 
-          {/* See who's coming – only when allow_view_guest_list is true */}
+          {/* Dark gray See who's coming pill */}
           {plan.allow_view_guest_list !== false && (
-            <TouchableOpacity
-              style={styles.attendeesCard}
-              onPress={() => setShowGuestListModal(true)}
-              activeOpacity={0.9}
-            >
+            <TouchableOpacity style={styles.attendeesCard} onPress={() => setShowGuestListModal(true)} activeOpacity={0.9}>
               <View style={styles.attendeesTextBlock}>
                 <Text style={styles.attendeesTitle}>See who's coming</Text>
-                <Text style={styles.attendeesSubtitle}>Tap to view guest list</Text>
+                <Text style={styles.attendeesSubtitle}>Join event to view</Text>
               </View>
               <View style={styles.attendeesAvatars}>
                 {[1, 2, 3].map((i) => (
@@ -413,19 +453,13 @@ export default function BusinessPlanDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Select Tickets */}
+          {/* Select Passes – ticket bg images; unselected blurred 50% white */}
           {plan.passes && plan.passes.length > 0 && (
             <View style={styles.ticketsSection}>
-              <Text style={styles.ticketsTitle}>Select Tickets</Text>
+              <Text style={styles.ticketsTitle}>Select Passes</Text>
               {plan.passes.map((pass, index) => {
                 const isSelected = selectedPass === pass.pass_id;
-                const passImage = pass.media && pass.media.length > 0 ? pass.media[0].url : null;
-                const gradientColors: [string, string][] = [
-                  ['#7C3AED', '#6366F1'],
-                  ['#059669', '#10B981'],
-                  ['#047857', '#059669'],
-                ];
-                const colors = gradientColors[index % gradientColors.length];
+                const bgSource = TICKET_BGS[index % TICKET_BGS.length];
                 return (
                   <TouchableOpacity
                     key={pass.pass_id}
@@ -433,15 +467,8 @@ export default function BusinessPlanDetailScreen() {
                     onPress={() => setSelectedPass(pass.pass_id)}
                     activeOpacity={0.9}
                   >
-                    <LinearGradient
-                      colors={colors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.passGradient}
-                    >
-                      {passImage ? (
-                        <Image source={{ uri: passImage }} style={styles.passImage} resizeMode="cover" />
-                      ) : null}
+                    <ImageBackground source={bgSource} style={styles.passBg} imageStyle={styles.passBgImage}>
+                      {selectedPass !== null && !isSelected && <View style={styles.passBlurOverlay} />}
                       <View style={styles.passContent}>
                         <Text style={styles.passName}>{pass.name}</Text>
                         {pass.description ? (
@@ -454,7 +481,7 @@ export default function BusinessPlanDetailScreen() {
                           <Ionicons name="checkmark-circle" size={22} color="#FFF" style={styles.passCheck} />
                         )}
                       </View>
-                    </LinearGradient>
+                    </ImageBackground>
                   </TouchableOpacity>
                 );
               })}
@@ -521,17 +548,205 @@ export default function BusinessPlanDetailScreen() {
           )}
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFF',
   },
-  scrollView: {
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 40 },
+  heroWrap: {
+    width: SCREEN_WIDTH,
+    overflow: 'hidden',
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: SCREEN_WIDTH,
+    height: '100%',
+  },
+  heroScroll: {
     flex: 1,
+    width: SCREEN_WIDTH,
+  },
+  heroScrollContent: {},
+  heroImageSlide: {
+    width: SCREEN_WIDTH,
+    height: HERO_HEIGHT,
+  },
+  heroWhiteOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    zIndex: 20,
+  },
+  backButtonTouch: { zIndex: 11 },
+  topSafe: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 8,
+    left: 16,
+    zIndex: 11,
+  },
+  backButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerIconButton: {},
+  headerIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  organizerPillWrap: {
+    alignItems: 'center',
+    marginTop: 56,
+  },
+  organizerPillCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 28,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  organizerInfo: {
+    minWidth: 0,
+  },
+  organizerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  organizerTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  carouselDots: {
+    position: 'absolute',
+    bottom: 24,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    zIndex: 2,
+  },
+  carouselDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  carouselDotActive: {
+    backgroundColor: '#FFF',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  heroTapArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  contentOverlay: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: CONTENT_PADDING_H,
+    paddingBottom: 40,
+  },
+  venueDateCard: {
+    backgroundColor: '#E8E8E8',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  venueDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  venueDateIcon: {
+    marginRight: 10,
+  },
+  venueDateTextWrap: { flex: 1, minWidth: 0 },
+  venueDateTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  venueDateSubtitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  categoryPillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  categoryPill: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: '47%',
+  },
+  categoryPillHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    marginBottom: 4,
+  },
+  categoryPillValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    lineHeight: 18,
   },
   loadingContainer: {
     flex: 1,
@@ -554,109 +769,18 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
-  headerImageContainer: {
-    width: '100%',
-    height: 280,
-    position: 'relative',
-  },
-  heroScroll: {
-    width: '100%',
-    height: '100%',
-  },
-  heroScrollContent: {},
-  heroSlide: {
-    height: 280,
-  },
-  headerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  backButton: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    zIndex: 10,
-  },
   backButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
   },
-  backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerRightRow: {
+  heroTapArea: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    zIndex: 10,
-  },
-  headerIconButton: {},
-  headerIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  organizerPill: {
-    position: 'absolute',
-    top: 56,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    gap: 8,
-    zIndex: 2,
-    maxWidth: '38%',
-  },
-  organizerInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
-  organizerName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  organizerTime: {
-    fontSize: 11,
-    color: '#8E8E93',
-    marginTop: 2,
-  },
-  carouselDots: {
-    position: 'absolute',
-    bottom: 12,
+    top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-    zIndex: 2,
-  },
-  carouselDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  carouselDotActive: {
-    backgroundColor: '#FFF',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    height: HERO_HEIGHT,
+    zIndex: 1,
   },
   galleryOverlay: {
     flex: 1,
@@ -710,15 +834,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: '#FFF',
   },
-  contentPanel: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginTop: -24,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
   title: {
     fontSize: 22,
     fontWeight: '800',
@@ -730,68 +845,6 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 21,
     marginBottom: 20,
-  },
-  keyInfoWrap: {
-    gap: 12,
-    marginBottom: 20,
-  },
-  keyInfoBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F2F2F7',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  keyInfoIcon: {
-    marginRight: 12,
-  },
-  keyInfoTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  keyInfoLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#8E8E93',
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  keyInfoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  keyInfoSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  detailPillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 18,
-  },
-  detailPill: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    minWidth: '47%',
-    minHeight: 62,
-  },
-  detailPillLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#8E8E93',
-    marginBottom: 4,
-  },
-  detailPillValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    lineHeight: 18,
   },
   attendeesCard: {
     flexDirection: 'row',
@@ -838,17 +891,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
-  passGradient: {
+  passBg: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
+    minHeight: 100,
   },
-  passImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 10,
-    marginRight: 12,
+  passBgImage: {
+    borderRadius: 16,
+  },
+  passBlurOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    borderRadius: 16,
   },
   passContent: {
     flex: 1,
