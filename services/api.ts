@@ -323,13 +323,21 @@ class ApiService {
           (error as any).statusCode = 404;
           throw error;
         }
-        
+        // Don't log 404 for getUserTicket(plan_id, user_id) - user may not have a ticket yet
+        if (response.status === 404 && endpoint.match(/^\/ticket\/[^/]+\/[^/]+$/) && !endpoint.includes('by-id')) {
+          const error = new Error(data.message || 'Ticket not found');
+          (error as any).isExpected = true;
+          (error as any).statusCode = 404;
+          throw error;
+        }
+
         // Categorize errors by status code
         const error = new Error(data.message || `Request failed with status ${response.status}`);
         (error as any).statusCode = response.status;
-        
+
         // Only log 404 for endpoints we don't treat as expected
-        if (response.status !== 404 || (!endpoint.includes('/user/profile/') && !endpoint.includes('/analytics/business/event/') && !endpoint.includes('/ticket/guest-list/'))) {
+        const isExpectedTicket404 = endpoint.match(/^\/ticket\/[^/]+\/[^/]+$/) && !endpoint.includes('by-id');
+        if (response.status !== 404 || (!endpoint.includes('/user/profile/') && !endpoint.includes('/analytics/business/event/') && !endpoint.includes('/ticket/guest-list/') && !isExpectedTicket404)) {
           if (response.status >= 500) {
             console.error('❌ Server Error:', response.status, data);
           } else if (response.status >= 400) {
