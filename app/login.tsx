@@ -159,7 +159,7 @@ export default function LoginScreen() {
               ) : (
                 <View style={styles.otpSection}>
                   <View style={styles.otpContainer}>
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                    {[0, 1, 2, 3].map((index) => (
                       <TextInput
                         key={index}
                         ref={(ref) => (inputRefs.current[index] = ref)}
@@ -173,13 +173,11 @@ export default function LoginScreen() {
                           newOtp[index] = text;
                           setOtp(newOtp.join(''));
 
-                          // Auto-focus next input if text is entered
-                          if (text && index < 5) {
+                          if (text && index < 3) {
                             inputRefs.current[index + 1]?.focus();
                           }
                         }}
                         onKeyPress={({ nativeEvent }) => {
-                          // Handle Backspace: Move to previous input if current is empty
                           if (nativeEvent.key === 'Backspace') {
                             if (!otp[index] && index > 0) {
                               inputRefs.current[index - 1]?.focus();
@@ -218,7 +216,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
                 onPress={step === 'phone' ? handleSendOTP : handleVerifyOTP}
-                disabled={isLoading || (step === 'otp' && otp.length !== 6)}
+                disabled={isLoading || (step === 'otp' && otp.length !== 4)}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#FFFFFF" />
