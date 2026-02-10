@@ -158,7 +158,8 @@ export default function IndividualChatScreen() {
     try {
       const response = await apiService.getMessages(groupId);
       if (response.data) {
-        const list = Array.isArray(response.data) ? response.data : [];
+        const raw = response.data;
+        const list = Array.isArray(raw) ? raw : (raw?.messages ?? []);
         setMessages(list.map((m: any) => {
           const content = m.content;
           const isPlanContent = typeof content === 'object' && content && (content.title != null || content.plan_id != null);

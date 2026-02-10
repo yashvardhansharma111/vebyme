@@ -938,6 +938,14 @@ class ApiService {
     });
   }
 
+  /** Notify the group that the current user is typing. Backend can expose this to others via getMessages or a typing endpoint. */
+  async sendTyping(group_id: string, user_id: string) {
+    return this.request<void>('/chat/typing', {
+      method: 'POST',
+      body: JSON.stringify({ group_id, user_id }),
+    });
+  }
+
   async addMessageReaction(message_id: string, user_id: string, emoji_type: string) {
     return this.request<any>('/chat/message/reaction', {
       method: 'POST',

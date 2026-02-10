@@ -146,6 +146,9 @@ export default function GroupChatScreen() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [typingLabel, setTypingLabel] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+  const TYPING_DEBOUNCE_MS = 2000;
+  const TYPING_TTL_MS = 10000; // match backend: typing expires after 10s
   const flatListRef = useRef<FlatList>(null);
   const [driveLink, setDriveLink] = useState<string>('');
   const [showDriveModal, setShowDriveModal] = useState(false);
@@ -206,7 +209,8 @@ export default function GroupChatScreen() {
     try {
       const response = await apiService.getMessages(groupId);
       if (response.data) {
-        const list = Array.isArray(response.data) ? response.data : [];
+        const raw = response.data;
+        const list = Array.isArray(raw) ? raw : (raw?.messages ?? []);
         setMessages(list.map((m: any) => {
           const content = m.content;
           const isPlanContent = typeof content === 'object' && content && (content.title != null || content.plan_id != null);
@@ -218,6 +222,21 @@ export default function GroupChatScreen() {
           }
           return m;
         }));
+        // Typing indicator: show others who are typing (not self)
+        const typingUsers = Array.isArray(raw) ? [] : (raw?.typing_users ?? []);
+        const othersTyping = (typingUsers as { user_id: string; name: string }[]).filter(
+          (u) => String(u.user_id) !== String(user?.user_id)
+        );
+        if (othersTyping.length > 0) {
+          const label = othersTyping.length === 1
+            ? `${othersTyping[0].name} is typing...`
+            : `${othersTyping.map((u) => u.name).join(' and ')} are typing...`;
+          setTypingLabel(label);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setTypingLabel(null), TYPING_TTL_MS);
+        } else {
+          setTypingLabel(null);
+        }
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -314,7 +333,13 @@ export default function GroupChatScreen() {
 
   const handleTyping = (text: string) => {
     setInputText(text);
-    setTypingLabel('Typing...');
+    if (groupId && user?.user_id && text.trim()) {
+      const now = Date.now();
+      if (now - lastTypingSentRef.current >= TYPING_DEBOUNCE_MS) {
+        lastTypingSentRef.current = now;
+        apiService.sendTyping(groupId, user.user_id).catch(() => {});
+      }
+    }
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => setTypingLabel(null), 2000);
   };
@@ -559,88 +584,90 @@ export default function GroupChatScreen() {
                 )}
               </View>
             )}
-            
-            {item.type === 'plan' && item.shared_plan ? (
-            <View style={styles.planCardWrap}>
-              <SharedPlanCard
-                plan={{
-                  plan_id: item.shared_plan.plan_id,
-                  title: item.shared_plan.title,
-                  description: item.shared_plan.description,
-                  media: item.shared_plan.media,
-                  tags: item.shared_plan.tags,
-                  category_main: item.shared_plan.category_main,
-                  category_sub: item.shared_plan.category_sub,
-                  is_business: item.shared_plan.is_business,
-                }}
-                onJoinPress={() => {
-                  if (item.shared_plan?.plan_id) {
-                    router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
-                  }
-                }}
-                onCardPress={() => {
-                  if (item.shared_plan?.plan_id) {
-                    router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
-                  }
-                }}
-                senderName={isMe ? 'You' : item.user?.name}
-                senderTime={formatTimeHeader(item.timestamp)}
-                senderAvatar={isMe ? undefined : item.user?.profile_image}
-                pillPosition="left"
-                compact
-              />
-            </View>
-          ) : item.type === 'image' ? (
-            <View style={styles.imageMessageWrap}>
-              {(() => {
-                const urls: string[] = [];
-                if (typeof item.content === 'string' && item.content.trim() !== '') urls.push(item.content);
-                else if (item.content?.url && String(item.content.url).trim() !== '') urls.push(item.content.url);
-                else if (Array.isArray(item.content?.urls)) urls.push(...item.content.urls.filter((u: string) => u?.trim()));
-                if (urls.length === 0) return null;
-                if (urls.length === 1) {
-                  return (
-                    <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="contain" />
-                  );
-                }
-                return (
-                  <View style={styles.multiImageCard}>
-                    {urls.slice(0, 4).map((uri, i) => (
-                      <Image
-                        key={i}
-                        source={{ uri }}
-                        style={[
-                          styles.messageImageStacked,
-                          { top: i * 14, left: i * 16, zIndex: urls.length - i, transform: [{ rotate: `${(i - 1) * 4}deg` }] },
-                        ]}
-                        resizeMode="contain"
-                      />
-                    ))}
+
+            <View style={[styles.messageContentColumn, isMe && styles.messageContentColumnRight]}>
+              {item.type === 'plan' && item.shared_plan ? (
+                <View style={styles.planCardWrap}>
+                  <SharedPlanCard
+                    plan={{
+                      plan_id: item.shared_plan.plan_id,
+                      title: item.shared_plan.title,
+                      description: item.shared_plan.description,
+                      media: item.shared_plan.media,
+                      tags: item.shared_plan.tags,
+                      category_main: item.shared_plan.category_main,
+                      category_sub: item.shared_plan.category_sub,
+                      is_business: item.shared_plan.is_business,
+                    }}
+                    onJoinPress={() => {
+                      if (item.shared_plan?.plan_id) {
+                        router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
+                      }
+                    }}
+                    onCardPress={() => {
+                      if (item.shared_plan?.plan_id) {
+                        router.push({ pathname: '/business-plan/[planId]', params: { planId: item.shared_plan.plan_id } } as any);
+                      }
+                    }}
+                    senderName={isMe ? 'You' : item.user?.name}
+                    senderTime={formatTimeHeader(item.timestamp)}
+                    senderAvatar={isMe ? undefined : item.user?.profile_image}
+                    pillPosition="left"
+                    compact
+                  />
+                </View>
+              ) : item.type === 'image' ? (
+                <View style={styles.imageMessageWrap}>
+                  {(() => {
+                    const urls: string[] = [];
+                    if (typeof item.content === 'string' && item.content.trim() !== '') urls.push(item.content);
+                    else if (item.content?.url && String(item.content.url).trim() !== '') urls.push(item.content.url);
+                    else if (Array.isArray(item.content?.urls)) urls.push(...item.content.urls.filter((u: string) => u?.trim()));
+                    if (urls.length === 0) return null;
+                    if (urls.length === 1) {
+                      return (
+                        <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="contain" />
+                      );
+                    }
+                    return (
+                      <View style={styles.multiImageCard}>
+                        {urls.slice(0, 4).map((uri, i) => (
+                          <Image
+                            key={i}
+                            source={{ uri }}
+                            style={[
+                              styles.messageImageStacked,
+                              { top: i * 14, left: i * 16, zIndex: urls.length - i, transform: [{ rotate: `${(i - 1) * 4}deg` }] },
+                            ]}
+                            resizeMode="contain"
+                          />
+                        ))}
+                      </View>
+                    );
+                  })()}
+                </View>
+              ) : (
+                <View style={[styles.messageContentWrap, isMe && styles.messageContentWrapRight]}>
+                  {showName && <Text style={styles.senderName} numberOfLines={1}>{item.user?.name || 'User'}</Text>}
+                  <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
+                    {item.type === 'text' && (
+                      <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
+                        {item.content}
+                      </Text>
+                    )}
                   </View>
-                );
-              })()}
+                </View>
+              )}
+              {(item.reactions && item.reactions.length > 0) && (
+                <View style={[styles.reactionsRow, isMe ? styles.reactionsRowRight : styles.reactionsRowLeft]}>
+                  {item.reactions.map((r) => (
+                    <Text key={r.reaction_id} style={styles.reactionEmoji}>
+                      {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
+                    </Text>
+                  ))}
+                </View>
+              )}
             </View>
-          ) : (
-            <View style={{ maxWidth: '78%' }}>
-              {showName && <Text style={styles.senderName}>{item.user?.name || 'User'}</Text>}
-              <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
-                {item.type === 'text' && (
-                  <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
-                    {item.content}
-                  </Text>
-                )}
-              </View>
-            </View>
-          )}
-            {(item.reactions && item.reactions.length > 0) && (
-              <View style={[styles.reactionsRow, isMe ? styles.reactionsRowRight : styles.reactionsRowLeft]}>
-                {item.reactions.map((r) => (
-                  <Text key={r.reaction_id} style={styles.reactionEmoji}>
-                    {r.emoji_type === 'laugh' ? '😂' : r.emoji_type === 'wink' ? '😉' : r.emoji_type === 'heart' ? '❤️' : '👍'}
-                  </Text>
-                ))}
-              </View>
-            )}
           </View>
         )}
       </View>
@@ -1061,11 +1088,32 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     marginRight: 6,
   },
+  messageContentColumn: {
+    flex: 1,
+    maxWidth: '78%',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  messageContentColumnRight: {
+    flex: 0,
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+    maxWidth: '78%',
+  },
+  messageContentWrap: {
+    alignSelf: 'stretch',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+  },
+  messageContentWrapRight: {
+    alignItems: 'flex-end',
+  },
   senderName: {
     fontSize: 12,
     fontWeight: '700',
     color: '#6B7280',
-    marginBottom: 6,
+    marginBottom: 4,
     marginLeft: 2,
   },
   timeHeaderContainer: {
@@ -1092,7 +1140,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   messageBubble: {
-    maxWidth: '75%',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    minWidth: 56,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 18,
