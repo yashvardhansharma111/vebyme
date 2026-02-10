@@ -100,6 +100,13 @@ export default function MyProfileScreen() {
           resizeMode="cover"
         >
           <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+            </TouchableOpacity>
             <TouchableOpacity 
                 style={styles.editButton} 
                 onPress={() => router.push('/profile/edit')}
@@ -327,9 +334,18 @@ const styles = StyleSheet.create({
   },
   headerTopRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(242,242,242,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   editButton: {
     backgroundColor: '#F2F2F2',

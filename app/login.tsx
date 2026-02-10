@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   SafeAreaView,
   TouchableWithoutFeedback,
   Keyboard,
@@ -19,6 +18,7 @@ import { Colors, borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { store } from '@/store/store';
 import { sendOTP, verifyOTP, resendOTP, clearError } from '@/store/slices/authSlice';
+import { useSnackbar } from '@/context/SnackbarContext';
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
@@ -32,6 +32,7 @@ export default function LoginScreen() {
   
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { showSnackbar } = useSnackbar();
   const { isLoading, error, isAuthenticated, isNewUser } = useAppSelector((state) => state.auth);
 
   // Navigate based on authentication and new user status
@@ -49,13 +50,13 @@ export default function LoginScreen() {
     }
   }, [isAuthenticated, isNewUser, router]);
 
-  // Show error alerts
+  // Show errors in snackbar at top, 3 seconds
   useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      showSnackbar(error, { position: 'top', duration: 3000 });
       dispatch(clearError());
     }
-  }, [error, dispatch]);
+  }, [error, dispatch, showSnackbar]);
 
   // Auto-focus first OTP input when on OTP step so keyboard opens
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function LoginScreen() {
 
   const handleSendOTP = async () => {
     if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      showSnackbar('Please enter your phone number', { position: 'top', duration: 3000 });
       return;
     }
 
@@ -82,7 +83,7 @@ export default function LoginScreen() {
 
   const handleVerifyOTP = async () => {
     if (!otp.trim() || !otpId) {
-      Alert.alert('Error', 'Please enter the OTP code');
+      showSnackbar('Please enter the OTP code', { position: 'top', duration: 3000 });
       return;
     }
 

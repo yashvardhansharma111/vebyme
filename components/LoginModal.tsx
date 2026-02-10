@@ -9,13 +9,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { borderRadius } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { sendOTP, verifyOTP, resendOTP, clearError } from '@/store/slices/authSlice';
+import { useSnackbar } from '@/context/SnackbarContext';
 import { Ionicons } from '@expo/vector-icons';
 
 interface LoginModalProps {
@@ -33,6 +33,7 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
 
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
+  const { showSnackbar } = useSnackbar();
   const { isLoading, error, isAuthenticated } = useAppSelector((state) => state.auth);
 
   React.useEffect(() => {
@@ -44,10 +45,10 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
 
   React.useEffect(() => {
     if (error) {
-      Alert.alert('Error', error);
+      showSnackbar(error, { position: 'top', duration: 3000 });
       dispatch(clearError());
     }
-  }, [error, dispatch]);
+  }, [error, dispatch, showSnackbar]);
 
   const handleClose = () => {
     setPhone('');
@@ -59,7 +60,7 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
 
   const handleSendOTP = async () => {
     if (!phone.trim()) {
-      Alert.alert('Error', 'Please enter your phone number');
+      showSnackbar('Please enter your phone number', { position: 'top', duration: 3000 });
       return;
     }
 
@@ -74,7 +75,7 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
 
   const handleVerifyOTP = async () => {
     if (!otp.trim() || !otpId) {
-      Alert.alert('Error', 'Please enter the OTP code');
+      showSnackbar('Please enter the OTP code', { position: 'top', duration: 3000 });
       return;
     }
 

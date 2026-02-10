@@ -63,6 +63,8 @@ interface BusinessCardProps {
   onArrowPress?: () => void;
   /** When true, hide Register button (e.g. business user viewing their own event) */
   hideRegisterButton?: boolean;
+  /** When true, show Register button but greyed/disabled (e.g. user's own plan) */
+  registerButtonGreyed?: boolean;
   /** When true, pills stick above the card (same hack as event card) for list layouts */
   pillsAboveCard?: boolean;
 }
@@ -84,8 +86,9 @@ function BusinessCardBase({
   showArrowButton,
   onArrowPress,
   hideRegisterButton = false,
+  registerButtonGreyed = false,
   pillsAboveCard = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; pillsAboveCard?: boolean }) {
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean }) {
   const router = useRouter();
   const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
@@ -176,9 +179,13 @@ function BusinessCardBase({
             )}
             {!hideActions && (
               <View style={styles.footer}>
-                {!hideRegisterButton && (
-                  <TouchableOpacity style={styles.registerButton} onPress={onRegisterPress}>
-                    <Text style={styles.registerButtonText}>Register</Text>
+                {(!hideRegisterButton || registerButtonGreyed) && (
+                  <TouchableOpacity
+                    style={[styles.registerButton, registerButtonGreyed && styles.registerButtonGreyed]}
+                    onPress={registerButtonGreyed ? undefined : onRegisterPress}
+                    disabled={registerButtonGreyed}
+                  >
+                    <Text style={[styles.registerButtonText, registerButtonGreyed && styles.registerButtonTextGreyed]}>Register</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
@@ -264,6 +271,7 @@ export default function BusinessCard({
   isSwipeable = true,
   hideActions = false,
   hideRegisterButton = false,
+  registerButtonGreyed = false,
   containerStyle,
   onPress,
   onRegisterPress,
@@ -375,6 +383,7 @@ export default function BusinessCard({
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
           hideRegisterButton={hideRegisterButton}
+          registerButtonGreyed={registerButtonGreyed}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
@@ -428,6 +437,7 @@ export default function BusinessCard({
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
           hideRegisterButton={hideRegisterButton}
+          registerButtonGreyed={registerButtonGreyed}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
@@ -671,6 +681,12 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '700',
     fontSize: 16,
+  },
+  registerButtonGreyed: {
+    backgroundColor: '#C5C5D0',
+  },
+  registerButtonTextGreyed: {
+    color: '#8E8E93',
   },
   iconButton: {
     width: 44,

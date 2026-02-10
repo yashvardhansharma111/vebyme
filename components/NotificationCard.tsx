@@ -25,11 +25,38 @@ interface NotificationCardProps {
     description: string;
     category_main?: string;
     category_sub?: string[];
+    location_text?: string;
+    add_details?: Array<{ detail_type: string; title?: string; description?: string }>;
+    passes?: Array<{ pass_id: string; name: string; price: number; description?: string; capacity?: number }>;
   } | null;
   interactions: Interaction[];
   created_at: string;
   userCache: { [key: string]: { name: string; profile_image: string | null } };
   onPress?: () => void;
+  onUserPress?: (userId: string) => void;
+}
+
+// Build at most 4 event tags: price, distance, f&b, location (same as BusinessCard). Fallback: category_main + category_sub.
+function buildEventTags(post: NotificationCardProps['post']): string[] {
+  if (!post) return [];
+  const passes = post.passes || [];
+  const prices = passes.filter((p: { price: number }) => p.price > 0).map((p: { price: number }) => p.price);
+  const firstPrice = prices.length > 0 ? Math.min(...prices) : null;
+  const addDetails = post.add_details || [];
+  const detailByType = (type: string) => addDetails.find((d: { detail_type: string }) => d.detail_type === type);
+  const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
+  const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
+  const locationLabel = post.location_text?.trim();
+  const tags: string[] = [];
+  if (firstPrice != null && firstPrice > 0) tags.push(`₹${firstPrice}`);
+  if (distanceLabel) tags.push(distanceLabel);
+  if (fbLabel) tags.push(fbLabel);
+  if (locationLabel) tags.push(locationLabel);
+  if (tags.length > 0) return tags.slice(0, 4);
+  const fallback: string[] = [];
+  if (post.category_main) fallback.push(post.category_main);
+  if (post.category_sub?.length) fallback.push(...post.category_sub);
+  return fallback.slice(0, 4);
 }
 
 export default function NotificationCard({
@@ -39,6 +66,7 @@ export default function NotificationCard({
   created_at,
   userCache,
   onPress,
+  onUserPress,
 }: NotificationCardProps) {
   const router = useRouter();
 
@@ -56,6 +84,7 @@ export default function NotificationCard({
   const postText = post?.description || post?.title || 'Post interaction';
   const postTitle = post?.title || 'Untitled Plan';
   const interactionCount = displayInteractions.length;
+  const eventTags = buildEventTags(post);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -94,27 +123,35 @@ export default function NotificationCard({
       {/* Description */}
       <Text style={styles.description}>{postText}</Text>
 
-      {/* Tags */}
-      {(post?.category_main || post?.category_sub?.length) && (
+      {/* Tags - only 4: price, location, f&b, +1 (e.g. distance) */}
+      {eventTags.length > 0 && (
         <View style={styles.tagsContainer}>
-          {post?.category_main && (
-            <Tag label={post.category_main} />
-          )}
-          {post?.category_sub?.slice(0, 2).map((tag, idx) => (
+          {eventTags.map((tag, idx) => (
             <Tag key={idx} label={tag} />
           ))}
         </View>
       )}
 
-      {/* Interactions List */}
+      {/* Interactions List - tap name to open profile */}
       <View style={styles.interactionsList}>
         {displayInteractions.slice(0, 3).map((interaction) => {
           const cachedUser = userCache[interaction.source_user_id];
           const user = cachedUser || interaction.user;
           const userName = user?.name || 'Unknown';
           const userAvatar = user?.profile_image || null;
+          const handleUserPress = () => {
+            if (interaction.source_user_id) {
+              if (onUserPress) onUserPress(interaction.source_user_id);
+              else router.push({ pathname: '/profile/[userId]', params: { userId: interaction.source_user_id } } as any);
+            }
+          };
           return (
-            <View key={interaction.notification_id} style={styles.interactionRow}>
+            <TouchableOpacity
+              key={interaction.notification_id}
+              style={styles.interactionRow}
+              onPress={handleUserPress}
+              activeOpacity={0.7}
+            >
               <Avatar uri={userAvatar} size={28} />
               <Ionicons
                 name={
@@ -130,7 +167,7 @@ export default function NotificationCard({
                 {userName} {interaction.type === 'reaction' ? 'reacted' :
                            interaction.type === 'join' ? 'joined' : 'reposted'}
               </Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </View>

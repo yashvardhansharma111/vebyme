@@ -11,10 +11,10 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  Linking,
   Modal,
   Platform,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,8 +22,24 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Avatar from '@/components/Avatar';
+import ShareToChatModal from '@/components/ShareToChatModal';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+/** Extract domain from URL for display (e.g. https://drive.google.com/... -> drive.google.com) */
+function domainFromUrl(str: string): string | null {
+  const trimmed = str.trim();
+  try {
+    const url = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+    const u = new URL(url);
+    return u.hostname || null;
+  } catch {
+    return null;
+  }
+}
+function isUrl(str: string): boolean {
+  return /^https?:\/\/\S+/i.test(str.trim()) || /^[\w.-]+\.\w{2,}(\/.*)?$/i.test(str.trim());
+}
 const HERO_ASPECT = 4 / 3; // natural-ish image ratio
 const HERO_HEIGHT = SCREEN_WIDTH * HERO_ASPECT;
 const HERO_OVERLAP_PERCENT = 0.1; // white space covers lower 10% of image
@@ -81,6 +97,8 @@ export default function BusinessPlanDetailScreen() {
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [userHasTicket, setUserHasTicket] = useState<boolean | null>(null);
   const galleryScrollRef = useRef<ScrollView>(null);
   const screenWidth = Dimensions.get('window').width;
 
@@ -164,16 +182,8 @@ export default function BusinessPlanDetailScreen() {
     return time;
   };
 
-  const handleSharePlan = async () => {
-    try {
-      const planUrl = `${getWebBaseUrl()}/go/post/${plan?.plan_id}`;
-      const message = `Check out this event: ${plan?.title}\n\n${planUrl}`;
-      await Share.share({ message, url: planUrl, title: plan?.title });
-    } catch (err: any) {
-      if (err?.message && !err.message.includes('cancel')) {
-        Alert.alert('Error', err.message);
-      }
-    }
+  const handleSharePlan = () => {
+    setShowShareModal(true);
   };
 
   const insets = useSafeAreaInsets();
@@ -189,6 +199,34 @@ export default function BusinessPlanDetailScreen() {
   }, [user?.session_id, currentUser, dispatch]);
 
   const isOwnEvent = !!(plan && user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id));
+
+  useEffect(() => {
+    if (!planId || !user?.user_id || !plan) {
+      setUserHasTicket(null);
+      return;
+    }
+    apiService.hasTicketForPlan(planId, user.user_id).then(setUserHasTicket).catch(() => setUserHasTicket(false));
+  }, [planId, user?.user_id, plan?.plan_id]);
+
+  const handleViewPass = async () => {
+    if (!user?.user_id || !planId) return;
+    try {
+      const res = await apiService.getUserTicket(planId, user.user_id);
+      const ticket = (res as any)?.data ?? (res as any);
+      const ticketId = ticket?.ticket_id;
+      if (ticketId && ticket) {
+        const ticketData = encodeURIComponent(JSON.stringify(ticket));
+        router.push({
+          pathname: '/ticket/[ticketId]',
+          params: { ticketId, planId, ticketData },
+        } as any);
+      } else {
+        Alert.alert('Error', 'Could not load ticket');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', (e as any)?.message || 'Failed to load ticket');
+    }
+  };
 
   const handleRegister = async () => {
     if (!user?.user_id || !user?.access_token) {
@@ -325,7 +363,7 @@ export default function BusinessPlanDetailScreen() {
             )}
             <TouchableOpacity style={styles.headerIconButton} onPress={handleSharePlan}>
               <View style={styles.headerIconCircle}>
-                <Ionicons name="paper-plane-outline" size={22} color="#000" />
+                <Ionicons name="share-outline" size={22} color="#000" />
               </View>
             </TouchableOpacity>
           </View>
@@ -418,7 +456,7 @@ export default function BusinessPlanDetailScreen() {
             )}
           </View>
 
-          {/* Category pills – title above (e.g. Distance), value below (e.g. 5km) */}
+          {/* Category pills – title above, value below; links shortened to domain and clickable */}
           {detailPills.length > 0 && (
             <View style={styles.categoryPillsWrap}>
               {detailPills.slice(0, 4).map((detail, index) => {
@@ -426,18 +464,28 @@ export default function BusinessPlanDetailScreen() {
                   ? (detail.heading ?? detail.title ?? 'Additional Info')
                   : categoryLabel(detail);
                 const value = detail.description ?? '';
+                const displayValue = value && isUrl(value) ? (domainFromUrl(value) || value) : value;
+                const isLink = value && isUrl(value);
                 return (
                   <View key={index} style={styles.categoryPill}>
                     <Text style={styles.categoryPillHeading}>{heading}</Text>
-                    {value ? <Text style={styles.categoryPillValue} numberOfLines={2}>{value}</Text> : null}
+                    {value ? (
+                      isLink ? (
+                        <TouchableOpacity onPress={() => { try { Linking.openURL(value.startsWith('http') ? value : `https://${value}`); } catch (_) {} }}>
+                          <Text style={[styles.categoryPillValue, styles.categoryPillLink]} numberOfLines={2}>{displayValue}</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={styles.categoryPillValue} numberOfLines={2}>{value}</Text>
+                      )
+                    ) : null}
                   </View>
                 );
               })}
             </View>
           )}
 
-          {/* Dark gray See who's coming pill */}
-          {plan.allow_view_guest_list !== false && (
+          {/* Dark gray See who's coming pill – only if more than 3 registered */}
+          {plan.allow_view_guest_list !== false && (plan.joins_count ?? 0) > 3 && (
             <TouchableOpacity style={styles.attendeesCard} onPress={() => setShowGuestListModal(true)} activeOpacity={0.9}>
               <View style={styles.attendeesTextBlock}>
                 <Text style={styles.attendeesTitle}>See who's coming</Text>
@@ -488,9 +536,20 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {!isOwnEvent && (
+          {/* View Pass (if user has ticket), else Register (or greyed if organizer) */}
+          {userHasTicket === true && (
+            <TouchableOpacity style={styles.registerButton} onPress={handleViewPass}>
+              <Text style={styles.registerButtonText}>View Pass</Text>
+            </TouchableOpacity>
+          )}
+          {userHasTicket !== true && !isOwnEvent && (
             <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
               <Text style={styles.registerButtonText}>Register</Text>
+            </TouchableOpacity>
+          )}
+          {userHasTicket !== true && isOwnEvent && (
+            <TouchableOpacity style={[styles.registerButton, styles.registerButtonGreyed]} disabled>
+              <Text style={[styles.registerButtonText, styles.registerButtonTextGreyed]}>Register</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -504,6 +563,21 @@ export default function BusinessPlanDetailScreen() {
           setShowGuestListModal(false);
           handleRegister();
         }}
+      />
+
+      <ShareToChatModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        postId={plan?.plan_id ?? ''}
+        postTitle={plan?.title ?? ''}
+        postDescription={plan?.description ?? ''}
+        postMedia={plan?.media ?? []}
+        postTags={plan?.category_sub}
+        postCategorySub={plan?.category_sub}
+        postCategoryMain={plan?.category_sub?.[0]}
+        postIsBusiness={true}
+        userId={user?.user_id ?? ''}
+        currentUserAvatar={organizer?.profile_image ?? organizer?.avatar}
       />
 
       {/* Full-screen image gallery modal */}
@@ -748,6 +822,10 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     lineHeight: 18,
   },
+  categoryPillLink: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -940,9 +1018,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  registerButtonGreyed: {
+    backgroundColor: '#C5C5D0',
+  },
   registerButtonText: {
     color: '#FFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  registerButtonTextGreyed: {
+    color: '#8E8E93',
   },
 });

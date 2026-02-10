@@ -226,7 +226,7 @@ export default function OtherUserProfileScreen() {
                 {index > 0 && <View style={styles.hairlineDivider} />}
                 <TouchableOpacity
                   style={styles.socialRow}
-                  onPress={() => entry.url && copySocialLink(entry.url, entry.handle)}
+                  onPress={() => entry.url && Linking.openURL(entry.url)}
                   activeOpacity={entry.url ? 0.7 : 1}
                   disabled={!entry.url}
                 >
@@ -236,7 +236,7 @@ export default function OtherUserProfileScreen() {
                     <Ionicons name={entry.icon as any} size={24} color="#252525" />
                   )}
                   <Text style={[styles.socialHandle, !entry.url && styles.socialHandlePlaceholder]}>{entry.handle}</Text>
-                  {entry.url ? <Ionicons name="copy-outline" size={18} color="#8E8E93" /> : null}
+                  {entry.url ? <Ionicons name="open-outline" size={18} color="#8E8E93" /> : null}
                 </TouchableOpacity>
               </React.Fragment>
             ))}

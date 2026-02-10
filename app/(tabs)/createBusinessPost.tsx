@@ -26,6 +26,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import BusinessCard from '@/components/BusinessCard';
 import CalendarPicker from '@/components/CalendarPicker';
+import ShareToChatModal from '@/components/ShareToChatModal';
 
 const CATEGORY_TAGS = ['Music', 'Cafe', 'Clubs', 'Sports', 'Comedy', 'Travel'];
 
@@ -39,15 +40,15 @@ const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
 };
 
 const ADDITIONAL_SETTINGS = [
-  { id: 'distance', label: 'Distance', icon: 'location' },
-  { id: 'starting_point', label: 'Starting Point', icon: 'navigate' },
-  { id: 'dress_code', label: 'Dress Code', icon: 'shirt' },
-  { id: 'music_type', label: 'Music Type', icon: 'musical-notes' },
-  { id: 'parking', label: 'Parking', icon: 'car' },
-  { id: 'f&b', label: 'F&B', icon: 'restaurant' },
-  { id: 'links', label: 'Links', icon: 'link' },
-  { id: 'google_drive_link', label: 'Google Drive link', icon: 'cloud-download-outline' },
-  { id: 'additional_info', label: 'Additional Info', icon: 'information-circle' },
+  { id: 'distance', label: 'Distance', icon: 'location', placeholder: 'e.g. 5k' },
+  { id: 'starting_point', label: 'Starting Point', icon: 'navigate', placeholder: 'e.g. Alienkind Indiranagar' },
+  { id: 'dress_code', label: 'Dress Code', icon: 'shirt', placeholder: 'e.g. Cafe Joggers' },
+  { id: 'music_type', label: 'Music Type', icon: 'musical-notes', placeholder: 'e.g. Electronic' },
+  { id: 'parking', label: 'Parking', icon: 'car', placeholder: 'e.g. Available' },
+  { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
+  { id: 'links', label: 'Links', icon: 'link', placeholder: 'https://...' },
+  { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
+  { id: 'additional_info', label: 'Additional Info', icon: 'information-circle', placeholder: 'Heading and description' },
 ];
 
 interface Pass {
@@ -89,7 +90,6 @@ export default function CreateBusinessPostScreen() {
   const [passes, setPasses] = useState<Pass[]>([]);
   const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<string[]>([]);
   const [additionalDetails, setAdditionalDetails] = useState<{ [key: string]: { title: string; description: string } }>({});
-  const [venueRequired, setVenueRequired] = useState(false);
   const [womenOnly, setWomenOnly] = useState(false);
   const [hideGuestListFromViewers, setHideGuestListFromViewers] = useState(false);
   const [shareToAnnouncementGroup, setShareToAnnouncementGroup] = useState(false);
@@ -99,6 +99,11 @@ export default function CreateBusinessPostScreen() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [showTicketPreview, setShowTicketPreview] = useState(false);
   const [previewPassIndex, setPreviewPassIndex] = useState<number>(0);
+  const [showPostSuccessModal, setShowPostSuccessModal] = useState(false);
+  const [createdPlanIdForSuccess, setCreatedPlanIdForSuccess] = useState<string | null>(null);
+  const [showShareToChatModal, setShowShareToChatModal] = useState(false);
+  const [startAmPm, setStartAmPm] = useState<'AM' | 'PM'>('AM');
+  const [endAmPm, setEndAmPm] = useState<'AM' | 'PM'>('PM');
   const isEditFlowRef = useRef(false);
 
   const resetForm = useCallback(() => {
@@ -121,7 +126,6 @@ export default function CreateBusinessPostScreen() {
     setPasses([]);
     setSelectedAdditionalSettings([]);
     setAdditionalDetails({});
-    setVenueRequired(false);
     setWomenOnly(false);
     setHideGuestListFromViewers(false);
     setShareToAnnouncementGroup(false);
@@ -183,7 +187,6 @@ export default function CreateBusinessPostScreen() {
             setSelectedSubcategories(planData.category_sub);
           }
           if (planData.is_women_only) setWomenOnly(planData.is_women_only);
-          if (planData.venue_required) setVenueRequired(planData.venue_required);
           if (planData.allow_view_guest_list === false) setHideGuestListFromViewers(true);
           else if (planData.allow_view_guest_list) setHideGuestListFromViewers(false);
           if (planData.reshare_to_announcement_group) setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
@@ -199,11 +202,11 @@ export default function CreateBusinessPostScreen() {
             setStartTimeText(planData.time);
             const timeMatch = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
             if (timeMatch) {
-              let hours = parseInt(timeMatch[1]);
-              const minutes = parseInt(timeMatch[2]);
-              const ampm = timeMatch[3].toUpperCase();
-              if (ampm === 'PM' && hours !== 12) hours += 12;
-              if (ampm === 'AM' && hours === 12) hours = 0;
+              setStartAmPm(timeMatch[3].toUpperCase() as 'AM' | 'PM');
+              let hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              if (timeMatch[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+              if (timeMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
               const timeDate = new Date();
               timeDate.setHours(hours, minutes, 0, 0);
               setStartTime(timeDate);
@@ -212,11 +215,11 @@ export default function CreateBusinessPostScreen() {
               setEndTimeText(planData.end_time);
               const endMatch = planData.end_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
               if (endMatch) {
-                let hours = parseInt(endMatch[1]);
-                const minutes = parseInt(endMatch[2]);
-                const ampm = endMatch[3].toUpperCase();
-                if (ampm === 'PM' && hours !== 12) hours += 12;
-                if (ampm === 'AM' && hours === 12) hours = 0;
+                setEndAmPm(endMatch[3].toUpperCase() as 'AM' | 'PM');
+                let hours = parseInt(endMatch[1], 10);
+                const minutes = parseInt(endMatch[2], 10);
+                if (endMatch[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+                if (endMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
                 const timeDate = new Date();
                 timeDate.setHours(hours, minutes, 0, 0);
                 setEndTime(timeDate);
@@ -563,9 +566,6 @@ export default function CreateBusinessPostScreen() {
       if (addDetails.length > 0) {
         planData.add_details = addDetails;
       }
-      if (venueRequired) {
-        planData.venue_required = true;
-      }
       if (editMode && planId) {
         planData.is_women_only = womenOnly;
       } else if (womenOnly) {
@@ -630,7 +630,7 @@ export default function CreateBusinessPostScreen() {
               onPress: () => {
                 setEditMode(false);
                 setPlanId(null);
-                router.back();
+                router.replace('/(tabs)');
               },
             },
           ]);
@@ -674,7 +674,8 @@ export default function CreateBusinessPostScreen() {
             category_main: selectedCategory?.toLowerCase(),
           }));
           isEditFlowRef.current = false;
-          router.back();
+          setCreatedPlanIdForSuccess(createdPlanId);
+          setShowPostSuccessModal(true);
         }
       }
     } catch (error: any) {
@@ -721,7 +722,7 @@ export default function CreateBusinessPostScreen() {
           <Text style={styles.previewTitle}>Preview</Text>
           <View style={{ width: 24 }} />
         </View>
-        <ScrollView>
+        <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
           <BusinessCard
             plan={previewData}
             user={currentUser ? {
@@ -735,6 +736,14 @@ export default function CreateBusinessPostScreen() {
             hideActions
           />
         </ScrollView>
+        <View style={styles.previewStickyBar}>
+          <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
+            <Text style={styles.previewEditButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionButton, styles.postButton]} onPress={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.postButtonText}>Post</Text>}
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -742,10 +751,10 @@ export default function CreateBusinessPostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.createPostHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.cancelButton}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.cancelButton}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.createPostHeaderTitle}>Create Post</Text>
+        <Text style={styles.createPostHeaderTitle}>{editMode ? 'Editing post' : 'Create Post'}</Text>
         <View style={styles.cancelButton} />
       </View>
       <KeyboardAvoidingView
@@ -851,87 +860,66 @@ export default function CreateBusinessPostScreen() {
 
           {timeEnabled && (
             <>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => {
-                  setStartTimeText(startTime ? formatTime(startTime) : startTimeText || '');
-                  setShowStartTimePicker(true);
-                }}
-              >
-                <Text style={(startTime || startTimeText) ? styles.inputText : styles.inputPlaceholder}>
-                  {startTime ? formatTime(startTime) : startTimeText || '8:00 AM'}
-                </Text>
-              </TouchableOpacity>
-
-              {showStartTimePicker && (
-                <View style={styles.datePickerContainer}>
-                  <Text style={styles.datePickerTitle}>Select Start Time</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    placeholder="HH:MM AM/PM (e.g., 8:00 AM)"
-                    value={startTimeText}
-                    onChangeText={(text) => {
-                      setStartTimeText(text);
-                      const parsed = parseTimeText(text);
-                      if (parsed) setStartTime(parsed);
-                    }}
-                    placeholderTextColor="#999"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+              <View style={styles.timeRow}>
+                <TextInput
+                  style={[styles.input, styles.timeInput]}
+                  placeholder="8:00"
+                  value={startTimeText.replace(/\s*AM|PM/i, '').trim()}
+                  onChangeText={(text) => {
+                    const cleaned = text.replace(/[^0-9:]/g, '');
+                    setStartTimeText(cleaned ? `${cleaned} ${startAmPm}` : '');
+                    const parsed = parseTimeText(cleaned ? `${cleaned} ${startAmPm}` : '');
+                    if (parsed) setStartTime(parsed);
+                  }}
+                  placeholderTextColor="#999"
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+                <View style={styles.amPmBox}>
                   <TouchableOpacity
-                    style={styles.datePickerButton}
-                    onPress={() => {
-                      const parsed = parseTimeText(startTimeText);
-                      if (parsed) setStartTime(parsed);
-                      setShowStartTimePicker(false);
-                    }}
+                    style={[styles.amPmOption, startAmPm === 'AM' && styles.amPmOptionSelected]}
+                    onPress={() => { setStartAmPm('AM'); const t = startTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setStartTimeText(`${t} AM`); const p = parseTimeText(`${t} AM`); if (p) setStartTime(p); } }}
                   >
-                    <Text style={styles.datePickerButtonText}>Done</Text>
+                    <Text style={[styles.amPmOptionText, startAmPm === 'AM' && styles.amPmOptionTextSelected]}>AM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.amPmOption, startAmPm === 'PM' && styles.amPmOptionSelected]}
+                    onPress={() => { setStartAmPm('PM'); const t = startTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setStartTimeText(`${t} PM`); const p = parseTimeText(`${t} PM`); if (p) setStartTime(p); } }}
+                  >
+                    <Text style={[styles.amPmOptionText, startAmPm === 'PM' && styles.amPmOptionTextSelected]}>PM</Text>
                   </TouchableOpacity>
                 </View>
-              )}
-
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => {
-                  setEndTimeText(endTime ? formatTime(endTime) : endTimeText || '');
-                  setShowEndTimePicker(true);
-                }}
-              >
-                <Text style={(endTime || endTimeText) ? styles.inputText : styles.inputPlaceholder}>
-                  {endTime ? formatTime(endTime) : endTimeText || 'End Time (optional)'}
-                </Text>
-              </TouchableOpacity>
-
-              {showEndTimePicker && (
-                <View style={styles.datePickerContainer}>
-                  <Text style={styles.datePickerTitle}>Select End Time</Text>
-                  <TextInput
-                    style={styles.dateInput}
-                    placeholder="HH:MM AM/PM (e.g., 10:00 PM)"
-                    value={endTimeText}
-                    onChangeText={(text) => {
-                      setEndTimeText(text);
-                      const parsed = parseTimeText(text);
-                      if (parsed) setEndTime(parsed);
-                    }}
-                    placeholderTextColor="#999"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
+              </View>
+              <View style={styles.timeRow}>
+                <TextInput
+                  style={[styles.input, styles.timeInput]}
+                  placeholder="End time (optional)"
+                  value={endTimeText.replace(/\s*AM|PM/i, '').trim()}
+                  onChangeText={(text) => {
+                    const cleaned = text.replace(/[^0-9:]/g, '');
+                    setEndTimeText(cleaned ? `${cleaned} ${endAmPm}` : '');
+                    const parsed = parseTimeText(cleaned ? `${cleaned} ${endAmPm}` : '');
+                    if (parsed) setEndTime(parsed);
+                  }}
+                  placeholderTextColor="#999"
+                  keyboardType="numbers-and-punctuation"
+                  maxLength={5}
+                />
+                <View style={styles.amPmBox}>
                   <TouchableOpacity
-                    style={styles.datePickerButton}
-                    onPress={() => {
-                      const parsed = parseTimeText(endTimeText);
-                      if (parsed) setEndTime(parsed);
-                      setShowEndTimePicker(false);
-                    }}
+                    style={[styles.amPmOption, endAmPm === 'AM' && styles.amPmOptionSelected]}
+                    onPress={() => { setEndAmPm('AM'); const t = endTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setEndTimeText(`${t} AM`); const p = parseTimeText(`${t} AM`); if (p) setEndTime(p); } }}
                   >
-                    <Text style={styles.datePickerButtonText}>Done</Text>
+                    <Text style={[styles.amPmOptionText, endAmPm === 'AM' && styles.amPmOptionTextSelected]}>AM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.amPmOption, endAmPm === 'PM' && styles.amPmOptionSelected]}
+                    onPress={() => { setEndAmPm('PM'); const t = endTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setEndTimeText(`${t} PM`); const p = parseTimeText(`${t} PM`); if (p) setEndTime(p); } }}
+                  >
+                    <Text style={[styles.amPmOptionText, endAmPm === 'PM' && styles.amPmOptionTextSelected]}>PM</Text>
                   </TouchableOpacity>
                 </View>
-              )}
+              </View>
             </>
           )}
 
@@ -1010,7 +998,10 @@ export default function CreateBusinessPostScreen() {
             <Text style={styles.toggleLabel}>Tickets</Text>
             <Switch
               value={ticketsEnabled}
-              onValueChange={setTicketsEnabled}
+              onValueChange={(value) => {
+                setTicketsEnabled(value);
+                if (value && passes.length === 0) addPass();
+              }}
               trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
               thumbColor="#FFF"
             />
@@ -1018,6 +1009,33 @@ export default function CreateBusinessPostScreen() {
 
           {ticketsEnabled && (
             <View style={styles.passesSection}>
+              {/* Fixed Add Media row (for first pass ticket image) */}
+              {passes[0] && !(editMode && passes[0].isExisting) && (
+                <TouchableOpacity
+                  style={styles.addMediaOptionButton}
+                  onPress={() => handleAddPassImage(0)}
+                >
+                  {passes[0].media && passes[0].media.length > 0 ? (
+                    <View style={styles.passMediaPreview}>
+                      <Image source={{ uri: passes[0].media[0].uri }} style={styles.passMediaThumb} />
+                      <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(0)}>
+                        <Ionicons name="close" size={18} color="#FFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <>
+                      <Ionicons name="add" size={20} color="#666" />
+                      <Text style={styles.addMediaOptionText}>+ Add Media</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+              {passes[0] && editMode && passes[0].isExisting && passes[0].media && passes[0].media.length > 0 && (
+                <View style={styles.passImageRow}>
+                  <Text style={styles.passImageLabel}>Ticket image</Text>
+                  <Image source={{ uri: passes[0].media[0].uri }} style={styles.passMediaThumb} />
+                </View>
+              )}
               {passes.map((pass, index) => {
                 const isExistingTicket = editMode && pass.isExisting;
                 return (
@@ -1030,48 +1048,25 @@ export default function CreateBusinessPostScreen() {
                         </TouchableOpacity>
                       )}
                     </View>
-                    {/* Image and Preview Ticket only for Pass 1 */}
-                    {index === 0 && !isExistingTicket && (
-                      <View style={styles.passImageRow}>
-                        <Text style={styles.passImageLabel}>Ticket image (optional)</Text>
-                        {pass.media && pass.media.length > 0 ? (
-                          <View style={styles.passMediaPreview}>
-                            <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
-                            <TouchableOpacity style={styles.removePassMediaBtn} onPress={() => removePassImage(index)}>
-                              <Ionicons name="close" size={18} color="#FFF" />
-                            </TouchableOpacity>
-                          </View>
-                        ) : (
-                          <TouchableOpacity style={styles.addPassImageBtn} onPress={() => handleAddPassImage(index)}>
-                            <Ionicons name="image-outline" size={20} color="#666" />
-                            <Text style={styles.addPassImageText}>Add image</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                    {index === 0 && isExistingTicket && pass.media && pass.media.length > 0 && (
-                      <View style={styles.passImageRow}>
-                        <Text style={styles.passImageLabel}>Ticket image</Text>
-                        <Image source={{ uri: pass.media[0].uri }} style={styles.passMediaThumb} />
-                      </View>
-                    )}
-                    <TextInput
-                      style={styles.passInput}
-                      placeholder="Ticket Name"
-                      value={pass.name}
-                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'name', text)}
-                      placeholderTextColor="#999"
-                      editable={!isExistingTicket}
-                    />
-                    <TextInput
-                      style={styles.passInput}
-                      placeholder="Ticket Fee (0 for free)"
-                      value={pass.price >= 0 ? pass.price.toString() : ''}
-                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
-                      keyboardType="numeric"
-                      placeholderTextColor="#999"
-                      editable={!isExistingTicket}
-                    />
+                    <View style={styles.passNamePriceRow}>
+                      <TextInput
+                        style={[styles.passInput, styles.passNameInRow]}
+                        placeholder="Ticket Name"
+                        value={pass.name}
+                        onChangeText={(text) => !isExistingTicket && updatePass(index, 'name', text)}
+                        placeholderTextColor="#999"
+                        editable={!isExistingTicket}
+                      />
+                      <TextInput
+                        style={[styles.passInput, styles.passPriceInRow]}
+                        placeholder="Price"
+                        value={pass.price >= 0 ? pass.price.toString() : ''}
+                        onChangeText={(text) => !isExistingTicket && updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
+                        keyboardType="numeric"
+                        placeholderTextColor="#999"
+                        editable={!isExistingTicket}
+                      />
+                    </View>
                     <TextInput
                       style={[styles.passInput, styles.passDescription]}
                       placeholder="Description (Optional)"
@@ -1082,24 +1077,24 @@ export default function CreateBusinessPostScreen() {
                       placeholderTextColor="#999"
                       editable={!isExistingTicket}
                     />
-                    {index === 0 && !isExistingTicket && (
-                      <TouchableOpacity
-                        style={styles.previewTicketButton}
-                        onPress={() => {
-                          setPreviewPassIndex(0);
-                          setShowTicketPreview(true);
-                        }}
-                      >
-                        <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
-                        <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 );
               })}
-              <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
-                <Text style={styles.addPassText}>+ Add Type</Text>
-              </TouchableOpacity>
+              <View style={styles.addTypePreviewRow}>
+                <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
+                  <Text style={styles.addPassText}>+ Add Type</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.previewTicketButton}
+                  onPress={() => {
+                    setPreviewPassIndex(0);
+                    setShowTicketPreview(true);
+                  }}
+                >
+                  <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
@@ -1182,7 +1177,7 @@ export default function CreateBusinessPostScreen() {
                   ) : (
                     <TextInput
                       style={styles.additionalDetailInput}
-                      placeholder={setting?.label ? `Enter ${setting.label}` : 'Value'}
+                      placeholder={(setting as any)?.placeholder ?? (setting?.label ? `Enter ${setting.label}` : 'Value')}
                       value={additionalDetails[settingId]?.description ?? additionalDetails[settingId]?.title ?? ''}
                       onChangeText={(text) =>
                         setAdditionalDetails({
@@ -1202,16 +1197,6 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           {/* Additional Toggles */}
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Venue Required</Text>
-            <Switch
-              value={venueRequired}
-              onValueChange={setVenueRequired}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
-
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Women&apos;s only</Text>
             <Switch
@@ -1310,29 +1295,157 @@ export default function CreateBusinessPostScreen() {
               </ScrollView>
             </SafeAreaView>
           </Modal>
+        </ScrollView>
+        {/* Sticky Action Buttons - visible on every page of create flow */}
+        <View style={styles.stickyActionBar}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.previewButton]}
+            onPress={handlePreview}
+          >
+            <Text style={styles.previewButtonText}>Preview</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.postButton]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
-          {/* Action Buttons */}
-          <View style={styles.actionButtons}>
+      {/* Post success modal: full BusinessCard + Edit event & Share */}
+      <Modal visible={showPostSuccessModal} animationType="slide" transparent>
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalContent}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.successModalScroll}>
+              <BusinessCard
+                plan={{
+                  ...formatPreviewData(),
+                  plan_id: createdPlanIdForSuccess ?? 'preview',
+                }}
+                user={currentUser ? {
+                  id: currentUser.user_id,
+                  name: currentUser.name || 'Organizer',
+                  avatar: currentUser.profile_image || '',
+                  time: selectedDate ? selectedDate.toLocaleDateString() : '',
+                } : undefined}
+                attendeesCount={0}
+                isSwipeable={false}
+                hideActions
+              />
+              <View style={styles.successModalButtons}>
+                <TouchableOpacity
+                  style={styles.successEditButton}
+                  onPress={async () => {
+                    if (!createdPlanIdForSuccess) return;
+                    setShowPostSuccessModal(false);
+                    try {
+                      const response = await apiService.getBusinessPlan(createdPlanIdForSuccess);
+                      const planData = response.data;
+                      if (planData) {
+                        setPlanId(createdPlanIdForSuccess);
+                        setEditMode(true);
+                        isEditFlowRef.current = true;
+                        if (planData.title) setTitle(planData.title);
+                        if (planData.description) setDescription(planData.description);
+                        if (planData.location_text) setLocation(planData.location_text);
+                        if (planData.category_main) setSelectedCategory(planData.category_main);
+                        if (planData.category_sub && Array.isArray(planData.category_sub)) setSelectedSubcategories(planData.category_sub);
+                        if (planData.is_women_only) setWomenOnly(planData.is_women_only);
+                        if (planData.allow_view_guest_list === false) setHideGuestListFromViewers(true);
+                        else if (planData.allow_view_guest_list) setHideGuestListFromViewers(false);
+                        if (planData.date) setSelectedDate(new Date(planData.date));
+                        if (planData.time) {
+                          setTimeEnabled(true);
+                          setStartTimeText(planData.time);
+                          const m = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+                          if (m) {
+                            setStartAmPm(m[3].toUpperCase() as 'AM' | 'PM');
+                            let h = parseInt(m[1], 10);
+                            const min = parseInt(m[2], 10);
+                            if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+                            if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
+                            const d = new Date();
+                            d.setHours(h, min, 0, 0);
+                            setStartTime(d);
+                          }
+                        }
+                        if (planData.media?.length) setMedia(planData.media.map((m: any) => ({ uri: m.url, type: m.type === 'video' ? 'video' as const : 'image' as const })));
+                        if (planData.passes?.length) {
+                          setTicketsEnabled(true);
+                          setPasses(planData.passes.map((p: any) => ({
+                            pass_id: p.pass_id || `pass_${Date.now()}`,
+                            name: p.name || '',
+                            price: p.price ?? 0,
+                            description: p.description || '',
+                            media: p.media?.map((pm: any) => ({ uri: pm.url, type: 'image' as const })),
+                            isExisting: true,
+                          })));
+                        }
+                        if (planData.add_details?.length) {
+                          const settings = planData.add_details.map((d: any) => d.detail_type).filter(Boolean);
+                          const details: typeof additionalDetails = {};
+                          planData.add_details.forEach((d: any) => {
+                            if (d.detail_type === 'additional_info') {
+                              details[d.detail_type] = { title: d.heading ?? d.title ?? '', description: d.description ?? '' };
+                            } else {
+                              details[d.detail_type] = { title: d.title ?? '', description: d.description ?? '' };
+                            }
+                          });
+                          setSelectedAdditionalSettings(settings);
+                          setAdditionalDetails(details);
+                        }
+                      }
+                    } catch (e) {
+                      Alert.alert('Error', 'Failed to load plan for editing');
+                    }
+                  }}
+                >
+                  <Text style={styles.successEditButtonText}>Edit event</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.successShareButton}
+                  onPress={() => {
+                    setShowShareToChatModal(true);
+                  }}
+                >
+                  <Text style={styles.successShareButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
             <TouchableOpacity
-              style={[styles.actionButton, styles.previewButton]}
-              onPress={handlePreview}
+              style={styles.successModalClose}
+              onPress={() => {
+                setShowPostSuccessModal(false);
+                setCreatedPlanIdForSuccess(null);
+                router.replace('/(tabs)');
+              }}
             >
-              <Text style={styles.previewButtonText}>Preview</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.postButton]}
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
-              )}
+              <Ionicons name="close" size={24} color="#666" />
             </TouchableOpacity>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <ShareToChatModal
+        visible={showShareToChatModal}
+        onClose={() => setShowShareToChatModal(false)}
+        postId={createdPlanIdForSuccess ?? ''}
+        postTitle={title}
+        postDescription={description}
+        postMedia={media.map(m => ({ url: m.uri, type: m.type }))}
+        postTags={selectedSubcategories.length ? selectedSubcategories : (selectedCategory ? [selectedCategory] : [])}
+        postCategorySub={selectedSubcategories}
+        postCategoryMain={selectedCategory}
+        postIsBusiness={true}
+        userId={user?.user_id ?? ''}
+        currentUserAvatar={currentUser?.profile_image}
+      />
     </SafeAreaView>
   );
 }
@@ -1372,7 +1485,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100,
+  },
+  stickyActionBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 24,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#C5C5D0',
   },
   loadingContainer: {
     flex: 1,
@@ -1494,6 +1617,39 @@ const styles = StyleSheet.create({
   inputPlaceholder: {
     fontSize: 14,
     color: '#999',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  timeInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  amPmBox: {
+    flexDirection: 'row',
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    overflow: 'hidden',
+  },
+  amPmOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  amPmOptionSelected: {
+    backgroundColor: '#1C1C1E',
+  },
+  amPmOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  amPmOptionTextSelected: {
+    color: '#FFF',
   },
   toggleRow: {
     flexDirection: 'row',
@@ -1660,16 +1816,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
   },
+  addMediaOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  addMediaOptionText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  passNamePriceRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  passNameInRow: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  passPriceInRow: {
+    width: 100,
+    marginBottom: 0,
+  },
+  addTypePreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
   previewTicketButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
     backgroundColor: '#E5E5EA',
     borderRadius: 8,
-    alignSelf: 'flex-start',
   },
   previewTicketButtonText: {
     fontSize: 14,
@@ -1922,6 +2109,61 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModalContent: {
+    width: '92%',
+    maxHeight: '85%',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  successModalScroll: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  successModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  successEditButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successEditButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
+  },
+  successShareButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successShareButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  successModalClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 8,
+    zIndex: 10,
+  },
   previewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1930,6 +2172,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
+  },
+  previewScroll: { flex: 1 },
+  previewScrollContent: { paddingBottom: 24 },
+  previewStickyBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingBottom: 24,
+    backgroundColor: '#FFF',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5E5',
+  },
+  previewEditButton: {
+    backgroundColor: '#E5E5EA',
+  },
+  previewEditButtonText: {
+    color: '#1C1C1E',
+    fontSize: 16,
+    fontWeight: '700',
   },
   previewTitle: {
     fontSize: 18,

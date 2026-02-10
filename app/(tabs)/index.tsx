@@ -402,59 +402,51 @@ export default function HomeScreen() {
         />
 
         <SafeAreaView style={styles.safeArea}>
-          <ScrollView
-            ref={scrollViewRef}
-            contentContainerStyle={styles.scrollContainer}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
-            }
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.locationContainer}>
-                <View style={styles.locationIconBg}>
-                  <Ionicons name="location-sharp" size={18} color="#FFF" />
-                </View>
-                <View style={{ marginLeft: 10 }}>
-                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={styles.locationTitle}>Indiranagar</Text>
-                    <Ionicons name="chevron-down" size={16} color="#FFF" style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                  <Text style={styles.locationSubtitle}>Bengaluru</Text>
-                </View>
+          {/* Header – fixed at top */}
+          <View style={styles.header}>
+            <View style={styles.locationContainer}>
+              <View style={styles.locationIconBg}>
+                <Ionicons name="location-sharp" size={18} color="#FFF" />
               </View>
-              <View style={styles.headerRight}>
-                {/* QR Scanner Icon for Business Owners */}
-                {isAuthenticated && currentUser?.is_business && (
-                  <TouchableOpacity
-                    style={styles.qrScannerButton}
-                    onPress={() => router.push('/qr-scanner')}
-                  >
-                    <Ionicons name="qr-code-outline" size={24} color="#FFF" />
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (isAuthenticated) {
-                      router.push('/profile');
-                    } else {
-                      setShowLoginModal(true);
-                    }
-                  }}
-                >
-                  {isAuthenticated ? (
-                    <ProfileAvatar />
-                  ) : (
-                    <View style={styles.guestAvatar}>
-                      <Ionicons name="person-outline" size={24} color={Colors.light.text} />
-                    </View>
-                  )}
+              <View style={{ marginLeft: 10 }}>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.locationTitle}>Indiranagar</Text>
+                  <Ionicons name="chevron-down" size={16} color="#FFF" style={{ marginLeft: 4 }} />
                 </TouchableOpacity>
+                <Text style={styles.locationSubtitle}>Bengaluru</Text>
               </View>
             </View>
+            <View style={styles.headerRight}>
+              {isAuthenticated && currentUser?.is_business && (
+                <TouchableOpacity
+                  style={styles.qrScannerButton}
+                  onPress={() => router.push('/qr-scanner')}
+                >
+                  <Ionicons name="qr-code-outline" size={24} color="#FFF" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => {
+                  if (isAuthenticated) {
+                    router.push('/profile');
+                  } else {
+                    setShowLoginModal(true);
+                  }
+                }}
+              >
+                {isAuthenticated ? (
+                  <ProfileAvatar />
+                ) : (
+                  <View style={styles.guestAvatar}>
+                    <Ionicons name="person-outline" size={24} color={Colors.light.text} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
 
-            {/* Filters – selected tag moves to front; tap filters immediately */}
+          {/* Categories – sticky below header, stays visible when scrolling */}
+          <View style={styles.stickyFilterWrap}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
               {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter, index) => {
                 const isActive = activeFilter === filter;
@@ -472,7 +464,16 @@ export default function HomeScreen() {
                 );
               })}
             </ScrollView>
+          </View>
 
+          <ScrollView
+            ref={scrollViewRef}
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
+            }
+          >
             {/* Single full-length business card (index hero) */}
             {businessEvents.length > 0 && (() => {
               const item = businessEvents[0];
@@ -504,7 +505,8 @@ export default function HomeScreen() {
                     onPress={() => {
                       router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
                     }}
-                    hideRegisterButton={rawPost?.user_id === user?.user_id}
+                    hideRegisterButton={false}
+                    registerButtonGreyed={rawPost?.user_id === user?.user_id}
                     onRegisterPress={async () => {
                       if (!isAuthenticated || !user?.user_id) {
                         setShowLoginModal(true);
@@ -782,7 +784,12 @@ const styles = StyleSheet.create({
   locationSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
   headerAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
   guestAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  filterScroll: { marginBottom: 24 },
+  stickyFilterWrap: {
+    backgroundColor: 'rgba(224,232,230,0.98)',
+    paddingBottom: 8,
+    zIndex: 10,
+  },
+  filterScroll: { marginBottom: 16 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   activeFilterText: { color: '#FFF', fontWeight: '600' },

@@ -268,6 +268,7 @@ export default function BusinessPostsScreen() {
 
         <SafeAreaView style={styles.safeArea}>
           {/* Header with Back Button */}
+          {/* Header – fixed at top */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.backButton}
@@ -279,14 +280,8 @@ export default function BusinessPostsScreen() {
             <View style={styles.placeholder} />
           </View>
 
-          <ScrollView 
-            contentContainerStyle={styles.scrollContainer} 
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
-            }
-          >
-            {/* Filters – selected tag moves to front; tap filters immediately (Happening Near Me) */}
+          {/* Categories – sticky below header */}
+          <View style={styles.stickyFilterWrap}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
               {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter) => {
                 const isActive = activeFilter === filter;
@@ -304,7 +299,15 @@ export default function BusinessPostsScreen() {
                 );
               })}
             </ScrollView>
+          </View>
 
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer} 
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
+            }
+          >
             {isLoading && events.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4A3B69" />
@@ -348,7 +351,8 @@ export default function BusinessPostsScreen() {
                       attendeesCount={rawPost?.joins_count ?? 0}
                       interactedUsers={item.event?.interacted_users}
                       isSwipeable={true}
-                      hideRegisterButton={rawPost?.user_id === user?.user_id}
+                      hideRegisterButton={false}
+                      registerButtonGreyed={rawPost?.user_id === user?.user_id}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
                       }}
@@ -502,7 +506,12 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 0,
   },
-  filterScroll: { marginBottom: 20 },
+  stickyFilterWrap: {
+    backgroundColor: 'rgba(224,232,230,0.98)',
+    paddingBottom: 8,
+    zIndex: 10,
+  },
+  filterScroll: { marginBottom: 16 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   activeFilterText: { color: '#FFF', fontWeight: '600' },

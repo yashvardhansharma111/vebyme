@@ -26,6 +26,9 @@ interface GroupedPlanCardProps {
     description: string;
     category_main?: string;
     category_sub?: string[];
+    location_text?: string;
+    add_details?: Array<{ detail_type: string; title?: string; description?: string }>;
+    passes?: Array<{ pass_id: string; name: string; price: number; description?: string; capacity?: number }>;
   } | null;
   interactions: Interaction[];
   created_at: string;
@@ -72,6 +75,7 @@ export default function GroupedPlanCard({
   const [showAddToCommunityModal, setShowAddToCommunityModal] = useState(false);
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
   const [interactionFilter, setInteractionFilter] = useState<'all' | 'first_timers' | 'returning'>('all');
+  const [planDetails, setPlanDetails] = useState<null | { passes?: any[]; add_details?: any[]; location_text?: string; category_main?: string; category_sub?: string[] }>(null);
 
   const alreadyInGroupSet = React.useMemo(() => {
     if (!alreadyInAnnouncementGroupIds) return new Set<string>();
@@ -81,6 +85,60 @@ export default function GroupedPlanCard({
   }, [alreadyInAnnouncementGroupIds]);
 
   const planId = post?.plan_id;
+
+  // When expanded, fetch full plan so we can show 4 pills: price, location, f&b, distance
+  useEffect(() => {
+    if (!(expanded && showInteractions && planId)) {
+      setPlanDetails(null);
+      return;
+    }
+    let cancelled = false;
+    apiService
+      .getBusinessPlan(planId)
+      .then((res: any) => {
+        const data = res?.data ?? res;
+        const plan = data?.plan ?? data;
+        if (!cancelled && plan && typeof plan === 'object') {
+          setPlanDetails({
+            passes: plan.passes,
+            add_details: plan.add_details,
+            location_text: plan.location_text,
+            category_main: plan.category_main,
+            category_sub: plan.category_sub,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPlanDetails(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, showInteractions, planId]);
+
+  // Only 4 event tags: price, distance, f&b, location (same as BusinessCard). Use planDetails when expanded, else post.
+  const eventTags = React.useMemo(() => {
+    const source = planDetails || post;
+    if (!source) return [];
+    const passes = source.passes || [];
+    const prices = passes.filter((p: { price: number }) => p.price > 0).map((p: { price: number }) => p.price);
+    const firstPrice = prices.length > 0 ? Math.min(...prices) : null;
+    const addDetails = source.add_details || [];
+    const detailByType = (type: string) => addDetails.find((d: { detail_type: string }) => d.detail_type === type);
+    const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
+    const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
+    const locationLabel = source.location_text?.trim();
+    const tags: string[] = [];
+    if (firstPrice != null && firstPrice > 0) tags.push(`₹${firstPrice}`);
+    if (distanceLabel) tags.push(distanceLabel);
+    if (fbLabel) tags.push(fbLabel);
+    if (locationLabel) tags.push(locationLabel);
+    if (tags.length > 0) return tags.slice(0, 4);
+    const fallback: string[] = [];
+    if (source.category_main) fallback.push(source.category_main);
+    if (source.category_sub?.length) fallback.push(...source.category_sub);
+    return fallback.slice(0, 4);
+  }, [post, planDetails]);
 
   useEffect(() => {
     if (!planId) {
@@ -371,13 +429,10 @@ export default function GroupedPlanCard({
           </View>
         )}
 
-        {/* Tags - Show in Level 2 (collapsed) and Level 3 (expanded) */}
-        {(post?.category_main || post?.category_sub?.length) && (
+        {/* Tags - only 4: price, location, f&b, +1 (e.g. distance) */}
+        {eventTags.length > 0 && (
           <View style={styles.tagsContainer}>
-            {post?.category_main && (
-              <Tag label={post.category_main} />
-            )}
-            {post?.category_sub?.slice(0, 2).map((tag, idx) => (
+            {eventTags.map((tag, idx) => (
               <Tag key={idx} label={tag} />
             ))}
           </View>
@@ -406,13 +461,23 @@ export default function GroupedPlanCard({
                 </Text>
               ) : (
                 filteredGuests.map((guest) => (
-                  <View key={guest.user_id} style={styles.registeredRow}>
+                  <TouchableOpacity
+                    key={guest.user_id}
+                    style={styles.registeredRow}
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      if (guest.user_id) {
+                        router.push({ pathname: '/profile/[userId]', params: { userId: guest.user_id } } as any);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
                     <Avatar uri={guest.profile_image} size={36} />
                     <Text style={styles.registeredText}>
                       <Text style={styles.registeredName}>{guest.name}</Text>
                       <Text style={styles.registeredAction}> registered</Text>
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 ))
               )}
             </View>
