@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import { captureRef } from 'react-native-view-shot';
@@ -307,8 +308,8 @@ export default function TicketScreen() {
 
           {/* Centered block: ticket card + overlapping details */}
           <View style={styles.centeredBlock}>
-            {/* Main ticket card - image ~half viewport */}
-            <View ref={ticketCardRef} collapsable={false} style={styles.ticketCardWrap}>
+            {/* Main ticket card - image ~half viewport, on top of white section */}
+            <View ref={ticketCardRef} collapsable={false} style={[styles.ticketCardWrap, { zIndex: 2 }]}>
               <View style={styles.ticketCard}>
                 {mainImage ? (
                   <Image source={{ uri: mainImage }} style={[styles.ticketCardImage, { height: imageHeight }]} resizeMode="cover" />
@@ -317,6 +318,10 @@ export default function TicketScreen() {
                     <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.6)" />
                   </View>
                 )}
+              {/* Bottom 20% blur */}
+              <View style={[styles.ticketCardBlurStrip, { height: imageHeight * 0.2 }]} pointerEvents="none">
+                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+              </View>
               <LinearGradient
                 colors={['transparent', 'rgba(0,0,0,0.75)']}
                 style={styles.ticketCardOverlay}
@@ -340,8 +345,8 @@ export default function TicketScreen() {
             </View>
           </View>
 
-          {/* Info section: overlaps image, white extends up behind it */}
-          <View style={[styles.infoSection, { marginTop: -overlapAmount, paddingTop: overlapAmount + 16 }]}>
+          {/* Info section: sits under the image (image on top) */}
+          <View style={[styles.infoSection, { marginTop: -overlapAmount, paddingTop: overlapAmount + 16, zIndex: 1 }]}>
             <View style={styles.infoLeft}>
               {pillItems.map((item, idx) => (
                 <View key={idx} style={styles.pill}>
@@ -460,6 +465,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  ticketCardBlurStrip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
   ticketCardOverlay: {
     position: 'absolute',
     left: 0,
@@ -468,6 +481,7 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    zIndex: 2,
   },
   bannerTitle: {
     fontSize: 26,
@@ -499,6 +513,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
+    zIndex: 3,
     width: 44,
     height: 44,
     borderRadius: 22,

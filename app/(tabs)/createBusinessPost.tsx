@@ -28,15 +28,23 @@ import BusinessCard from '@/components/BusinessCard';
 import CalendarPicker from '@/components/CalendarPicker';
 import ShareToChatModal from '@/components/ShareToChatModal';
 
-const CATEGORY_TAGS = ['Music', 'Cafe', 'Clubs', 'Sports', 'Comedy', 'Travel'];
+const CATEGORY_TAGS = ['Running', 'Sports', 'Fitness/Training', 'Social/Community'];
 
+// Previously used categories – hidden per design; uncomment to restore
+// const CATEGORY_TAGS_OLD = ['Music', 'Cafe', 'Clubs', 'Sports', 'Comedy', 'Travel'];
+// const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
+//   Music: ['Rave', 'Live Music', 'DJ', 'Concert', 'Karaoke'],
+//   Cafe: ['Coffee', 'Brunch', 'Work'],
+//   Clubs: ['Nightlife', 'Lounge'],
+//   Sports: ['Running', 'Cycling', 'Football', 'Yoga', 'Weekend'],
+//   Comedy: ['Standup', 'Open Mic'],
+//   Travel: ['Road Trip', 'Hitchhiking', 'Weekend', 'Evening'],
+// };
 const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
-  Music: ['Rave', 'Live Music', 'DJ', 'Concert', 'Karaoke'],
-  Cafe: ['Coffee', 'Brunch', 'Work'],
-  Clubs: ['Nightlife', 'Lounge'],
-  Sports: ['Running', 'Cycling', 'Football', 'Yoga', 'Weekend'],
-  Comedy: ['Standup', 'Open Mic'],
-  Travel: ['Road Trip', 'Hitchhiking', 'Weekend', 'Evening'],
+  Running: [],
+  Sports: [],
+  'Fitness/Training': [],
+  'Social/Community': [],
 };
 
 const ADDITIONAL_SETTINGS = [
@@ -104,6 +112,7 @@ export default function CreateBusinessPostScreen() {
   const [showShareToChatModal, setShowShareToChatModal] = useState(false);
   const [startAmPm, setStartAmPm] = useState<'AM' | 'PM'>('AM');
   const [endAmPm, setEndAmPm] = useState<'AM' | 'PM'>('PM');
+  const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
   const isEditFlowRef = useRef(false);
 
   const resetForm = useCallback(() => {
@@ -276,6 +285,7 @@ export default function CreateBusinessPostScreen() {
   }, []);
 
   const MAX_MEDIA = 5;
+  const DESCRIPTION_MAX_LENGTH = 250;
 
   const handleAddMedia = async () => {
     try {
@@ -751,39 +761,45 @@ export default function CreateBusinessPostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.createPostHeader}>
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButtonHeader} hitSlop={12}>
+          <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.createPostHeaderTitle}>{editMode ? 'Editing post' : 'Create Post'}</Text>
-        <View style={styles.cancelButton} />
+        <View style={styles.backButtonHeader} />
       </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Title */}
-          <TextInput
-            style={styles.titleInput}
-            placeholder="Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholderTextColor="#999"
-          />
+          {/* Description – top, multiline, character counter */}
+          <View style={styles.sectionCard}>
+            <TextInput
+              style={styles.descriptionInput}
+              placeholder="Join the run club for another 5k at Bohemians Indiranagar. Runs, Coffees, and some groovy music on the house."
+              value={description}
+              onChangeText={(t) => setDescription(t.slice(0, DESCRIPTION_MAX_LENGTH))}
+              multiline
+              numberOfLines={4}
+              placeholderTextColor="#999"
+              maxLength={DESCRIPTION_MAX_LENGTH}
+            />
+            <Text style={styles.characterCounter}>{description.length}/{DESCRIPTION_MAX_LENGTH}</Text>
+          </View>
 
-          {/* Description */}
-          <TextInput
-            style={styles.descriptionInput}
-            placeholder="Plan Description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={4}
-            placeholderTextColor="#999"
-          />
+          {/* Title */}
+          <View style={styles.sectionCard}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholderTextColor="#999"
+            />
+          </View>
 
           {/* Media - up to 5 images */}
-          <View style={styles.mediaSection}>
+          <View style={[styles.sectionCard, styles.mediaSection]}>
             {media.length > 0 ? (
               <View style={styles.mediaList}>
                 {media.map((item, index) => (
@@ -807,34 +823,39 @@ export default function CreateBusinessPostScreen() {
             ) : (
               <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
                 <Ionicons name="add" size={24} color="#666" />
-                <Text style={styles.addMediaText}>+ Add Media (up to {MAX_MEDIA} images)</Text>
+                <Text style={styles.addMediaText}>+ Add Media</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Location */}
-          <TextInput
-            style={styles.input}
-            placeholder="Location"
-            value={location}
-            onChangeText={setLocation}
-            placeholderTextColor="#999"
-          />
+          {/* Location – pill-shaped */}
+          <View style={styles.sectionCard}>
+            <TextInput
+              style={styles.locationInputPill}
+              placeholder="Bohemians Indiranagar, 1st Main"
+              value={location}
+              onChangeText={setLocation}
+              placeholderTextColor="#999"
+            />
+          </View>
 
           {/* Date */}
+          <View style={styles.sectionCard}>
           <TouchableOpacity
-            style={styles.input}
+            style={styles.dateRow}
             onPress={() => setShowDatePicker(true)}
           >
             <Text style={selectedDate ? styles.inputText : styles.inputPlaceholder}>
-              {selectedDate ? selectedDate.toLocaleDateString('en-US', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              }) : 'Date of event'}
+              {selectedDate ? (() => {
+                const d = selectedDate;
+                const day = d.getDate();
+                const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
+                return `${day}${suffix} ${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
+              })() : '7th January, 2026'}
             </Text>
             <Ionicons name="calendar-outline" size={20} color="#666" />
           </TouchableOpacity>
+          </View>
 
           <CalendarPicker
             visible={showDatePicker}
@@ -848,6 +869,7 @@ export default function CreateBusinessPostScreen() {
           />
 
           {/* Time of Event */}
+          <View style={styles.sectionCard}>
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Time of Event</Text>
             <Switch
@@ -922,9 +944,10 @@ export default function CreateBusinessPostScreen() {
               </View>
             </>
           )}
+          </View>
 
           {/* Category – select category then expand subcategories */}
-          <View style={styles.section}>
+          <View style={[styles.section, styles.sectionCard]}>
             <Text style={styles.sectionTitle}>CATEGORY</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.categoryContainer}>
@@ -994,6 +1017,7 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           {/* Tickets */}
+          <View style={styles.sectionCard}>
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Tickets</Text>
             <Switch
@@ -1097,8 +1121,10 @@ export default function CreateBusinessPostScreen() {
               </View>
             </View>
           )}
+          </View>
 
           {/* Share to Announcement Group */}
+          <View style={styles.sectionCard}>
           <View style={styles.toggleRow}>
             <Text style={styles.toggleLabel}>Share to Announcement Group</Text>
             <Switch
@@ -1108,10 +1134,24 @@ export default function CreateBusinessPostScreen() {
               thumbColor="#FFF"
             />
           </View>
+          </View>
 
-          {/* Additional Settings */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Additional Settings</Text>
+          {/* Additional Settings – collapsible, collapsed by default */}
+          <View style={[styles.section, styles.sectionCard]}>
+            <TouchableOpacity
+              style={styles.additionalSettingsHeader}
+              onPress={() => setAdditionalSettingsExpanded((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sectionTitle}>Additional Settings</Text>
+              <Ionicons
+                name={additionalSettingsExpanded ? 'chevron-up' : 'chevron-down'}
+                size={22}
+                color="#666"
+              />
+            </TouchableOpacity>
+            {additionalSettingsExpanded && (
+            <>
             <View style={styles.settingsGrid}>
               {ADDITIONAL_SETTINGS.map((setting) => (
                 <TouchableOpacity
@@ -1175,30 +1215,38 @@ export default function CreateBusinessPostScreen() {
                       />
                     </>
                   ) : (
-                    <TextInput
-                      style={styles.additionalDetailInput}
-                      placeholder={(setting as any)?.placeholder ?? (setting?.label ? `Enter ${setting.label}` : 'Value')}
-                      value={additionalDetails[settingId]?.description ?? additionalDetails[settingId]?.title ?? ''}
-                      onChangeText={(text) =>
-                        setAdditionalDetails({
-                          ...additionalDetails,
-                          [settingId]: {
-                            title: setting?.label ?? settingId,
-                            description: text,
-                          },
-                        })
-                      }
-                      placeholderTextColor="#999"
-                    />
+                    <>
+                      <TextInput
+                        style={styles.additionalDetailInput}
+                        placeholder={(setting as any)?.placeholder ?? (setting?.label ? `Enter ${setting.label}` : 'Value')}
+                        value={additionalDetails[settingId]?.description ?? additionalDetails[settingId]?.title ?? ''}
+                        onChangeText={(text) =>
+                          setAdditionalDetails({
+                            ...additionalDetails,
+                            [settingId]: {
+                              title: setting?.label ?? settingId,
+                              description: text,
+                            },
+                          })
+                        }
+                        placeholderTextColor="#999"
+                      />
+                      {settingId === 'google_drive_link' && (
+                        <Text style={styles.photosLinkHint}>Only registered users will be able to access</Text>
+                      )}
+                    </>
                   )}
                 </View>
               );
             })}
+            </>
+            )}
           </View>
 
           {/* Additional Toggles */}
+          <View style={styles.sectionCard}>
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Women&apos;s only</Text>
+            <Text style={styles.toggleLabel}>Women&apos;s Only</Text>
             <Switch
               value={womenOnly}
               onValueChange={setWomenOnly}
@@ -1213,13 +1261,14 @@ export default function CreateBusinessPostScreen() {
           )}
 
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Hide guest list from viewers</Text>
+            <Text style={styles.toggleLabel}>Allow Viewing Guest List</Text>
             <Switch
-              value={hideGuestListFromViewers}
-              onValueChange={setHideGuestListFromViewers}
+              value={!hideGuestListFromViewers}
+              onValueChange={(v) => setHideGuestListFromViewers(!v)}
               trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
               thumbColor="#FFF"
             />
+          </View>
           </View>
 
           {/* Ticket Preview Modal */}
@@ -1444,7 +1493,7 @@ export default function CreateBusinessPostScreen() {
         postCategoryMain={selectedCategory}
         postIsBusiness={true}
         userId={user?.user_id ?? ''}
-        currentUserAvatar={currentUser?.profile_image}
+        currentUserAvatar={currentUser?.profile_image ?? undefined}
       />
     </SafeAreaView>
   );
@@ -1453,7 +1502,37 @@ export default function CreateBusinessPostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F7',
+  },
+  sectionCard: {
+    backgroundColor: '#EBEBED',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+  },
+  /* Single gray box: inputs inside cards have no inner box */
+  characterCounter: {
+    fontSize: 12,
+    color: '#8E8E93',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  locationInputPill: {
+    fontSize: 15,
+    color: '#1C1C1E',
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    backgroundColor: 'transparent',
+    borderRadius: 24,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
+    borderRadius: 12,
   },
   createPostHeader: {
     flexDirection: 'row',
@@ -1461,12 +1540,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F7',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#C5C5D0',
+    borderBottomColor: '#E5E5EA',
   },
   cancelButton: {
     minWidth: 70,
+  },
+  backButtonHeader: {
+    minWidth: 44,
   },
   cancelButtonText: {
     fontSize: 16,
@@ -1493,9 +1575,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F7',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#C5C5D0',
+    borderTopColor: '#E5E5EA',
   },
   loadingContainer: {
     flex: 1,
@@ -1511,20 +1593,22 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 16,
+    marginBottom: 0,
     padding: 12,
-    backgroundColor: '#FFF',
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
     borderRadius: 12,
   },
   descriptionInput: {
     fontSize: 14,
     color: '#000',
     padding: 12,
-    backgroundColor: '#FFF',
+    paddingVertical: 12,
+    backgroundColor: 'transparent',
     borderRadius: 12,
     minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   mediaSection: {
     marginBottom: 16,
@@ -1603,7 +1687,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     padding: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     marginBottom: 16,
     flexDirection: 'row',
@@ -1630,10 +1714,10 @@ const styles = StyleSheet.create({
   },
   amPmBox: {
     flexDirection: 'row',
-    backgroundColor: '#FFF',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: 'rgba(0,0,0,0.1)',
     overflow: 'hidden',
   },
   amPmOption: {
@@ -1685,6 +1769,12 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 8,
     textTransform: 'uppercase',
+  },
+  additionalSettingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 12,
@@ -1748,7 +1838,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   passCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1768,7 +1858,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     padding: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: 'transparent',
     borderRadius: 8,
     marginBottom: 12,
   },
@@ -2041,7 +2131,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   additionalDetailCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -2056,11 +2146,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     padding: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: 'transparent',
     borderRadius: 8,
   },
   additionalDetailDescription: {
     marginTop: 10,
+  },
+  photosLinkHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
   },
   productionTags: {
     flexDirection: 'row',
@@ -2094,10 +2189,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   previewButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: '#E5E5EA',
   },
   previewButtonText: {
-    color: '#FFF',
+    color: '#1C1C1E',
     fontSize: 16,
     fontWeight: '700',
   },
