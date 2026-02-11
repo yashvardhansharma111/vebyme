@@ -7,12 +7,16 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CAMERA_SQUARE_SIZE = Math.min(Dimensions.get('window').width - 32, 320);
 
 /** Scan API response – adjust to match your backend */
 interface ScanResultData {
@@ -35,6 +39,7 @@ interface ScanResultData {
 
 export default function QRScannerScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const { user } = useAppSelector((state) => state.auth);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
@@ -44,6 +49,7 @@ export default function QRScannerScreen() {
   const [scanning, setScanning] = useState(false);
   const [lastScannedHash, setLastScannedHash] = useState<string | null>(null);
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
+  const [scanErrorMessage, setScanErrorMessage] = useState<string | null>(null);
   const [checkedInCount, setCheckedInCount] = useState<number | null>(null);
   const [totalCount, setTotalCount] = useState<number | null>(null);
 
@@ -98,22 +104,23 @@ export default function QRScannerScreen() {
         const result = response?.data ?? response;
         const scannedPlanId = (result?.plan ?? result?.event)?.plan_id as string | undefined;
         if (scannedPlanId && scannedPlanId !== selectedPlanId) {
-          Alert.alert('Wrong event', 'This ticket is for a different plan. Please select the correct plan and try again.');
-          setScanResult(null);
+          setScanErrorMessage('Wrong event – select the correct plan.');
+          setTimeout(() => setScanErrorMessage(null), 2000);
           return;
         }
         const attendee = result?.attendee ?? result?.user;
         const name = attendee?.name || 'User';
+        const planData = result?.plan ?? result?.event;
         setCheckedInCount(result?.checked_in_count ?? result?.checked_in ?? null);
         setTotalCount(result?.total ?? result?.attendees_count ?? null);
         setSnackbarMessage(`${name} checked in`);
         setTimeout(() => setSnackbarMessage(null), 2500);
-        setScanResult(null);
+        setScanResult({ plan: planData, attendee: attendee ?? { user_id: '', name: 'User' } });
       } catch (error: any) {
-        Alert.alert('Scan failed', error?.message ?? 'Invalid or already used ticket.');
-        setScanResult(null);
+        setScanErrorMessage(error?.message ?? 'Invalid or already used ticket.');
+        setTimeout(() => setScanErrorMessage(null), 2000);
       } finally {
-        setScanning(false);
+        setTimeout(() => setScanning(false), 1500);
       }
     },
     [user?.user_id, scanning, selectedPlanId]
@@ -193,9 +200,14 @@ export default function QRScannerScreen() {
     );
   }
 
-  const confirmed = false;
   const checkedIn = checkedInCount ?? 0;
   const total = totalCount ?? 0;
+  const selectedPlan = plans.find((p: any) => p.plan_id === selectedPlanId);
+  const formatPlanDate = (d: string | Date | undefined) => {
+    if (!d) return '';
+    const date = typeof d === 'string' ? new Date(d) : d;
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -210,32 +222,72 @@ export default function QRScannerScreen() {
         </TouchableOpacity>
       </View>
 
-      {total > 0 && (
-        <View style={styles.statsRow}>
-          <Text style={styles.statsText}>Checked In: {checkedIn}/{total}</Text>
-        </View>
-      )}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {total > 0 && (
+          <View style={styles.statsRow}>
+            <Text style={styles.statsText}>Checked In: {checkedIn}/{total}</Text>
+          </View>
+        )}
 
-      <View style={styles.cameraWrap}>
-        <CameraView
-          style={styles.camera}
-          facing="back"
-          onBarcodeScanned={scanning ? undefined : handleBarCodeScanned}
-          barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-        >
-          <View style={styles.scanFrame} />
-          {scanning && (
-            <View style={styles.scanningOverlay}>
-              <ActivityIndicator size="large" color="#FFF" />
-            </View>
+        {/* Camera – square at center */}
+        <View style={[styles.cameraWrap, { width: CAMERA_SQUARE_SIZE, height: CAMERA_SQUARE_SIZE, alignSelf: 'center' }]}>
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            onBarcodeScanned={scanning ? undefined : handleBarCodeScanned}
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+          >
+            <View style={styles.scanFrame} />
+            {scanning && (
+              <View style={styles.scanningOverlay}>
+                <ActivityIndicator size="large" color="#FFF" />
+              </View>
+            )}
+          </CameraView>
+        </View>
+
+        {/* Selected plan details */}
+        <View style={styles.detailsCard}>
+          <Text style={styles.detailsCardTitle}>Selected plan</Text>
+          {selectedPlan ? (
+            <>
+              <Text style={styles.detailsCardName}>{selectedPlan.title || 'Untitled Plan'}</Text>
+              <Text style={styles.detailsCardDate}>
+                {formatPlanDate(selectedPlan.date ?? selectedPlan.event_date)} 
+                {selectedPlan.time ? ` · ${selectedPlan.time}` : ''}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.detailsCardMuted}>No plan selected</Text>
           )}
-        </CameraView>
-      </View>
+        </View>
+
+        {/* Last checked-in user */}
+        <View style={styles.detailsCard}>
+          <Text style={styles.detailsCardTitle}>Last check-in</Text>
+          {scanResult?.attendee ? (
+            <>
+              <Text style={styles.detailsCardName}>{scanResult.attendee.name || 'Guest'}</Text>
+              {scanResult.plan?.title && (
+                <Text style={styles.detailsCardDate}>{scanResult.plan.title}</Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.detailsCardMuted}>Scan a ticket to see check-in details</Text>
+          )}
+        </View>
+      </ScrollView>
 
       {snackbarMessage && (
         <View style={styles.snackbar}>
           <Ionicons name="checkmark-circle" size={20} color="#FFF" />
           <Text style={styles.snackbarText}>{snackbarMessage}</Text>
+        </View>
+      )}
+      {scanErrorMessage && (
+        <View style={[styles.snackbarTop, { top: insets.top + 12 }]}>
+          <Ionicons name="warning" size={18} color="#FFF" />
+          <Text style={styles.snackbarTopText} numberOfLines={2}>{scanErrorMessage}</Text>
         </View>
       )}
     </SafeAreaView>
@@ -279,6 +331,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFF',
   },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 24 },
   statsRow: {
     alignItems: 'center',
     paddingVertical: 8,
@@ -289,24 +343,48 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   cameraWrap: {
-    flex: 1,
-    marginHorizontal: 16,
+    marginTop: 8,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: '#000',
   },
-  camera: {
-    flex: 1,
-  },
   scanFrame: {
     position: 'absolute',
-    top: '15%',
-    left: '10%',
-    right: '10%',
-    bottom: '15%',
+    top: '12%',
+    left: '12%',
+    right: '12%',
+    bottom: '12%',
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.5)',
-    borderRadius: 16,
+    borderRadius: 12,
+  },
+  detailsCard: {
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  detailsCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  detailsCardName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFF',
+  },
+  detailsCardDate: {
+    fontSize: 14,
+    color: '#E5E5EA',
+    marginTop: 4,
+  },
+  detailsCardMuted: {
+    fontSize: 15,
+    color: '#8E8E93',
   },
   scanningOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -332,6 +410,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#FFF',
+  },
+  snackbarTop: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(44, 44, 46, 0.95)',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    zIndex: 100,
+  },
+  snackbarTopText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFF',
+    flex: 1,
   },
   cameraPlaceholder: {
     flex: 1,

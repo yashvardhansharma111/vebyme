@@ -92,29 +92,12 @@ export default function MyProfileScreen() {
   return (
     <View style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* --- HEADER IMAGE SECTION --- */}
+        {/* --- HEADER IMAGE SECTION (no white; sticky row floats over) --- */}
         <ImageBackground
           source={currentUser?.profile_image ? { uri: currentUser.profile_image } : { uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' }}
-          style={[styles.headerBackground, { paddingTop: insets.top, backgroundColor: '#E5E5E5' }]}
+          style={[styles.headerBackground, { paddingTop: insets.top + 56, height: 240 + insets.top + 56, backgroundColor: '#E5E5E5' }]}
           resizeMode="cover"
-        >
-          <View style={styles.headerTopRow}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.back()}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
-            </TouchableOpacity>
-            <TouchableOpacity 
-                style={styles.editButton} 
-                onPress={() => router.push('/profile/edit')}
-            >
-              <Text style={styles.editButtonText}>Edit</Text>
-            </TouchableOpacity>
-          </View>
-        </ImageBackground>
+        />
 
         {/* --- PROFILE CARD --- */}
         <View style={styles.profileCardWrapper}>
@@ -229,6 +212,26 @@ export default function MyProfileScreen() {
         </View>
       </ScrollView>
 
+      {/* Sticky back + edit with blur */}
+      <View style={[styles.stickyProfileHeader, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity style={styles.headerIconTouch} onPress={() => router.back()} activeOpacity={0.8}>
+            <BlurView intensity={60} tint="light" style={styles.profileHeaderBlur}>
+              <View style={styles.backButton}>
+                <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+              </View>
+            </BlurView>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerIconTouch} onPress={() => router.push('/profile/edit')} activeOpacity={0.8}>
+            <BlurView intensity={60} tint="light" style={styles.profileEditBlur}>
+              <View style={styles.editButton}>
+                <Text style={styles.editButtonText}>Edit</Text>
+              </View>
+            </BlurView>
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* --- DELETE ACCOUNT MODAL WITH BLUR --- */}
       <Modal
         animationType="fade"
@@ -329,26 +332,47 @@ const styles = StyleSheet.create({
   // Header
   headerBackground: {
     width: '100%',
-    height: 240,
     justifyContent: 'flex-start',
+  },
+  stickyProfileHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: 'transparent',
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 10,
+  },
+  headerIconTouch: {},
+  profileHeaderBlur: {
+    overflow: 'hidden',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileEditBlur: {
+    overflow: 'hidden',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(242,242,242,0.9)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   editButton: {
-    backgroundColor: '#F2F2F2',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
