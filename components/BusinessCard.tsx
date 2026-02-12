@@ -103,13 +103,19 @@ function BusinessCardBase({
   const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
   const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
   const locationLabel = plan.location_text?.trim();
-  // Only these 4 tags: price, distance, F&B, location – nothing else
-  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location'; label: string }[] = [];
+  // Event tags: price, distance, F&B, location; then category_main and category_sub for proper tag viewing
+  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location' | 'category'; label: string }[] = [];
   if (firstTicketPrice != null && firstTicketPrice > 0) cardTags.push({ type: 'price', label: `₹${firstTicketPrice}` });
   if (distanceLabel) cardTags.push({ type: 'distance', label: distanceLabel });
   if (fbLabel) cardTags.push({ type: 'fb', label: fbLabel });
   if (locationLabel) cardTags.push({ type: 'location', label: locationLabel });
-  const tagsToShow = cardTags.slice(0, 4);
+  if (plan.category_main && cardTags.length < 4) cardTags.push({ type: 'category', label: plan.category_main });
+  if (plan.category_sub?.length && cardTags.length < 4) {
+    for (const sub of plan.category_sub) {
+      if (sub && cardTags.length < 4) cardTags.push({ type: 'category', label: sub });
+    }
+  }
+  const tagsToShow = cardTags.slice(0, 6);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = async () => {
@@ -169,6 +175,8 @@ function BusinessCardBase({
                   <View key={`${item.type}-${index}`} style={styles.tag}>
                     {item.type === 'price' ? (
                       <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                    ) : item.type === 'category' ? (
+                      <Ionicons name="pricetag-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
                     ) : (
                       <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
                     )}

@@ -285,7 +285,6 @@ export default function CreateBusinessPostScreen() {
   }, []);
 
   const MAX_MEDIA = 5;
-  const DESCRIPTION_MAX_LENGTH = 250;
 
   const handleAddMedia = async () => {
     try {
@@ -778,13 +777,11 @@ export default function CreateBusinessPostScreen() {
               style={styles.descriptionInput}
               placeholder="Join the run club for another 5k at Bohemians Indiranagar. Runs, Coffees, and some groovy music on the house."
               value={description}
-              onChangeText={(t) => setDescription(t.slice(0, DESCRIPTION_MAX_LENGTH))}
+              onChangeText={setDescription}
               multiline
               numberOfLines={4}
               placeholderTextColor="#999"
-              maxLength={DESCRIPTION_MAX_LENGTH}
             />
-            <Text style={styles.characterCounter}>{description.length}/{DESCRIPTION_MAX_LENGTH}</Text>
           </View>
 
           {/* Title */}
@@ -1123,10 +1120,10 @@ export default function CreateBusinessPostScreen() {
           )}
           </View>
 
-          {/* Share to Announcement Group */}
+          {/* Share to community */}
           <View style={styles.sectionCard}>
           <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Share to Announcement Group</Text>
+            <Text style={styles.toggleLabel}>Share to community</Text>
             <Switch
               value={shareToAnnouncementGroup}
               onValueChange={setShareToAnnouncementGroup}
@@ -1291,7 +1288,7 @@ export default function CreateBusinessPostScreen() {
                   const mainImage = pass.media?.[0]?.uri ?? (media[0]?.uri);
                   const eventDate = selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
                   const eventTime = (startTime ? formatTime(startTime) : startTimeText) || 'TBD';
-                  const categoryTags = [...(selectedCategory ? [selectedCategory] : []), ...selectedSubcategories].slice(0, 3);
+                  const categoryTags = [...(selectedCategory ? [selectedCategory] : []), ...selectedSubcategories];
                   return (
                     <View style={styles.ticketPreviewCard}>
                       {mainImage ? (
@@ -1460,6 +1457,7 @@ export default function CreateBusinessPostScreen() {
                 <TouchableOpacity
                   style={styles.successShareButton}
                   onPress={() => {
+                    setShowPostSuccessModal(false);
                     setShowShareToChatModal(true);
                   }}
                 >
@@ -1509,13 +1507,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-  },
-  /* Single gray box: inputs inside cards have no inner box */
-  characterCounter: {
-    fontSize: 12,
-    color: '#8E8E93',
-    textAlign: 'right',
-    marginTop: 4,
   },
   locationInputPill: {
     fontSize: 15,

@@ -14,6 +14,7 @@ import {
   Linking,
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -592,21 +593,27 @@ export default function BusinessPlanDetailScreen() {
         currentUserAvatar={organizer?.profile_image ?? organizer?.avatar}
       />
 
-      {/* Full-screen image gallery modal – safe area, inset from borders */}
+      {/* Full-screen image gallery modal – safe area, inset from borders; tap backdrop or close to dismiss */}
       <Modal
         visible={showImageGallery}
         transparent
         animationType="fade"
+        statusBarTranslucent
         onRequestClose={() => setShowImageGallery(false)}
       >
         <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
-          <View style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
+          <View
+            style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV }]}
+            pointerEvents="box-none"
+          >
             <TouchableOpacity
               style={styles.galleryCloseButton}
               onPress={() => setShowImageGallery(false)}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.8}
             >
-              <Ionicons name="close" size={28} color="#FFF" />
+              <Ionicons name="close-circle" size={36} color="#FFF" />
             </TouchableOpacity>
             <ScrollView
               ref={galleryScrollRef}
