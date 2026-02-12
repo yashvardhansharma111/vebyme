@@ -388,7 +388,20 @@ export default function CreatePostScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Description */}
+          {/* Title – top */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Title (Optional)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter a title..."
+              value={title}
+              onChangeText={setTitle}
+              maxLength={30}
+            />
+            <Text style={styles.charCount}>{title.length}/30</Text>
+          </View>
+
+          {/* Description – below title */}
           <View style={styles.section}>
             <Text style={styles.label}>What are you up to?</Text>
             <TextInput
@@ -400,19 +413,6 @@ export default function CreatePostScreen() {
               onChangeText={setDescription}
               textAlignVertical="top"
             />
-          </View>
-
-          {/* Title */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Title (Optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter a title..."
-              value={title}
-              onChangeText={setTitle}
-              maxLength={30}
-            />
-            <Text style={styles.charCount}>{title.length}/30</Text>
           </View>
 
           {/* Media */}

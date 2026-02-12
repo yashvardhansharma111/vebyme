@@ -50,36 +50,37 @@ export default function EditProfileScreen() {
   }, [currentUser, user, dispatch]);
 
   const pickImage = async (source: 'camera' | 'gallery') => {
-    // Close modal first
+    // Close modal first so the native picker can present (especially on iOS)
     setShowPhotoModal(false);
-    
-    try {
-      let result;
-      if (source === 'camera') {
-        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permissionResult.granted) {
-          Alert.alert('Permission needed', 'Camera permission is required');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-      } else {
-        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permissionResult.granted) {
-          Alert.alert('Permission needed', 'Photo library permission is required');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-      }
 
-      if (!result.canceled && result.assets[0]) {
+    const runPicker = async () => {
+      try {
+        let result;
+        if (source === 'camera') {
+          const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permissionResult.granted) {
+            Alert.alert('Permission needed', 'Camera permission is required');
+            return;
+          }
+          result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+        } else {
+          const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!permissionResult.granted) {
+            Alert.alert('Permission needed', 'Photo library permission is required');
+            return;
+          }
+          result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          });
+        }
+
+        if (!result.canceled && result.assets[0]) {
         setUploading(true);
         const asset = result.assets[0];
         
@@ -157,10 +158,18 @@ export default function EditProfileScreen() {
           setUploading(false);
           setShowPhotoModal(false);
         }
+        }
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to pick image');
+        setUploading(false);
       }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to pick image');
-      setUploading(false);
+    };
+
+    // On iOS, present the native picker after the modal has dismissed to avoid presentation issues
+    if (Platform.OS === 'ios') {
+      setTimeout(() => runPicker(), 400);
+    } else {
+      await runPicker();
     }
   };
 

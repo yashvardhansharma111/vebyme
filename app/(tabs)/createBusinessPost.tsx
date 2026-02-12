@@ -685,6 +685,7 @@ export default function CreateBusinessPostScreen() {
           }));
           isEditFlowRef.current = false;
           setCreatedPlanIdForSuccess(createdPlanId);
+          setShowPreview(false); // Close preview so main view (with success modal) is shown
           setShowPostSuccessModal(true);
         }
       }
@@ -778,7 +779,18 @@ export default function CreateBusinessPostScreen() {
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Description – top, multiline, character counter */}
+          {/* Title – top */}
+          <View style={styles.sectionCard}>
+            <TextInput
+              style={styles.titleInput}
+              placeholder="Title"
+              value={title}
+              onChangeText={setTitle}
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          {/* Description – below title, multiline */}
           <View style={styles.sectionCard}>
             <TextInput
               style={styles.descriptionInput}
@@ -787,17 +799,6 @@ export default function CreateBusinessPostScreen() {
               onChangeText={setDescription}
               multiline
               numberOfLines={4}
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          {/* Title */}
-          <View style={styles.sectionCard}>
-            <TextInput
-              style={styles.titleInput}
-              placeholder="Title"
-              value={title}
-              onChangeText={setTitle}
               placeholderTextColor="#999"
             />
           </View>
