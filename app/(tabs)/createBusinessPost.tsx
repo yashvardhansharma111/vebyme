@@ -25,6 +25,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import BusinessCard from '@/components/BusinessCard';
+import BusinessPlanDetailPreview from '@/components/BusinessPlanDetailPreview';
 import CalendarPicker from '@/components/CalendarPicker';
 import ShareToChatModal from '@/components/ShareToChatModal';
 
@@ -416,6 +417,15 @@ export default function CreateBusinessPostScreen() {
   };
 
   const formatPreviewData = () => {
+    const add_details = selectedAdditionalSettings.map((settingId) => {
+      const isAdditionalInfo = settingId === 'additional_info';
+      return {
+        detail_type: settingId,
+        title: additionalDetails[settingId]?.title ?? (isAdditionalInfo ? '' : (ADDITIONAL_SETTINGS.find((s) => s.id === settingId)?.label ?? settingId)),
+        description: additionalDetails[settingId]?.description ?? '',
+        ...(isAdditionalInfo ? { heading: additionalDetails[settingId]?.title ?? '' } : {}),
+      };
+    });
     return {
       plan_id: 'preview',
       title: title || 'Event Title',
@@ -428,7 +438,14 @@ export default function CreateBusinessPostScreen() {
         return timeEnabled && s ? formatTime(s) : undefined;
       })(),
       category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
-      passes: passes.filter(p => p.name && p.price >= 0),
+      add_details: add_details.length > 0 ? add_details : undefined,
+      passes: passes.filter((p) => p.name && p.price >= 0).map((p) => ({
+        pass_id: p.pass_id,
+        name: p.name,
+        price: p.price,
+        description: p.description ?? '',
+        media: p.media?.map((m) => ({ url: m.uri, type: m.type })),
+      })),
       user: currentUser ? {
         user_id: currentUser.user_id,
         name: currentUser.name || 'Organizer',
@@ -734,24 +751,14 @@ export default function CreateBusinessPostScreen() {
           >
             <Ionicons name="close" size={28} color="#1C1C1E" />
           </TouchableOpacity>
-          <ScrollView
-            style={styles.previewScroll}
-            contentContainerStyle={styles.previewScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <BusinessCard
+          <View style={styles.previewScroll}>
+            <BusinessPlanDetailPreview
               plan={previewData}
-              user={currentUser ? {
-                id: currentUser.user_id,
-                name: currentUser.name || 'Organizer',
-                avatar: currentUser.profile_image || '',
-                time: selectedDate ? selectedDate.toLocaleDateString() : '',
-              } : undefined}
-              attendeesCount={0}
-              isSwipeable={false}
-              hideActions
+              organizerName={currentUser?.name || 'Organizer'}
+              organizerAvatar={currentUser?.profile_image ?? null}
+              showOrganizer={true}
             />
-          </ScrollView>
+          </View>
           <View style={styles.previewStickyBar}>
             <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
               <Text style={styles.previewEditButtonText}>Back to edit</Text>
