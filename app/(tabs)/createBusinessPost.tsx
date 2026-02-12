@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import BusinessCard from '@/components/BusinessCard';
 import CalendarPicker from '@/components/CalendarPicker';
@@ -114,6 +114,7 @@ export default function CreateBusinessPostScreen() {
   const [endAmPm, setEndAmPm] = useState<'AM' | 'PM'>('PM');
   const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
   const isEditFlowRef = useRef(false);
+  const insets = useSafeAreaInsets();
 
   const resetForm = useCallback(() => {
     setTitle('');
@@ -723,37 +724,43 @@ export default function CreateBusinessPostScreen() {
   if (showPreview) {
     const previewData = formatPreviewData();
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.previewHeader}>
-          <TouchableOpacity onPress={() => setShowPreview(false)}>
-            <Ionicons name="arrow-back" size={24} color="#000" />
+      <Modal visible={true} animationType="slide" statusBarTranslucent>
+        <SafeAreaView style={styles.previewFullScreen} edges={['top', 'bottom']}>
+          <TouchableOpacity
+            style={[styles.previewCloseButton, { top: insets.top + 8 }]}
+            onPress={() => setShowPreview(false)}
+            hitSlop={16}
+          >
+            <Ionicons name="close" size={28} color="#1C1C1E" />
           </TouchableOpacity>
-          <Text style={styles.previewTitle}>Preview</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
-          <BusinessCard
-            plan={previewData}
-            user={currentUser ? {
-              id: currentUser.user_id,
-              name: currentUser.name || 'Organizer',
-              avatar: currentUser.profile_image || '',
-              time: selectedDate ? selectedDate.toLocaleDateString() : '',
-            } : undefined}
-            attendeesCount={0}
-            isSwipeable={false}
-            hideActions
-          />
-        </ScrollView>
-        <View style={styles.previewStickyBar}>
-          <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
-            <Text style={styles.previewEditButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionButton, styles.postButton]} onPress={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.postButtonText}>Post</Text>}
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+          <ScrollView
+            style={styles.previewScroll}
+            contentContainerStyle={styles.previewScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <BusinessCard
+              plan={previewData}
+              user={currentUser ? {
+                id: currentUser.user_id,
+                name: currentUser.name || 'Organizer',
+                avatar: currentUser.profile_image || '',
+                time: selectedDate ? selectedDate.toLocaleDateString() : '',
+              } : undefined}
+              attendeesCount={0}
+              isSwipeable={false}
+              hideActions
+            />
+          </ScrollView>
+          <View style={styles.previewStickyBar}>
+            <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
+              <Text style={styles.previewEditButtonText}>Back to edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.postButton]} onPress={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.postButtonText}>Post</Text>}
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     );
   }
 
@@ -820,7 +827,7 @@ export default function CreateBusinessPostScreen() {
             ) : (
               <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
                 <Ionicons name="add" size={24} color="#666" />
-                <Text style={styles.addMediaText}>+ Add Media</Text>
+                <Text style={styles.addMediaText}> Add Media</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1387,72 +1394,14 @@ export default function CreateBusinessPostScreen() {
               <View style={styles.successModalButtons}>
                 <TouchableOpacity
                   style={styles.successEditButton}
-                  onPress={async () => {
+                  onPress={() => {
                     if (!createdPlanIdForSuccess) return;
                     setShowPostSuccessModal(false);
-                    try {
-                      const response = await apiService.getBusinessPlan(createdPlanIdForSuccess);
-                      const planData = response.data;
-                      if (planData) {
-                        setPlanId(createdPlanIdForSuccess);
-                        setEditMode(true);
-                        isEditFlowRef.current = true;
-                        if (planData.title) setTitle(planData.title);
-                        if (planData.description) setDescription(planData.description);
-                        if (planData.location_text) setLocation(planData.location_text);
-                        if (planData.category_main) setSelectedCategory(planData.category_main);
-                        if (planData.category_sub && Array.isArray(planData.category_sub)) setSelectedSubcategories(planData.category_sub);
-                        if (planData.is_women_only) setWomenOnly(planData.is_women_only);
-                        if (planData.allow_view_guest_list === false) setHideGuestListFromViewers(true);
-                        else if (planData.allow_view_guest_list) setHideGuestListFromViewers(false);
-                        if (planData.date) setSelectedDate(new Date(planData.date));
-                        if (planData.time) {
-                          setTimeEnabled(true);
-                          setStartTimeText(planData.time);
-                          const m = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-                          if (m) {
-                            setStartAmPm(m[3].toUpperCase() as 'AM' | 'PM');
-                            let h = parseInt(m[1], 10);
-                            const min = parseInt(m[2], 10);
-                            if (m[3].toUpperCase() === 'PM' && h !== 12) h += 12;
-                            if (m[3].toUpperCase() === 'AM' && h === 12) h = 0;
-                            const d = new Date();
-                            d.setHours(h, min, 0, 0);
-                            setStartTime(d);
-                          }
-                        }
-                        if (planData.media?.length) setMedia(planData.media.map((m: any) => ({ uri: m.url, type: m.type === 'video' ? 'video' as const : 'image' as const })));
-                        if (planData.passes?.length) {
-                          setTicketsEnabled(true);
-                          setPasses(planData.passes.map((p: any) => ({
-                            pass_id: p.pass_id || `pass_${Date.now()}`,
-                            name: p.name || '',
-                            price: p.price ?? 0,
-                            description: p.description || '',
-                            media: p.media?.map((pm: any) => ({ uri: pm.url, type: 'image' as const })),
-                            isExisting: true,
-                          })));
-                        }
-                        if (planData.add_details?.length) {
-                          const settings = planData.add_details.map((d: any) => d.detail_type).filter(Boolean);
-                          const details: typeof additionalDetails = {};
-                          planData.add_details.forEach((d: any) => {
-                            if (d.detail_type === 'additional_info') {
-                              details[d.detail_type] = { title: d.heading ?? d.title ?? '', description: d.description ?? '' };
-                            } else {
-                              details[d.detail_type] = { title: d.title ?? '', description: d.description ?? '' };
-                            }
-                          });
-                          setSelectedAdditionalSettings(settings);
-                          setAdditionalDetails(details);
-                        }
-                      }
-                    } catch (e) {
-                      Alert.alert('Error', 'Failed to load plan for editing');
-                    }
+                    setCreatedPlanIdForSuccess(null);
+                    router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
                   }}
                 >
-                  <Text style={styles.successEditButtonText}>Edit event</Text>
+                  <Text style={styles.successEditButtonText}>View Event</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.successShareButton}
@@ -2250,6 +2199,22 @@ const styles = StyleSheet.create({
     padding: 8,
     zIndex: 10,
   },
+  previewFullScreen: {
+    flex: 1,
+    backgroundColor: '#F2F2F7',
+  },
+  previewCloseButton: {
+    position: 'absolute',
+    top: 56,
+    right: 16,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   previewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2260,14 +2225,14 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5E5',
   },
   previewScroll: { flex: 1 },
-  previewScrollContent: { paddingBottom: 24 },
+  previewScrollContent: { paddingBottom: 24, paddingTop: 16, paddingHorizontal: 16 },
   previewStickyBar: {
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F7',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E5E5',
   },

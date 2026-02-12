@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
+import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import EventReviewCard, { EventReviewRating } from '@/components/EventReviewCard';
 import QRCode from 'react-native-qrcode-svg';
@@ -171,24 +173,77 @@ export default function TicketScreen() {
     }
   };
 
+  const shareTicketImage = async (uri: string) => {
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Save ticket',
+      });
+    } else {
+      await Share.share({
+        url: uri,
+        title: 'Save ticket',
+        type: 'image/png',
+      });
+    }
+  };
+
   const handleAddToWallet = async () => {
     if (!ticketCardRef.current) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please allow access to save the ticket to your photos.');
-        return;
-      }
       const uri = await captureRef(ticketCardRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
-        width: 400,
+        width: 800,
       });
-      await MediaLibrary.saveToLibraryAsync(uri);
-      Alert.alert('Saved', 'Ticket image saved to your photos.');
+
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          Alert.alert('Saved', 'Ticket (with QR code) saved to your photos.');
+          return;
+        }
+      } catch (mediaError: any) {
+        const msg = mediaError?.message || '';
+        const isExpoGoMediaRejected =
+          msg.includes('requestPermissionsAsync') && msg.includes('rejected');
+        const isAndroidMediaRestriction =
+          msg.includes('Expo Go') || msg.includes('development build');
+        if (isExpoGoMediaRejected || isAndroidMediaRestriction) {
+          try {
+            await shareTicketImage(uri);
+            return;
+          } catch (shareErr: any) {
+            if (shareErr?.message?.includes('cancel') || shareErr?.code === 'E_SHARE_CANCELLED') return;
+            Alert.alert(
+              'Could not save to photos',
+              'In Expo Go on Android, saving to photos is not available. Use Share to save the ticket image to your device, or create a development build for direct save.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+        }
+      }
+
+      // Permission denied or save failed: offer share so user can save the image
+      await shareTicketImage(uri);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Could not save ticket image.');
+      const msg = error?.message || '';
+      if (
+        msg.includes('requestPermissionsAsync') &&
+        (msg.includes('rejected') || msg.includes('Expo Go') || msg.includes('development build'))
+      ) {
+        Alert.alert(
+          'Save not available in Expo Go',
+          'On Android, Expo Go cannot save directly to photos. Create a development build to save tickets to your gallery, or use Share to save the ticket image elsewhere.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', error?.message || 'Could not save ticket image.');
+      }
     }
   };
 
@@ -306,69 +361,71 @@ export default function TicketScreen() {
           {/* Title */}
           <Text style={styles.pageTitle}>Booking Confirmed</Text>
 
-          {/* Centered block: ticket card + overlapping details */}
+          {/* Centered block: ticket card + overlapping details – ref wraps image + QR section so save includes QR */}
           <View style={styles.centeredBlock}>
-            {/* Main ticket card - image ~half viewport, on top of white section */}
-            <View ref={ticketCardRef} collapsable={false} style={[styles.ticketCardWrap, { zIndex: 2 }]}>
-              <View style={styles.ticketCard}>
-                {mainImage ? (
-                  <Image source={{ uri: mainImage }} style={[styles.ticketCardImage, { height: imageHeight }]} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.ticketCardImage, styles.bannerPlaceholder, { height: imageHeight }]}>
-                    <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.6)" />
+            <View ref={ticketCardRef} collapsable={false} style={{ zIndex: 2 }}>
+              {/* Main ticket card - image ~half viewport, on top of white section */}
+              <View style={[styles.ticketCardWrap, { zIndex: 2 }]}>
+                <View style={styles.ticketCard}>
+                  {mainImage ? (
+                    <Image source={{ uri: mainImage }} style={[styles.ticketCardImage, { height: imageHeight }]} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.ticketCardImage, styles.bannerPlaceholder, { height: imageHeight }]}>
+                      <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.6)" />
+                    </View>
+                  )}
+                  {/* Bottom 20% blur */}
+                  <View style={[styles.ticketCardBlurStrip, { height: imageHeight * 0.2 }]} pointerEvents="none">
+                    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
                   </View>
-                )}
-              {/* Bottom 20% blur */}
-              <View style={[styles.ticketCardBlurStrip, { height: imageHeight * 0.2 }]} pointerEvents="none">
-                <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-              </View>
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.75)']}
-                style={styles.ticketCardOverlay}
-              >
-                <Text style={styles.bannerTitle} numberOfLines={2}>{ticket.plan?.title || 'Event'}</Text>
-                <View style={styles.bannerMetaRow}>
-                  <Text style={styles.bannerDate}>{formatDate(ticket.plan?.date)}</Text>
-                  <Text style={styles.bannerTime}>{formatTime(ticket.plan?.time)}</Text>
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.75)']}
+                    style={styles.ticketCardOverlay}
+                  >
+                    <Text style={styles.bannerTitle} numberOfLines={2}>{ticket.plan?.title || 'Event'}</Text>
+                    <View style={styles.bannerMetaRow}>
+                      <Text style={styles.bannerDate}>{formatDate(ticket.plan?.date)}</Text>
+                      <Text style={styles.bannerTime}>{formatTime(ticket.plan?.time)}</Text>
+                    </View>
+                    {ticket.plan?.location_text ? (
+                      <Text style={styles.bannerLocation} numberOfLines={1}>{ticket.plan.location_text}</Text>
+                    ) : null}
+                  </LinearGradient>
+                  <TouchableOpacity
+                    style={styles.downloadTicketBtn}
+                    onPress={handleAddToWallet}
+                    hitSlop={12}
+                  >
+                    <Ionicons name="download-outline" size={22} color="#1C1C1E" />
+                  </TouchableOpacity>
                 </View>
-                {ticket.plan?.location_text ? (
-                  <Text style={styles.bannerLocation} numberOfLines={1}>{ticket.plan.location_text}</Text>
-                ) : null}
-              </LinearGradient>
-              <TouchableOpacity
-                style={styles.downloadTicketBtn}
-                onPress={handleAddToWallet}
-                hitSlop={12}
-              >
-                <Ionicons name="download-outline" size={22} color="#1C1C1E" />
-              </TouchableOpacity>
-            </View>
-          </View>
+              </View>
 
-          {/* Info section: sits under the image (image on top) */}
-          <View style={[styles.infoSection, { marginTop: -overlapAmount, paddingTop: overlapAmount + 16, zIndex: 1 }]}>
-            <View style={styles.infoLeft}>
-              {pillItems.map((item, idx) => (
-                <View key={idx} style={styles.pill}>
-                  <Ionicons name={item.icon} size={18} color="#1C1C1E" />
-                  <Text style={styles.pillLabel} numberOfLines={1}>{item.label}</Text>
+              {/* Info section: pills + QR – inside ref so saved image includes QR */}
+              <View style={[styles.infoSection, { marginTop: -overlapAmount, paddingTop: overlapAmount + 16, zIndex: 1 }]}>
+                <View style={styles.infoLeft}>
+                  {pillItems.map((item, idx) => (
+                    <View key={idx} style={styles.pill}>
+                      <Ionicons name={item.icon} size={18} color="#1C1C1E" />
+                      <Text style={styles.pillLabel} numberOfLines={1}>{item.label}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
-            </View>
-            <View style={styles.infoRight}>
-              <View style={styles.qrWrap}>
-                {ticket.qr_code_hash ? (
-                  <QRCode value={ticket.qr_code_hash} size={112} color="#1C1C1E" backgroundColor="#FFF" />
-                ) : (
-                  <View style={styles.qrPlaceholder}>
-                    <Ionicons name="qr-code-outline" size={56} color="#8E8E93" />
+                <View style={styles.infoRight}>
+                  <View style={styles.qrWrap}>
+                    {ticket.qr_code_hash ? (
+                      <QRCode value={ticket.qr_code_hash} size={112} color="#1C1C1E" backgroundColor="#FFF" />
+                    ) : (
+                      <View style={styles.qrPlaceholder}>
+                        <Ionicons name="qr-code-outline" size={56} color="#8E8E93" />
+                      </View>
+                    )}
                   </View>
-                )}
+                  <Text style={styles.passType}>{passName}</Text>
+                  <Text style={styles.passId}>{ticket.ticket_number}</Text>
+                </View>
               </View>
-              <Text style={styles.passType}>{passName}</Text>
-              <Text style={styles.passId}>{ticket.ticket_number}</Text>
             </View>
-          </View>
           </View>
 
           {showReviewCard && (

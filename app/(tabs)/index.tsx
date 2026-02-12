@@ -725,7 +725,7 @@ export default function HomeScreen() {
             <Text style={styles.postCreatedTitle}>{postCreated?.title ?? ''} is Live</Text>
             <View style={styles.postCreatedActions}>
               <TouchableOpacity style={styles.postCreatedEditButton} onPress={handlePostCreatedEdit}>
-                <Text style={styles.postCreatedEditButtonText}>Edit Event</Text>
+                <Text style={styles.postCreatedEditButtonText}>View Event</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.postCreatedShareButton} onPress={handlePostCreatedShare}>
                 <Ionicons name="paper-plane-outline" size={20} color="#FFF" />

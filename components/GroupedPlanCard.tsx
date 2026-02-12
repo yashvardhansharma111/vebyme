@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Pl
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Avatar from './Avatar';
-import Tag from './Tag';
 import { apiService } from '@/services/api';
 
 interface Interaction {
@@ -115,30 +114,6 @@ export default function GroupedPlanCard({
       cancelled = true;
     };
   }, [expanded, showInteractions, planId]);
-
-  // Only 4 event tags: price, distance, f&b, location (same as BusinessCard). Use planDetails when expanded, else post.
-  const eventTags = React.useMemo(() => {
-    const source = planDetails || post;
-    if (!source) return [];
-    const passes = source.passes || [];
-    const prices = passes.filter((p: { price: number }) => p.price > 0).map((p: { price: number }) => p.price);
-    const firstPrice = prices.length > 0 ? Math.min(...prices) : null;
-    const addDetails = source.add_details || [];
-    const detailByType = (type: string) => addDetails.find((d: { detail_type: string }) => d.detail_type === type);
-    const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
-    const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
-    const locationLabel = source.location_text?.trim();
-    const tags: string[] = [];
-    if (firstPrice != null && firstPrice > 0) tags.push(`₹${firstPrice}`);
-    if (distanceLabel) tags.push(distanceLabel);
-    if (fbLabel) tags.push(fbLabel);
-    if (locationLabel) tags.push(locationLabel);
-    if (tags.length > 0) return tags.slice(0, 4);
-    const fallback: string[] = [];
-    if (source.category_main) fallback.push(source.category_main);
-    if (source.category_sub?.length) fallback.push(...source.category_sub);
-    return fallback.slice(0, 4);
-  }, [post, planDetails]);
 
   useEffect(() => {
     if (!planId) {
@@ -429,15 +404,6 @@ export default function GroupedPlanCard({
           </View>
         )}
 
-        {/* Tags - only 4: price, location, f&b, +1 (e.g. distance) */}
-        {eventTags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {eventTags.map((tag, idx) => (
-              <Tag key={idx} label={tag} />
-            ))}
-          </View>
-        )}
-
         {/* View Ticket Distribution + Registered section (when expanded and we have a plan) */}
         {expanded && showInteractions && planId && (
           <>
@@ -482,17 +448,6 @@ export default function GroupedPlanCard({
               )}
             </View>
           </>
-        )}
-
-        {/* Add to Community Button (only when expanded in Level 3) */}
-        {expanded && showInteractions && (
-          <TouchableOpacity
-            style={styles.createGroupButton}
-            onPress={handleAddToCommunityPress}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.createGroupButtonText}>Add to Community</Text>
-          </TouchableOpacity>
         )}
       </TouchableOpacity>
 
@@ -722,12 +677,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1C1C1E',
   },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-    gap: 6,
-  },
   viewTicketDistributionButton: {
     backgroundColor: '#E5E5EA',
     borderRadius: 12,
@@ -793,19 +742,6 @@ const styles = StyleSheet.create({
   registeredAction: {
     fontWeight: '400',
     color: '#8E8E93',
-  },
-  createGroupButton: {
-    backgroundColor: '#1C1C1E',
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
-  },
-  createGroupButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
   },
   addToCommunityOverlay: {
     flex: 1,
