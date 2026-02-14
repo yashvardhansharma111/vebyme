@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState, useRef } from 'react';
-import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share } from 'react-native';
+import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share, Linking } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 
 const CARD_FIXED_HEIGHT = 400;
 const CARD_IMAGE_PERCENT = 0.7;
@@ -123,17 +124,42 @@ function BusinessCardBase({
       onSharePress();
       return;
     }
-    try {
-      if (!plan.plan_id) {
-        Alert.alert('Error', 'Plan ID not found');
-        return;
-      }
-      const planUrl = `${getWebBaseUrl()}/go/post/${plan.plan_id}`;
-      const shareMessage = `Check out this event: ${plan.title}\n\n${planUrl}`;
-      await Share.share({ message: shareMessage, url: planUrl, title: plan.title });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to share plan');
+    if (!plan.plan_id) {
+      Alert.alert('Error', 'Plan ID not found');
+      return;
     }
+    const planUrl = `${getWebBaseUrl()}/go/post/${plan.plan_id}`;
+    const storyImageUrl = `${getWebBaseUrl()}/api/og/post/${plan.plan_id}/story`;
+    const shareMessage = `Check out this event: ${plan.title}\n\n${planUrl}`;
+
+    Alert.alert('Share', 'Share this event', [
+      {
+        text: 'Share link',
+        onPress: async () => {
+          try {
+            await Share.share({ message: shareMessage, url: planUrl, title: plan.title });
+          } catch (e: any) {
+            if (e?.message !== 'User did not share') Alert.alert('Error', e?.message || 'Failed to share');
+          }
+        },
+      },
+      {
+        text: 'Share to Instagram Story',
+        onPress: async () => {
+          try {
+            await Clipboard.setStringAsync(planUrl);
+            Linking.openURL(storyImageUrl);
+            Alert.alert(
+              'Link copied',
+              'Add the image that opened to your Instagram story, then tap the link sticker and paste the link.'
+            );
+          } catch (e: any) {
+            Alert.alert('Error', e?.message || 'Failed to copy or open image');
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   return (
