@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState, useRef } from 'react';
-import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share, Linking } from 'react-native';
+import { Animated, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert, Share, Linking } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 
 const CARD_FIXED_HEIGHT = 400;
@@ -91,7 +92,14 @@ function BusinessCardBase({
   pillsAboveCard = false,
 }: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean }) {
   const router = useRouter();
-  const mainImage = plan.media && plan.media.length > 0 ? plan.media[0].url : undefined;
+  const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
+  const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
+  const [showImageGallery, setShowImageGallery] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const galleryScrollRef = useRef<ScrollView>(null);
+  const { width: screenWidth } = Dimensions.get('window');
+  const galleryPaddingH = 24;
+  const gallerySlideWidth = screenWidth - galleryPaddingH * 2;
   const organizerName = user?.name || plan.user?.name || 'Organizer';
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const organizerUserId = plan.user?.user_id;
@@ -173,7 +181,17 @@ function BusinessCardBase({
         <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove]}>
         <View style={styles.imageSection}>
           {mainImage ? (
-            <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                setGalleryIndex(0);
+                setShowImageGallery(true);
+              }}
+            >
+              <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
+            </TouchableOpacity>
           ) : (
             <View style={[styles.imageNatural, styles.imagePlaceholder]}>
               <Ionicons name="image-outline" size={48} color="#8E8E93" />
@@ -187,7 +205,7 @@ function BusinessCardBase({
         <View style={styles.textBottom} pointerEvents="box-none">
           <View style={styles.textBottomInner}>
             <Text style={styles.title}>{plan.title}</Text>
-            <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+            <Text style={styles.description} numberOfLines={4} ellipsizeMode="tail">
               {plan.description}
             </Text>
             {tagsToShow.length > 0 && (
@@ -296,6 +314,55 @@ function BusinessCardBase({
         </TouchableOpacity>
       )}
       </TouchableOpacity>
+
+      {/* Full-screen image gallery (same UX as business-plan [planId]) */}
+      <Modal
+        visible={showImageGallery}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowImageGallery(false)}
+      >
+        <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
+          <View style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: 20, paddingBottom: 20 }]} pointerEvents="box-none">
+            <TouchableOpacity
+              style={styles.galleryCloseButton}
+              onPress={() => setShowImageGallery(false)}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle" size={36} color="#FFF" />
+            </TouchableOpacity>
+            <ScrollView
+              ref={galleryScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              style={styles.galleryScroll}
+              contentContainerStyle={styles.galleryScrollContent}
+              onMomentumScrollEnd={(e) => {
+                const w = e.nativeEvent.layoutMeasurement.width;
+                const index = w > 0 ? Math.round(e.nativeEvent.contentOffset.x / w) : 0;
+                setGalleryIndex(index);
+              }}
+            >
+              {planMedia.map((item, index) => (
+                <View key={index} style={[styles.gallerySlide, { width: gallerySlideWidth }]}>
+                  <Image source={{ uri: item.url }} style={styles.galleryImage} resizeMode="contain" />
+                </View>
+              ))}
+            </ScrollView>
+            {planMedia.length > 1 && (
+              <View style={styles.galleryDots}>
+                {planMedia.map((_, i) => (
+                  <View key={i} style={[styles.galleryDot, i === galleryIndex && styles.galleryDotActive]} />
+                ))}
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -769,5 +836,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#1C1C1E',
+  },
+  galleryOverlay: {
+    flex: 1,
+    backgroundColor: '#2C2C2E',
+  },
+  galleryContentWrap: {
+    flex: 1,
+  },
+  galleryCloseButton: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryScroll: { flex: 1 },
+  galleryScrollContent: {},
+  gallerySlide: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  galleryDots: {
+    position: 'absolute',
+    bottom: 24,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 10,
+  },
+  galleryDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  galleryDotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFF',
   },
 });
