@@ -51,7 +51,7 @@ export default function ChatScreen() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
-  const [activeTab, setActiveTab] = useState<TabType>(isBusinessUser ? 'my_plans' : 'their_plans');
+  const [activeTab, setActiveTab] = useState<TabType>(isBusinessUser ? 'my_plans' : 'groups');
   const [theirPlans, setTheirPlans] = useState<ChatItem[]>([]);
   const [myPlans, setMyPlans] = useState<ChatItem[]>([]);
   const [groups, setGroups] = useState<ChatItem[]>([]);
@@ -247,12 +247,21 @@ export default function ChatScreen() {
 
     const isAnnouncement = !!(item.is_announcement_group || item.group_name === 'Announcement Group');
 
+    const unread = item.unread_count ?? 0;
+
     return (
       <TouchableOpacity
         style={[styles.chatItem, isAnnouncement && styles.chatItemAnnouncement]}
         onPress={() => handleChatPress(item)}
         activeOpacity={0.7}
       >
+        {unread > 0 && (
+          <View style={styles.chatUnreadBadge}>
+            <Text style={styles.chatUnreadBadgeText} numberOfLines={1}>
+              {unread > 99 ? '99+' : String(unread)}
+            </Text>
+          </View>
+        )}
         {item.is_group ? (
           <View style={styles.eventPhotoWrap}>
             {displayImage ? (
@@ -270,7 +279,7 @@ export default function ChatScreen() {
         )}
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>
-            <Text style={styles.chatName} numberOfLines={1}>
+            <Text style={[styles.chatName, unread > 0 && styles.chatNameUnread]} numberOfLines={1}>
               {displayName}
             </Text>
             {item.last_message && (
@@ -316,7 +325,7 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>Chats</Text>
       </View>
 
-      {/* Tabs: business users see only My events + Unread; others see Their Plans, My Plans, Groups */}
+      {/* Tabs: business users see My events + Unread; others: Groups, Their Plans, Your Plans */}
       <View style={styles.tabsContainer}>
         {isBusinessUser ? (
           <>
@@ -354,6 +363,21 @@ export default function ChatScreen() {
         ) : (
           <>
             <TouchableOpacity
+              style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
+              onPress={() => setActiveTab('groups')}
+            >
+              <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
+                Groups
+              </Text>
+              {getBadgeCount('groups') > 0 && (
+                <View style={[styles.badge, activeTab === 'groups' && styles.badgeActive]}>
+                  <Text style={[styles.badgeText, activeTab === 'groups' && styles.badgeTextActive]}>
+                    {getBadgeCount('groups')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.tab, activeTab === 'their_plans' && styles.tabActive]}
               onPress={() => setActiveTab('their_plans')}
             >
@@ -373,27 +397,12 @@ export default function ChatScreen() {
               onPress={() => setActiveTab('my_plans')}
             >
               <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
-                My Plans
+                Your Plans
               </Text>
               {getBadgeCount('my_plans') > 0 && (
                 <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>
                   <Text style={[styles.badgeText, activeTab === 'my_plans' && styles.badgeTextActive]}>
                     {getBadgeCount('my_plans')}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'groups' && styles.tabActive]}
-              onPress={() => setActiveTab('groups')}
-            >
-              <Text style={[styles.tabText, activeTab === 'groups' && styles.tabTextActive]}>
-                Groups
-              </Text>
-              {getBadgeCount('groups') > 0 && (
-                <View style={[styles.badge, activeTab === 'groups' && styles.badgeActive]}>
-                  <Text style={[styles.badgeText, activeTab === 'groups' && styles.badgeTextActive]}>
-                    {getBadgeCount('groups')}
                   </Text>
                 </View>
               )}
@@ -538,6 +547,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 16,
     alignItems: 'center',
+  },
+  chatUnreadBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    paddingHorizontal: 6,
+  },
+  chatUnreadBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  chatNameUnread: {
+    fontWeight: '800',
   },
   chatItemAnnouncement: {
     backgroundColor: '#F2F2F7',

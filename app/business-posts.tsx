@@ -328,13 +328,14 @@ export default function BusinessPostsScreen() {
               <View style={styles.feed}>
                 {events.map((item, index) => {
                   const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+                  const effectivePlanId = rawPost?.repost_data?.original_plan_id || item.id;
                   return (
                     <BusinessCard
                       key={item.id}
                       containerStyle={styles.businessCardInList}
                       pillsAboveCard
                       plan={{
-                        plan_id: item.id,
+                        plan_id: effectivePlanId,
                         title: item.event.title,
                         description: item.event.description,
                         media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
@@ -353,7 +354,7 @@ export default function BusinessPostsScreen() {
                       hideRegisterButton={false}
                       registerButtonGreyed={rawPost?.user_id === user?.user_id}
                       onPress={() => {
-                        router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
+                        router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                       }}
                       onRegisterPress={async () => {
                         if (!isAuthenticated || !user?.user_id) {
@@ -372,7 +373,7 @@ export default function BusinessPostsScreen() {
                           }
                         }
                         try {
-                          const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                          const alreadyRegistered = await apiService.hasTicketForPlan(effectivePlanId, user.user_id);
                           if (alreadyRegistered) {
                             Alert.alert(
                               'Already Registered',
@@ -380,14 +381,14 @@ export default function BusinessPostsScreen() {
                             );
                             return;
                           }
-                          const response = await apiService.registerForEvent(item.id, user.user_id);
+                          const response = await apiService.registerForEvent(effectivePlanId, user.user_id);
                           if (response.success && response.data?.ticket) {
                             const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
                             router.push({
                               pathname: '/ticket/[ticketId]',
                               params: { 
                                 ticketId: response.data.ticket.ticket_id,
-                                planId: item.id,
+                                planId: effectivePlanId,
                                 ticketData: ticketData
                               }
                             } as any);
@@ -407,7 +408,7 @@ export default function BusinessPostsScreen() {
                           return;
                         }
                         setSharedBusinessPlan({
-                          planId: item.id,
+                          planId: effectivePlanId,
                           title: item.event.title,
                           description: item.event.description,
                           media: rawPost?.media || [{ url: item.event.image, type: 'image' }],

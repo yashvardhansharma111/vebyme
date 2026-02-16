@@ -55,9 +55,14 @@ export default function RepostModal({
       Alert.alert('Error', 'Please login to repost');
       return;
     }
+    const planIdToUse = (originalPlanId || postId || '').trim();
+    if (!planIdToUse) {
+      Alert.alert('Error', 'Could not determine the plan to repost. Please try again.');
+      return;
+    }
     setLoading(true);
     try {
-      await apiService.createRepost(originalPlanId, user.user_id, {
+      await apiService.createRepost(planIdToUse, user.user_id, {
         repost_title: repostTitle.trim() || undefined,
         repost_description: repostDescription.trim() || undefined,
       });

@@ -481,11 +481,13 @@ export default function HomeScreen() {
                 >
                   {businessEvents.map((item) => {
                     const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+                    // For reposts, use original plan id so plan detail and APIs (e.g. getBusinessPlan) don't 404
+                    const effectivePlanId = item.event?.repost_data?.original_plan_id || item.id;
                     return (
                       <View key={item.id} style={styles.businessHorizontalCard}>
                         <BusinessCard
                           plan={{
-                            plan_id: item.id,
+                            plan_id: effectivePlanId,
                             title: item.event.title,
                             description: item.event.description,
                             media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
@@ -504,7 +506,7 @@ export default function HomeScreen() {
                           containerStyle={styles.businessHorizontalCardInner}
                           showArrowButton={false}
                           onPress={() => {
-                            router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
+                            router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}
                           hideRegisterButton={false}
                           registerButtonGreyed={rawPost?.user_id === user?.user_id}
@@ -525,7 +527,7 @@ export default function HomeScreen() {
                               }
                             }
                             try {
-                              const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                              const alreadyRegistered = await apiService.hasTicketForPlan(effectivePlanId, user.user_id);
                               if (alreadyRegistered) {
                                 Alert.alert(
                                   'Already Registered',
@@ -533,14 +535,14 @@ export default function HomeScreen() {
                                 );
                                 return;
                               }
-                              const response = await apiService.registerForEvent(item.id, user.user_id);
+                              const response = await apiService.registerForEvent(effectivePlanId, user.user_id);
                               if (response.success && response.data?.ticket) {
                                 const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
                                 router.push({
                                   pathname: '/ticket/[ticketId]',
                                   params: {
                                     ticketId: response.data.ticket.ticket_id,
-                                    planId: item.id,
+                                    planId: effectivePlanId,
                                     ticketData: ticketData
                                   }
                                 } as any);
@@ -558,7 +560,7 @@ export default function HomeScreen() {
                               return;
                             }
                             setSharedBusinessPlan({
-                              planId: item.id,
+                              planId: effectivePlanId,
                               title: item.event.title,
                               description: item.event.description,
                               media: rawPost?.media || [{ url: item.event.image, type: 'image' }],

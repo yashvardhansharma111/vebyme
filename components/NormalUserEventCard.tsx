@@ -270,8 +270,8 @@ export default function NormalUserEventCard({
                 );
               })}
             </View>
-            {/* Create group button */}
-            {onCreateGroup && createGroupUsers.length > 0 && (
+            {/* Create group button – only when 2+ users (avoid conflict with one-user "group") */}
+            {onCreateGroup && createGroupUsers.length >= 2 && (
               <TouchableOpacity
                 style={styles.createGroupButton}
                 onPress={() => setShowCreateGroupModal(true)}

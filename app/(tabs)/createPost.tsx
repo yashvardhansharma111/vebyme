@@ -5,7 +5,7 @@ import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -70,6 +70,7 @@ export default function CreatePostScreen() {
   const [planId, setPlanId] = useState<string | null>(null);
   const [descriptionHeight, setDescriptionHeight] = useState(100);
   const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
+  const openedFromMyPlansRef = useRef(false);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -90,6 +91,7 @@ export default function CreatePostScreen() {
       try {
         const planDataStr = await AsyncStorage.getItem('planForCreation');
         if (planDataStr) {
+          openedFromMyPlansRef.current = true;
           const planData = JSON.parse(planDataStr);
           const isEdit = planData.mode === 'edit';
           
@@ -138,20 +140,48 @@ export default function CreatePostScreen() {
     loadPlanData();
   }, []);
 
-  const handleAddMedia = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions');
-        return;
-      }
+  const handleAddMedia = () => {
+    Alert.alert('Add Image', 'Choose source', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Camera',
+        onPress: () => handleAddMediaFromSource('camera'),
+      },
+      {
+        text: 'Gallery',
+        onPress: () => handleAddMediaFromSource('gallery'),
+      },
+    ]);
+  };
 
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
-        allowsMultipleSelection: true,
-        quality: 0.8,
-        selectionLimit: 2 - media.length,
-      });
+  const handleAddMediaFromSource = async (source: 'camera' | 'gallery') => {
+    try {
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant camera permission to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant photo library permission.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.All,
+          allowsMultipleSelection: true,
+          allowsEditing: false,
+          quality: 0.8,
+          selectionLimit: 2 - media.length,
+        });
+      }
 
       if (!result.canceled && result.assets) {
         const newMedia = result.assets.map((asset) => ({
@@ -294,8 +324,11 @@ export default function CreatePostScreen() {
                 setShowPreview(false);
                 setEditMode(false);
                 setPlanId(null);
-                // Navigate back
-                router.back();
+                if (openedFromMyPlansRef.current) {
+                  router.replace('/profile/your-plans');
+                } else {
+                  router.back();
+                }
               },
             },
           ]);
@@ -321,8 +354,11 @@ export default function CreatePostScreen() {
                 setSelectedSubCategory('');
                 setMedia([]);
                 setShowPreview(false);
-                // Navigate back or to home
-                router.back();
+                if (openedFromMyPlansRef.current) {
+                  router.replace('/profile/your-plans');
+                } else {
+                  router.back();
+                }
               },
             },
           ]);
@@ -391,7 +427,16 @@ export default function CreatePostScreen() {
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
           <View style={styles.header}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+            <TouchableOpacity
+              onPress={() => {
+                if (editMode || openedFromMyPlansRef.current) {
+                  router.replace('/profile/your-plans');
+                } else {
+                  router.back();
+                }
+              }}
+              style={styles.closeButton}
+            >
               <Ionicons name="close" size={24} color="#000" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{editMode ? 'Edit Post' : 'New Post'}</Text>

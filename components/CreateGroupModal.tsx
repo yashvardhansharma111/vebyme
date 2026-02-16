@@ -57,7 +57,7 @@ export default function CreateGroupModal({
   const handleCreate = async () => {
     const name = groupName.trim() || defaultGroupName;
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) return;
+    if (ids.length < 2) return;
     setLoading(true);
     try {
       await onCreateGroup(name, ids);
@@ -113,10 +113,13 @@ export default function CreateGroupModal({
             </TouchableOpacity>
           </ScrollView>
 
+          {selectedIds.size > 0 && selectedIds.size < 2 && (
+            <Text style={styles.minMembersHint}>Select at least 2 people to create a group</Text>
+          )}
           <TouchableOpacity
-            style={[styles.createButton, loading && styles.createButtonDisabled]}
+            style={[styles.createButton, (loading || selectedIds.size < 2) && styles.createButtonDisabled]}
             onPress={handleCreate}
-            disabled={loading || selectedIds.size === 0}
+            disabled={loading || selectedIds.size < 2}
             activeOpacity={0.8}
           >
             {loading ? (
@@ -219,6 +222,12 @@ const styles = StyleSheet.create({
   },
   createButtonDisabled: {
     opacity: 0.6,
+  },
+  minMembersHint: {
+    fontSize: 13,
+    color: '#8E8E93',
+    textAlign: 'center',
+    marginBottom: 12,
   },
   createButtonText: {
     color: '#FFFFFF',

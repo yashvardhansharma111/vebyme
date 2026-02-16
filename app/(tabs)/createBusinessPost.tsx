@@ -132,6 +132,7 @@ export default function CreateBusinessPostScreen() {
   const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
   const [descriptionHeight, setDescriptionHeight] = useState(100);
   const isEditFlowRef = useRef(false);
+  const openedFromMyPlansRef = useRef(false);
   const insets = useSafeAreaInsets();
 
   const resetForm = useCallback(() => {
@@ -198,6 +199,7 @@ export default function CreateBusinessPostScreen() {
       try {
         const planDataStr = await AsyncStorage.getItem('planForCreation');
         if (planDataStr) {
+          openedFromMyPlansRef.current = true;
           const planData = JSON.parse(planDataStr);
           const isEdit = planData.mode === 'edit';
           if (isEdit) isEditFlowRef.current = true;
@@ -305,25 +307,46 @@ export default function CreateBusinessPostScreen() {
 
   const MAX_MEDIA = 5;
 
-  const handleAddMedia = async () => {
+  const handleAddMedia = () => {
+    if (media.length >= MAX_MEDIA) {
+      Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} images per post.`);
+      return;
+    }
+    Alert.alert('Add Image', 'Choose source', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Camera', onPress: () => handleAddMediaFromSource('camera') },
+      { text: 'Gallery', onPress: () => handleAddMediaFromSource('gallery') },
+    ]);
+  };
+
+  const handleAddMediaFromSource = async (source: 'camera' | 'gallery') => {
     try {
-      if (media.length >= MAX_MEDIA) {
-        Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} images per post.`);
-        return;
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant camera permission to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant photo library permission.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: true,
+          allowsEditing: false,
+          selectionLimit: MAX_MEDIA - media.length,
+          quality: 0.8,
+        });
       }
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
-        selectionLimit: MAX_MEDIA - media.length,
-        quality: 0.8,
-      });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const newItems = result.assets.slice(0, MAX_MEDIA - media.length).map((asset) => ({
           uri: asset.uri,
@@ -345,18 +368,41 @@ export default function CreateBusinessPostScreen() {
     }
   };
 
-  const handleAddPassImage = async (passIndex: number) => {
+  const handleAddPassImage = (passIndex: number) => {
+    Alert.alert('Add Image', 'Choose source', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Camera', onPress: () => handleAddPassImageFromSource(passIndex, 'camera') },
+      { text: 'Gallery', onPress: () => handleAddPassImageFromSource(passIndex, 'gallery') },
+    ]);
+  };
+
+  const handleAddPassImageFromSource = async (passIndex: number, source: 'camera' | 'gallery') => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant camera roll permissions');
-        return;
+      let result;
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant camera permission to take photos.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission needed', 'Please grant photo library permission.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsMultipleSelection: false,
+          allowsEditing: false,
+          quality: 0.8,
+        });
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false,
-        quality: 0.8,
-      });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const updated = [...passes];
         updated[passIndex] = { ...updated[passIndex], media: [{ uri: result.assets[0].uri, type: 'image' as const }] };
@@ -674,7 +720,11 @@ export default function CreateBusinessPostScreen() {
               onPress: () => {
                 setEditMode(false);
                 setPlanId(null);
-                router.replace('/(tabs)');
+                if (openedFromMyPlansRef.current) {
+                  router.replace('/profile/your-plans');
+                } else {
+                  router.replace('/(tabs)');
+                }
               },
             },
           ]);
@@ -792,7 +842,17 @@ export default function CreateBusinessPostScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.createPostHeader}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButtonHeader} hitSlop={12}>
+        <TouchableOpacity
+          onPress={() => {
+            if (editMode || openedFromMyPlansRef.current) {
+              router.replace('/profile/your-plans');
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.backButtonHeader}
+          hitSlop={12}
+        >
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.createPostHeaderTitle}>{editMode ? 'Editing post' : 'Create Post'}</Text>
@@ -1483,7 +1543,11 @@ export default function CreateBusinessPostScreen() {
               onPress={() => {
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
-                router.replace('/(tabs)');
+                if (openedFromMyPlansRef.current) {
+                  router.replace('/profile/your-plans');
+                } else {
+                  router.replace('/(tabs)');
+                }
               }}
             >
               <Ionicons name="close" size={24} color="#666" />

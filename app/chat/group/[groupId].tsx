@@ -150,18 +150,29 @@ export default function GroupChatScreen() {
   const TYPING_DEBOUNCE_MS = 2000;
   const TYPING_TTL_MS = 10000; // match backend: typing expires after 10s
   const flatListRef = useRef<FlatList>(null);
+  const initialScrollDoneRef = useRef(false);
   const [driveLink, setDriveLink] = useState<string>('');
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [driveDraft, setDriveDraft] = useState('');
+  const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (groupId) {
+      initialScrollDoneRef.current = false;
       loadGroupDetails();
       loadMessages();
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
     }
   }, [groupId]);
+
+  // Scroll to bottom when chat is first opened (after messages load)
+  useEffect(() => {
+    if (!loading && messages.length > 0 && !initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+    }
+  }, [loading, messages.length]);
 
   const openDriveLink = async () => {
     const url = (driveLink || '').trim();
@@ -508,6 +519,7 @@ export default function GroupChatScreen() {
 
     return (
       <View style={styles.pollWrapper}>
+        <Text style={styles.pollLabel}>View Poll</Text>
         <Text style={styles.pollQuestion}>{message.poll.question}</Text>
         <Text style={styles.pollVoteCount}>{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</Text>
         
@@ -626,21 +638,24 @@ export default function GroupChatScreen() {
                     if (urls.length === 0) return null;
                     if (urls.length === 1) {
                       return (
-                        <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="contain" />
+                        <TouchableOpacity activeOpacity={1} onPress={() => setViewingImageUri(urls[0])}>
+                          <Image source={{ uri: urls[0] }} style={styles.messageImage} resizeMode="contain" />
+                        </TouchableOpacity>
                       );
                     }
                     return (
                       <View style={styles.multiImageCard}>
                         {urls.slice(0, 4).map((uri, i) => (
-                          <Image
-                            key={i}
-                            source={{ uri }}
-                            style={[
-                              styles.messageImageStacked,
-                              { top: i * 14, left: i * 16, zIndex: urls.length - i, transform: [{ rotate: `${(i - 1) * 4}deg` }] },
-                            ]}
-                            resizeMode="contain"
-                          />
+                          <TouchableOpacity key={i} activeOpacity={1} onPress={() => setViewingImageUri(uri)}>
+                            <Image
+                              source={{ uri }}
+                              style={[
+                                styles.messageImageStacked,
+                                { top: i * 14, left: i * 16, zIndex: urls.length - i, transform: [{ rotate: `${(i - 1) * 4}deg` }] },
+                              ]}
+                              resizeMode="contain"
+                            />
+                          </TouchableOpacity>
                         ))}
                       </View>
                     );
@@ -750,6 +765,20 @@ export default function GroupChatScreen() {
           );
         })()}
       </KeyboardAvoidingView>
+
+      {/* Full-screen image viewer */}
+      <Modal visible={!!viewingImageUri} transparent animationType="fade" onRequestClose={() => setViewingImageUri(null)}>
+        <TouchableOpacity style={styles.imageViewerOverlay} activeOpacity={1} onPress={() => setViewingImageUri(null)}>
+          <View style={styles.imageViewerContent}>
+            {viewingImageUri ? (
+              <Image source={{ uri: viewingImageUri }} style={styles.imageViewerImage} resizeMode="contain" />
+            ) : null}
+          </View>
+          <TouchableOpacity style={styles.imageViewerClose} onPress={() => setViewingImageUri(null)}>
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Share Plan Modal */}
       <Modal
@@ -1008,6 +1037,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E5EA',
   },
+  pollLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
   pollQuestion: {
     fontSize: 16,
     fontWeight: '700',
@@ -1164,6 +1200,28 @@ const styles = StyleSheet.create({
   imageMessageWrap: {
     overflow: 'hidden',
     marginBottom: 2,
+  },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerImage: {
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('window').height * 0.85,
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    padding: 8,
   },
   messageImage: {
     width: SCREEN_WIDTH * 0.4,

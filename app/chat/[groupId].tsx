@@ -129,16 +129,27 @@ export default function IndividualChatScreen() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const [messageImageErrors, setMessageImageErrors] = useState<Set<string>>(new Set());
+  const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const initialScrollDoneRef = useRef(false);
 
   useEffect(() => {
     if (groupId) {
+      initialScrollDoneRef.current = false;
       loadGroupDetails();
       loadMessages();
       const interval = setInterval(loadMessages, 3000);
       return () => clearInterval(interval);
     }
   }, [groupId]);
+
+  // Scroll to bottom when chat is first opened (after messages load)
+  useEffect(() => {
+    if (!loading && messages.length > 0 && !initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+    }
+  }, [loading, messages.length]);
 
   const loadGroupDetails = async () => {
     if (!groupId) return;
@@ -388,32 +399,35 @@ export default function IndividualChatScreen() {
                       );
                     }
                     return (
-                      <Image
-                        source={{ uri: uriStr }}
-                        style={styles.messageImage}
-                        resizeMode="contain"
-                        onError={() => setMessageImageErrors((prev) => new Set(prev).add(uriStr))}
-                      />
+                      <TouchableOpacity activeOpacity={1} onPress={() => setViewingImageUri(uriStr)}>
+                        <Image
+                          source={{ uri: uriStr }}
+                          style={styles.messageImage}
+                          resizeMode="contain"
+                          onError={() => setMessageImageErrors((prev) => new Set(prev).add(uriStr))}
+                        />
+                      </TouchableOpacity>
                     );
                   }
                   return (
                     <View style={styles.multiImageCard}>
                       {urls.slice(0, 4).map((uri, i) => (
-                        <Image
-                          key={i}
-                          source={{ uri }}
-                          style={[
-                            styles.messageImageStacked,
-                            {
-                              top: i * 14,
-                              left: i * 16,
-                              zIndex: urls.length - i,
-                              transform: [{ rotate: `${(i - 1) * 4}deg` }],
-                            },
-                          ]}
-                          resizeMode="contain"
-                          onError={() => setMessageImageErrors((prev) => new Set(prev).add(uri))}
-                        />
+                        <TouchableOpacity key={i} activeOpacity={1} onPress={() => setViewingImageUri(uri)}>
+                          <Image
+                            source={{ uri }}
+                            style={[
+                              styles.messageImageStacked,
+                              {
+                                top: i * 14,
+                                left: i * 16,
+                                zIndex: urls.length - i,
+                                transform: [{ rotate: `${(i - 1) * 4}deg` }],
+                              },
+                            ]}
+                            resizeMode="contain"
+                            onError={() => setMessageImageErrors((prev) => new Set(prev).add(uri))}
+                          />
+                        </TouchableOpacity>
                       ))}
                     </View>
                   );
@@ -521,6 +535,20 @@ export default function IndividualChatScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Full-screen image viewer */}
+      <Modal visible={!!viewingImageUri} transparent animationType="fade" onRequestClose={() => setViewingImageUri(null)}>
+        <TouchableOpacity style={styles.imageViewerOverlay} activeOpacity={1} onPress={() => setViewingImageUri(null)}>
+          <View style={styles.imageViewerContent}>
+            {viewingImageUri ? (
+              <Image source={{ uri: viewingImageUri }} style={styles.imageViewerImage} resizeMode="contain" />
+            ) : null}
+          </View>
+          <TouchableOpacity style={styles.imageViewerClose} onPress={() => setViewingImageUri(null)}>
+            <Ionicons name="close" size={28} color="#FFF" />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Share Plan Modal */}
       <Modal visible={showShareModal} transparent animationType="slide" onRequestClose={() => setShowShareModal(false)}>
@@ -780,6 +808,28 @@ const styles = StyleSheet.create({
   },
   reactionPickerBtn: { padding: 4 },
   reactionPickerEmoji: { fontSize: 20 },
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerImage: {
+    width: SCREEN_WIDTH,
+    height: Dimensions.get('window').height * 0.85,
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    padding: 8,
+  },
   shareModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

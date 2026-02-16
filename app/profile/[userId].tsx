@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,14 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchUserProfile, fetchUserStats } from '@/store/slices/profileSlice';
 import { apiService } from '@/services/api';
 import { extractInstagramIdFromUrl, getInstagramProfileUrl } from '@/utils/social';
+
+function resolveProfileImageUri(uri: string | null | undefined): string | null {
+  if (!uri || !uri.trim()) return null;
+  if (uri.startsWith('http://') || uri.startsWith('https://')) return uri;
+  const base = (Constants.expoConfig?.extra as { apiUrl?: string })?.apiUrl || process.env.EXPO_PUBLIC_API_URL || '';
+  const assetBase = base ? base.replace(/\/api\/?$/, '') : '';
+  return assetBase ? `${assetBase}${uri.startsWith('/') ? uri : `/${uri}`}` : uri;
+}
 
 const CARD_SHADOW = {
   shadowColor: '#000',
@@ -73,9 +82,15 @@ export default function OtherUserProfileScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const { height: screenHeight } = useWindowDimensions();
   const dispatch = useAppDispatch();
+  const { user: currentUser } = useAppSelector((state) => state.auth);
   const { viewedUser, stats, isLoading } = useAppSelector((state) => state.profile);
   const [recentPlans, setRecentPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
+  const [profileImageError, setProfileImageError] = useState(false);
+
+  const isOwnProfile = !!userId && !!currentUser?.user_id && String(userId) === String(currentUser.user_id);
+  const profileImageUri = resolveProfileImageUri(viewedUser?.profile_image ?? undefined);
+  const showProfileImage = !!profileImageUri && !profileImageError;
 
   const { width: screenWidth } = useWindowDimensions();
   const topSectionHeight = screenHeight * 0.6;
@@ -84,11 +99,16 @@ export default function OtherUserProfileScreen() {
 
   useEffect(() => {
     if (userId) {
+      setProfileImageError(false);
       dispatch(fetchUserProfile(userId));
       dispatch(fetchUserStats(userId));
       loadRecentPlans();
     }
   }, [dispatch, userId]);
+
+  useEffect(() => {
+    setProfileImageError(false);
+  }, [viewedUser?.profile_image]);
 
   const loadRecentPlans = async () => {
     if (!userId) return;
@@ -134,7 +154,6 @@ export default function OtherUserProfileScreen() {
 
   const socialMedia = (viewedUser as any)?.social_media || {};
   const interests = viewedUser?.interests || [];
-  const hasProfileImage = viewedUser?.profile_image;
   const hasInteracted = (viewedUser as any)?.has_interacted === true;
   const instagramId = extractInstagramIdFromUrl(socialMedia.instagram) || socialMedia.instagram?.replace(/^@/, '') || '';
   const instagramUrl = getInstagramProfileUrl(socialMedia.instagram) || (instagramId ? `https://www.instagram.com/${instagramId}/` : null);
@@ -162,11 +181,12 @@ export default function OtherUserProfileScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* 1. Top section: profile image, blur on bottom 60% */}
         <View key="top-section" style={[styles.topSection, { height: topSectionHeight }]}>
-          {hasProfileImage ? (
+          {showProfileImage ? (
             <Image
-              source={{ uri: viewedUser!.profile_image! }}
+              source={{ uri: profileImageUri! }}
               style={styles.profileBackgroundImage}
               resizeMode="cover"
+              onError={() => setProfileImageError(true)}
             />
           ) : (
             <View style={styles.profileBackgroundPlaceholder} />
@@ -236,7 +256,6 @@ export default function OtherUserProfileScreen() {
                     <Ionicons name={entry.icon as any} size={24} color="#252525" />
                   )}
                   <Text style={[styles.socialHandle, !entry.url && styles.socialHandlePlaceholder]}>{entry.handle}</Text>
-                  {entry.url ? <Ionicons name="open-outline" size={18} color="#8E8E93" /> : null}
                 </TouchableOpacity>
               </React.Fragment>
             ))}
@@ -256,7 +275,6 @@ export default function OtherUserProfileScreen() {
                   {instagramId || socialMedia.instagram || 'Not added'}
                 </Text>
               </View>
-              {instagramUrl ? <Ionicons name="open-outline" size={18} color="#8E8E93" /> : null}
             </TouchableOpacity>
             <View style={styles.instaGrid}>
               {instagramPreviewTiles.map((i) => (
@@ -338,13 +356,15 @@ export default function OtherUserProfileScreen() {
                 })}
               </ScrollView>
             )}
-            <TouchableOpacity style={styles.reportButton} onPress={handleReport} activeOpacity={0.7}>
-              <Ionicons name="person-outline" size={20} color="#1C1C1E" />
-              <Text style={styles.reportButtonText}>Report</Text>
-            </TouchableOpacity>
+            {!isOwnProfile && (
+              <TouchableOpacity style={styles.reportButton} onPress={handleReport} activeOpacity={0.7}>
+                <Ionicons name="person-outline" size={20} color="#1C1C1E" />
+                <Text style={styles.reportButtonText}>Report</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {/* Actions: Interacted = Remove Interaction + Report in one card + Chat. Non-interacted = Report only */}
+          {/* Actions: Interacted = Remove Interaction + Report in one card + Chat. Non-interacted = Report only. Hide Report on own profile. */}
           {hasInteracted ? (
             <React.Fragment key="actions-interacted">
               <View style={[styles.sectionCard, { marginBottom: 15, gap: 16 }]}>
@@ -352,26 +372,32 @@ export default function OtherUserProfileScreen() {
                   <Ionicons name="close-circle-outline" size={24} color="#252525" />
                   <Text style={styles.actionRowText}>Remove Interaction</Text>
                 </TouchableOpacity>
-                <View style={styles.hairlineDivider} />
-                <TouchableOpacity style={styles.actionRow} onPress={handleReport} activeOpacity={0.7}>
-                  <Ionicons name="person-remove-outline" size={24} color="#c33939" />
-                  <Text style={[styles.actionRowText, styles.actionRowTextDanger]}>Report User</Text>
-                </TouchableOpacity>
+                {!isOwnProfile && (
+                  <>
+                    <View style={styles.hairlineDivider} />
+                    <TouchableOpacity style={styles.actionRow} onPress={handleReport} activeOpacity={0.7}>
+                      <Ionicons name="person-remove-outline" size={24} color="#c33939" />
+                      <Text style={[styles.actionRowText, styles.actionRowTextDanger]}>Report User</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
-              <TouchableOpacity
-                style={styles.chatButton}
-                onPress={() => userId && router.push({ pathname: '/chat/[groupId]', params: { groupId: userId } } as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.chatButtonText}>Chat</Text>
-              </TouchableOpacity>
+              {!isOwnProfile && (
+                <TouchableOpacity
+                  style={styles.chatButton}
+                  onPress={() => userId && router.push({ pathname: '/chat/[groupId]', params: { groupId: userId } } as any)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.chatButtonText}>Chat</Text>
+                </TouchableOpacity>
+              )}
             </React.Fragment>
-          ) : (
+          ) : !isOwnProfile ? (
             <TouchableOpacity key="actions-report-only" style={styles.reportOnlyButton} onPress={handleReport} activeOpacity={0.7}>
               <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
               <Text style={styles.reportOnlyText}>Report User</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
           <View key="bottom-spacer" style={{ height: 40 }} />
         </View>
       </ScrollView>
