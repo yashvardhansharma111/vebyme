@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useRef } from 'react';
-import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { Animated, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import PostInteractionModal from './PostInteractionModal';
@@ -21,7 +22,7 @@ function getAllEventTags(event: any): string[] {
 }
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const allTags = getAllEventTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
@@ -84,11 +85,13 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
               )}
               <View style={styles.embeddedCard}>
               {hasEventImage ? (
-                <Image source={{ uri: event.image }} style={styles.embeddedCardBg} resizeMode="cover" />
+                <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onImagePress}>
+                  <Image source={{ uri: event.image }} style={styles.embeddedCardBg} resizeMode="cover" />
+                </TouchableOpacity>
               ) : (
                 <View style={[styles.embeddedCardBg, styles.embeddedCardBgPlaceholder]} />
               )}
-              <View style={styles.embeddedCardOverlay} />
+              <View style={styles.embeddedCardOverlay} pointerEvents="none" />
               <View style={styles.embeddedCardContent}>
                 {originalAuthor && (
                   <View style={styles.originalAuthorPill}>
@@ -97,7 +100,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
                   </View>
                 )}
                 <Text style={styles.embeddedTitle}>{originalPostTitle || event.title}</Text>
-                <Text style={styles.embeddedDescription} numberOfLines={3}>{originalPostDescription || event.description}</Text>
+                <Text style={styles.embeddedDescription} numberOfLines={4}>{originalPostDescription || event.description}</Text>
                 {allTags.length > 0 && (
                   <View style={styles.embeddedTagsRow}>
                     {allTags.slice(0, 3).map((tag: string, index: number) => (
@@ -123,7 +126,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
             /* Regular post */
             <>
               <Text style={styles.title}>{event.title}</Text>
-              <Text style={styles.description} numberOfLines={3}>{event.description}</Text>
+              <Text style={styles.description} numberOfLines={4}>{event.description}</Text>
               <View style={styles.middleRow}>
                 <View style={styles.tagsContainer}>
                   {allTags.map((tag: string, index: number) => (
@@ -134,7 +137,9 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
                   ))}
                 </View>
                 {hasEventImage ? (
-                  <Image source={{ uri: event.image }} style={styles.eventImage} />
+                  <TouchableOpacity onPress={onImagePress} activeOpacity={0.95}>
+                    <Image source={{ uri: event.image }} style={styles.eventImage} />
+                  </TouchableOpacity>
                 ) : (
                   <View style={[styles.eventImage, styles.eventImagePlaceholder]}>
                     <Ionicons name="image-outline" size={28} color="#8E8E93" />
@@ -164,13 +169,17 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
   );
 }
 
+export { EventCard };
+
 // --- The Swipe Wrapper ---
 export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showInteractionModal, setShowInteractionModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showImageGallery, setShowImageGallery] = useState(false);
   const [saving, setSaving] = useState(false);
+  const hasEventImage = event?.image && String(event.image).trim();
   const swipeableRef = useRef<Swipeable>(null);
   
   // Logic: Reveal the Left Action (Save icon) when swiping
@@ -288,6 +297,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           originalAuthor={event.original_author_name}
           originalPostTitle={event.original_post_title}
           originalPostDescription={event.original_post_description}
+          onImagePress={hasEventImage ? () => setShowImageGallery(true) : undefined}
         />
       </Swipeable>
       <PostInteractionModal
@@ -325,6 +335,33 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           }}
         />
       )}
+      {/* Full-screen image gallery (same UX as business-plan [planId]) */}
+      <Modal
+        visible={showImageGallery}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowImageGallery(false)}
+      >
+        <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
+          <View style={styles.galleryContentWrap} pointerEvents="box-none">
+            {hasEventImage && event?.image && (
+              <View style={styles.galleryCenterWrap}>
+                <Image source={{ uri: event.image }} style={styles.galleryImageCentered} resizeMode="contain" />
+              </View>
+            )}
+            <TouchableOpacity
+              style={styles.galleryCloseButton}
+              onPress={() => setShowImageGallery(false)}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle" size={36} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </>
   );
 }
@@ -334,7 +371,7 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   cardContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: -2,
     paddingTop: 20, 
   },
   // Save Button Styles
@@ -370,8 +407,8 @@ const styles = StyleSheet.create({
   },
   userPill: {
     position: 'absolute',
-    top: -8,
-    left: -6,
+    top: -20,
+    left: 4,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -530,11 +567,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   embeddedJoinBtn: {
+    height: 44,
     backgroundColor: '#FFF',
-    paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 20,
+    borderRadius: 22,
     minWidth: 100,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   embeddedJoinText: {
@@ -622,9 +660,9 @@ const styles = StyleSheet.create({
   },
   joinButton: {
     flex: 1,
+    height: 44,
     backgroundColor: '#1C1C1E',
-    paddingVertical: 14,
-    borderRadius: 14,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -636,5 +674,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  galleryOverlay: {
+    flex: 1,
+    backgroundColor: '#2C2C2E',
+  },
+  galleryContentWrap: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+  },
+  galleryCenterWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryImageCentered: {
+    width: Dimensions.get('window').width - 48,
+    height: '100%',
+    maxHeight: Dimensions.get('window').height - 120,
+    borderRadius: 12,
+  },
+  galleryCloseButton: {
+    position: 'absolute',
+    top: 28,
+    left: 0,
+    zIndex: 10,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryScroll: { flex: 1 },
+  galleryScrollContent: {},
+  gallerySlide: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+    minHeight: 300,
+    borderRadius: 12,
   },
 });

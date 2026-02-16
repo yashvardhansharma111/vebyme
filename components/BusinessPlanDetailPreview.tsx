@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from './Avatar';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const HERO_ASPECT = 4 / 3;
-const HERO_HEIGHT = SCREEN_WIDTH * HERO_ASPECT;
-const HERO_OVERLAP_PERCENT = 0.1;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Match business-plan/[planId]: hero ~60vh, content sheet overlap
+const HERO_HEIGHT = Math.max(280, SCREEN_HEIGHT * 0.6);
+const HERO_OVERLAP = 24;
 const CONTENT_PADDING_H = 20;
 
 const TICKET_BGS = [
@@ -45,6 +46,8 @@ interface BusinessPlanDetailPreviewProps {
   organizerAvatar?: string | null;
   /** When true, show organizer pill at top of content (detail-page style) */
   showOrganizer?: boolean;
+  /** When true, add extra bottom padding for sticky bar (e.g. in create post preview) */
+  withStickyBar?: boolean;
 }
 
 function formatDate(date: Date | string | undefined): string {
@@ -65,19 +68,20 @@ export default function BusinessPlanDetailPreview({
   organizerName = 'Organizer',
   organizerAvatar = null,
   showOrganizer = true,
+  withStickyBar = false,
 }: BusinessPlanDetailPreviewProps) {
   const [heroIndex, setHeroIndex] = useState(0);
 
   const planMedia = plan.media?.length ? plan.media.slice(0, 5) : [];
   const mediaCount = planMedia.length;
   const heroImageUri = planMedia[0]?.url;
-  const overlayHeight = HERO_HEIGHT * HERO_OVERLAP_PERCENT;
+  const overlayHeight = HERO_OVERLAP;
   const detailPills = plan.add_details?.filter((d) => d.detail_type !== 'google_drive_link') ?? [];
 
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, withStickyBar && { paddingBottom: 100 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Hero */}
@@ -123,8 +127,10 @@ export default function BusinessPlanDetailPreview({
         )}
       </View>
 
-      {/* White content overlay – same as detail page */}
-      <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 16 }]}>
+      {/* White content overlay – same as business-plan/[planId]: gradient, rounded top */}
+      <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 8 }]}>
+        <LinearGradient colors={['rgba(255,255,255,0.7)', '#FFFFFF']} style={StyleSheet.absoluteFill} pointerEvents="none" />
+        <View style={styles.contentOverlayInner}>
         {showOrganizer && (
           <View style={styles.organizerRow}>
             <Avatar uri={organizerAvatar ?? undefined} size={36} />
@@ -205,6 +211,7 @@ export default function BusinessPlanDetailPreview({
             })}
           </View>
         )}
+        </View>
       </View>
     </ScrollView>
   );
@@ -242,11 +249,18 @@ const styles = StyleSheet.create({
   },
   carouselDotActive: { backgroundColor: '#FFF', width: 8, height: 8, borderRadius: 4 },
   contentOverlay: {
-    backgroundColor: '#FFF',
+    position: 'relative',
+    backgroundColor: 'transparent',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    overflow: 'hidden',
     paddingHorizontal: CONTENT_PADDING_H,
     paddingBottom: 40,
+  },
+  contentOverlayInner: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingTop: 12,
   },
   organizerRow: {
     flexDirection: 'row',
@@ -260,8 +274,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '800', color: '#1C1C1E', marginBottom: 10 },
   description: { fontSize: 14, color: '#444', lineHeight: 21, marginBottom: 20 },
   venueDateCard: {
-    backgroundColor: '#E8E8E8',
-    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
     padding: 14,
     marginTop: 0,
     marginBottom: 16,
@@ -278,8 +292,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     minWidth: '47%',
   },
-  categoryPillHeading: { fontSize: 12, fontWeight: '700', color: '#8E8E93', marginBottom: 4 },
-  categoryPillValue: { fontSize: 14, fontWeight: '700', color: '#1C1C1E', lineHeight: 18 },
+  categoryPillHeading: { fontSize: 12, fontWeight: '700', color: '#1C1C1E', marginBottom: 4 },
+  categoryPillValue: { fontSize: 14, fontWeight: '600', color: '#6B7280', lineHeight: 18 },
   ticketsSection: { marginBottom: 24 },
   ticketsTitle: { fontSize: 18, fontWeight: '800', color: '#1C1C1E', marginBottom: 14 },
   passCard: { marginBottom: 12, borderRadius: 16, overflow: 'hidden' },

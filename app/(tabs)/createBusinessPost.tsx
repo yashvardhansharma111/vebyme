@@ -29,6 +29,7 @@ import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import BusinessCard from '@/components/BusinessCard';
 import BusinessPlanDetailPreview from '@/components/BusinessPlanDetailPreview';
+import { EventCard } from '@/components/SwipeableEventCard';
 import CalendarPicker from '@/components/CalendarPicker';
 import ShareToChatModal from '@/components/ShareToChatModal';
 
@@ -808,25 +809,44 @@ export default function CreateBusinessPostScreen() {
 
   if (showPreview) {
     const previewData = formatPreviewData();
+    const isBusinessUser = currentUser?.is_business === true;
     return (
       <Modal visible={true} animationType="slide" statusBarTranslucent>
         <SafeAreaView style={styles.previewFullScreen} edges={['top', 'bottom']}>
-          <TouchableOpacity
-            style={[styles.previewCloseButton, { top: insets.top + 8 }]}
-            onPress={() => setShowPreview(false)}
-            hitSlop={16}
-          >
-            <Ionicons name="close" size={28} color="#1C1C1E" />
-          </TouchableOpacity>
           <View style={styles.previewScroll}>
-            <BusinessPlanDetailPreview
-              plan={previewData}
-              organizerName={currentUser?.name || 'Organizer'}
-              organizerAvatar={currentUser?.profile_image ?? null}
-              showOrganizer={true}
-            />
+            {isBusinessUser ? (
+              <BusinessPlanDetailPreview
+                plan={previewData}
+                organizerName={currentUser?.name || 'Organizer'}
+                organizerAvatar={currentUser?.profile_image ?? null}
+                showOrganizer={true}
+                withStickyBar={true}
+              />
+            ) : (
+              <View style={styles.eventPreviewWrap}>
+                <EventCard
+                  user={{
+                    id: currentUser?.user_id ?? 'preview',
+                    name: currentUser?.name || 'You',
+                    avatar: currentUser?.profile_image ?? '',
+                    time: 'Preview',
+                  }}
+                  event={{
+                    title: previewData.title,
+                    description: previewData.description,
+                    image: previewData.media?.[0]?.url ?? '',
+                    tags: previewData.category_sub ?? [],
+                    category_sub: previewData.category_sub ?? [],
+                  }}
+                  onUserPress={() => {}}
+                  onJoinPress={() => {}}
+                  onRepostPress={() => {}}
+                  onSharePress={() => {}}
+                />
+              </View>
+            )}
           </View>
-          <View style={styles.previewStickyBar}>
+          <View style={[styles.previewStickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
               <Text style={styles.previewEditButtonText}>Back to edit</Text>
             </TouchableOpacity>
@@ -2451,7 +2471,7 @@ const styles = StyleSheet.create({
   },
   previewFullScreen: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFF',
   },
   previewCloseButton: {
     position: 'absolute',
@@ -2476,6 +2496,12 @@ const styles = StyleSheet.create({
   },
   previewScroll: { flex: 1 },
   previewScrollContent: { paddingBottom: 24, paddingTop: 16, paddingHorizontal: 16 },
+  eventPreviewWrap: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
   previewStickyBar: {
     flexDirection: 'row',
     gap: 12,
