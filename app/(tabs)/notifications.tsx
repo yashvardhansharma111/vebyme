@@ -17,7 +17,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
 import { fetchUnreadCount, setUnreadCount } from '@/store/slices/notificationsSlice';
-import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 import NotificationCard from '@/components/NotificationCard';
 import NotificationListItem from '@/components/NotificationListItem';
@@ -67,7 +66,6 @@ export default function NotificationsScreen() {
   const [creatingGroup, setCreatingGroup] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
@@ -84,6 +82,7 @@ export default function NotificationsScreen() {
   
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+  const isBusinessUser = currentUser?.is_business === true;
 
   const openUserProfile = useCallback(
     (userId: string) => {
@@ -318,26 +317,19 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Redirect to login screen when not authenticated (same as Chat flow)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, router]);
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Please login to view notifications</Text>
-          <TouchableOpacity
-            style={styles.loginButton}
-            onPress={() => setShowLoginModal(true)}
-          >
-            <Text style={styles.loginButtonText}>Login</Text>
-          </TouchableOpacity>
-        </View>
-        <LoginModal
-          visible={showLoginModal}
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={() => loadNotifications()}
-        />
       </SafeAreaView>
     );
   }
@@ -443,7 +435,26 @@ export default function NotificationsScreen() {
 
   const timeGroupedNotifications = groupNotificationsByTime(allInteractionsForList);
 
-  // 3-Level Navigation Handlers
+  // Relative time for list items (e.g. "2h", "5m", "Yesterday")
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterday = today - 86400000;
+    const interactionDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    if (diffHours < 24 && interactionDay === today) return `${diffHours}h`;
+    if (interactionDay === yesterday) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // 3-Level Navigation Handlers (business user only)
   const handleSummaryCardPress = () => {
     if (viewMode === 'summary') {
       // Expand to Level 2: Show all event cards (collapsed)
@@ -519,24 +530,109 @@ export default function NotificationsScreen() {
     }
   };
 
+  // Normal user: Notification 1st iteration — list only (Today, Yesterday, Earlier), real data
+  const renderNormalUserList = () => {
+    const hasAny =
+      timeGroupedNotifications.today.length > 0 ||
+      timeGroupedNotifications.yesterday.length > 0 ||
+      timeGroupedNotifications.earlierSections.length > 0;
+
+    if (!hasAny) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No notifications yet</Text>
+          <Text style={styles.emptySubtext}>When someone reacts, comments or joins your plans, you’ll see it here</Text>
+        </View>
+      );
+    }
+
+    const renderItem = (interaction: InteractionWithPlan, isLast: boolean) => (
+      <NotificationListItem
+        key={interaction.notification_id}
+        interaction={interaction}
+        userCache={userCache}
+        planTitle={(interaction as any)._planTitle ?? undefined}
+        timeLabel={formatRelativeTime(interaction.created_at)}
+        onUserPress={openUserProfile}
+        onPress={() => {
+          if (interaction.notification_id && user?.user_id) {
+            apiService.markNotificationAsRead(interaction.notification_id).catch(() => null);
+            dispatch(fetchUnreadCount(user.user_id));
+          }
+          const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+          if (planId) {
+            router.push({ pathname: '/business-plan/[planId]', params: { planId } } as any);
+          }
+        }}
+        showDivider={!isLast}
+      />
+    );
+
+    return (
+      <View style={styles.listContainer}>
+        {timeGroupedNotifications.today.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>Today</Text>
+            </View>
+            {timeGroupedNotifications.today.map((interaction, index) =>
+              renderItem(
+                interaction,
+                index === timeGroupedNotifications.today.length - 1 &&
+                  timeGroupedNotifications.yesterday.length === 0 &&
+                  timeGroupedNotifications.earlierSections.length === 0
+              )
+            )}
+          </>
+        )}
+        {timeGroupedNotifications.yesterday.length > 0 && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>Yesterday</Text>
+            </View>
+            {timeGroupedNotifications.yesterday.map((interaction, index) =>
+              renderItem(
+                interaction,
+                index === timeGroupedNotifications.yesterday.length - 1 &&
+                  timeGroupedNotifications.earlierSections.length === 0
+              )
+            )}
+          </>
+        )}
+        {timeGroupedNotifications.earlierSections.map((section) => (
+          <React.Fragment key={section.dateKey}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.dateLabel}</Text>
+            </View>
+            {section.items.map((interaction, index) =>
+              renderItem(interaction, index === section.items.length - 1)
+            )}
+          </React.Fragment>
+        ))}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
-        {viewMode !== 'summary' ? (
-          <TouchableOpacity
-            style={styles.closeStackButton}
-            onPress={handleCloseStack}
-            accessibilityLabel="Close stack"
-          >
-            <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.editButton}>
-            <Ionicons name="create-outline" size={22} color="#FFD700" />
-          </TouchableOpacity>
+        {isBusinessUser && (
+          viewMode !== 'summary' ? (
+            <TouchableOpacity
+              style={styles.closeStackButton}
+              onPress={handleCloseStack}
+              accessibilityLabel="Close stack"
+            >
+              <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.editButton}>
+              <Ionicons name="create-outline" size={22} color="#FFD700" />
+            </TouchableOpacity>
+          )
         )}
       </View>
 
@@ -547,162 +643,149 @@ export default function NotificationsScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => loadNotifications(true)} />
         }
       >
-        {notifications.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No notifications yet</Text>
-            <Text style={styles.emptySubtext}>Interactions on your posts will appear here</Text>
-          </View>
+        {isBusinessUser ? (
+          /* Business user: 3-level stack (Summary → Events list → Event detail) + list below */
+          notifications.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No notifications yet</Text>
+              <Text style={styles.emptySubtext}>Interactions on your posts will appear here</Text>
+            </View>
+          ) : (
+            <>
+              {groupedPlanCards.length > 0 && (
+                <View style={styles.groupedCardsContainer}>
+                  {viewMode === 'summary' && groupedPlanCards.length > 0 && (
+                    <SummaryCard
+                      totalCount={groupedPlanCards.length}
+                      avatars={getAllAvatars()}
+                      eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
+                      onPress={handleSummaryCardPress}
+                    />
+                  )}
+                  {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
+                    <>
+                      {groupedPlanCards.map((group, index) => {
+                        const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+                        const shouldShowInteractions = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+                        return (
+                          <GroupedPlanCard
+                            key={group.post_id}
+                            post_id={group.post_id}
+                            post={group.post}
+                            interactions={group.interactions}
+                            created_at={group.created_at}
+                            userCache={userCache}
+                            isExpanded={isExpanded}
+                            onExpand={() => handleEventCardPress(group.post_id)}
+                            onCreateGroup={() => handleCreateGroupFromCard(group.post_id)}
+                            onAddToCommunity={handleAddToCommunity}
+                            index={index}
+                            showInteractions={shouldShowInteractions}
+                            hideCountBadge={viewedCardIds.has(group.post_id)}
+                            alreadyInAnnouncementGroupIds={announcementMemberIds}
+                          />
+                        );
+                      })}
+                    </>
+                  )}
+                </View>
+              )}
+              {(timeGroupedNotifications.today.length > 0 ||
+                timeGroupedNotifications.yesterday.length > 0 ||
+                timeGroupedNotifications.earlierSections.length > 0) && (
+                <View style={styles.listContainer}>
+                  {timeGroupedNotifications.today.length > 0 && (
+                    <>
+                      <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionHeaderText}>Today</Text>
+                      </View>
+                      {timeGroupedNotifications.today.map((interaction, index) => {
+                        const isLast =
+                          index === timeGroupedNotifications.today.length - 1 &&
+                          timeGroupedNotifications.yesterday.length === 0 &&
+                          timeGroupedNotifications.earlierSections.length === 0;
+                        return (
+                          <NotificationListItem
+                            key={interaction.notification_id}
+                            interaction={interaction}
+                            userCache={userCache}
+                            onUserPress={openUserProfile}
+                            onPress={() => {
+                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                              if (planId) {
+                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
+                              }
+                            }}
+                            showDivider={!isLast}
+                          />
+                        );
+                      })}
+                    </>
+                  )}
+                  {timeGroupedNotifications.yesterday.length > 0 && (
+                    <>
+                      <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionHeaderText}>Yesterday</Text>
+                      </View>
+                      {timeGroupedNotifications.yesterday.map((interaction, index) => {
+                        const isLast =
+                          index === timeGroupedNotifications.yesterday.length - 1 &&
+                          timeGroupedNotifications.earlierSections.length === 0;
+                        return (
+                          <NotificationListItem
+                            key={interaction.notification_id}
+                            interaction={interaction}
+                            userCache={userCache}
+                            onUserPress={openUserProfile}
+                            onPress={() => {
+                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                              if (planId) {
+                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
+                              }
+                            }}
+                            showDivider={!isLast}
+                          />
+                        );
+                      })}
+                    </>
+                  )}
+                  {timeGroupedNotifications.earlierSections.map((section) => (
+                    <React.Fragment key={section.dateKey}>
+                      <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionHeaderText}>{section.dateLabel}</Text>
+                      </View>
+                      {section.items.map((interaction, index) => {
+                        const isLast = index === section.items.length - 1;
+                        return (
+                          <NotificationListItem
+                            key={interaction.notification_id}
+                            interaction={interaction}
+                            userCache={userCache}
+                            onUserPress={openUserProfile}
+                            onPress={() => {
+                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
+                              if (planId) {
+                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
+                              }
+                            }}
+                            showDivider={!isLast}
+                          />
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </View>
+              )}
+            </>
+          )
         ) : (
-          <>
-            {/* TOP SECTION: Event Cards (3-Level System) */}
-            {groupedPlanCards.length > 0 && (
-              <View style={styles.groupedCardsContainer}>
-                {/* Level 1: Summary Card */}
-                {viewMode === 'summary' && groupedPlanCards.length > 0 && (
-                  <SummaryCard
-                    totalCount={groupedPlanCards.length}
-                    avatars={getAllAvatars()}
-                    eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
-                    onPress={handleSummaryCardPress}
-                  />
-                )}
-
-                {/* Level 2 & 3: Events List / Event Detail — no "X events" header above cards */}
-                {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
-                  <>
-                    {groupedPlanCards.map((group, index) => {
-                      // In Level 2, all cards are collapsed. In Level 3, only selected card is expanded
-                      const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
-                      const shouldShowInteractions = viewMode === 'eventDetail' && selectedEventId === group.post_id;
-                      
-                      return (
-                        <GroupedPlanCard
-                          key={group.post_id}
-                          post_id={group.post_id}
-                          post={group.post}
-                          interactions={group.interactions}
-                          created_at={group.created_at}
-                          userCache={userCache}
-                          isExpanded={isExpanded}
-                          onExpand={() => handleEventCardPress(group.post_id)}
-                          onCreateGroup={() => handleCreateGroupFromCard(group.post_id)}
-                          onAddToCommunity={handleAddToCommunity}
-                          index={index}
-                          showInteractions={shouldShowInteractions}
-                          hideCountBadge={viewedCardIds.has(group.post_id)}
-                          alreadyInAnnouncementGroupIds={announcementMemberIds}
-                        />
-                      );
-                    })}
-                  </>
-                )}
-              </View>
-            )}
-
-            {/* BOTTOM SECTION: Individual Notifications (Instagram-style, always below cards) */}
-            {(timeGroupedNotifications.today.length > 0 ||
-              timeGroupedNotifications.yesterday.length > 0 ||
-              timeGroupedNotifications.earlierSections.length > 0) && (
-              <View style={styles.listContainer}>
-                {/* Today Section */}
-                {timeGroupedNotifications.today.length > 0 && (
-                  <>
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionHeaderText}>Today</Text>
-                    </View>
-                    {timeGroupedNotifications.today.map((interaction, index) => {
-                      const isLast = index === timeGroupedNotifications.today.length - 1 &&
-                        timeGroupedNotifications.yesterday.length === 0 &&
-                        timeGroupedNotifications.earlierSections.length === 0;
-                      return (
-                        <NotificationListItem
-                          key={interaction.notification_id}
-                          interaction={interaction}
-                          userCache={userCache}
-                          onUserPress={openUserProfile}
-                          onPress={() => {
-                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                            if (planId) {
-                              router.push({
-                                pathname: '/plan/[planId]',
-                                params: { planId },
-                              } as any);
-                            }
-                          }}
-                          showDivider={!isLast}
-                        />
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* Yesterday Section */}
-                {timeGroupedNotifications.yesterday.length > 0 && (
-                  <>
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionHeaderText}>Yesterday</Text>
-                    </View>
-                    {timeGroupedNotifications.yesterday.map((interaction, index) => {
-                      const isLast = index === timeGroupedNotifications.yesterday.length - 1 &&
-                        timeGroupedNotifications.earlierSections.length === 0;
-                      return (
-                        <NotificationListItem
-                          key={interaction.notification_id}
-                          interaction={interaction}
-                          userCache={userCache}
-                          onUserPress={openUserProfile}
-                          onPress={() => {
-                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                            if (planId) {
-                              router.push({
-                                pathname: '/plan/[planId]',
-                                params: { planId },
-                              } as any);
-                            }
-                          }}
-                          showDivider={!isLast}
-                        />
-                      );
-                    })}
-                  </>
-                )}
-
-                {/* Earlier: one section per date */}
-                {timeGroupedNotifications.earlierSections.map((section) => (
-                  <React.Fragment key={section.dateKey}>
-                    <View style={styles.sectionHeader}>
-                      <Text style={styles.sectionHeaderText}>{section.dateLabel}</Text>
-                    </View>
-                    {section.items.map((interaction, index) => {
-                      const isLast = index === section.items.length - 1;
-                      return (
-                        <NotificationListItem
-                          key={interaction.notification_id}
-                          interaction={interaction}
-                          userCache={userCache}
-                          onUserPress={openUserProfile}
-                          onPress={() => {
-                            const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                            if (planId) {
-                              router.push({
-                                pathname: '/plan/[planId]',
-                                params: { planId },
-                              } as any);
-                            }
-                          }}
-                          showDivider={!isLast}
-                        />
-                      );
-                    })}
-                  </React.Fragment>
-                ))}
-              </View>
-            )}
-          </>
+          /* Normal user: Notification 1st iteration — list only */
+          renderNormalUserList()
         )}
       </ScrollView>
 
-      {/* Group Creation Modal - Centered */}
+      {/* Group Creation Modal - Business user only */}
+      {isBusinessUser && (
       <Modal
         visible={showGroupModal}
         transparent={true}
@@ -801,12 +884,8 @@ export default function NotificationsScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+      )}
 
-      <LoginModal
-        visible={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={() => loadNotifications()}
-      />
     </SafeAreaView>
   );
 }

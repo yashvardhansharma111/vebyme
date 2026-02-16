@@ -20,6 +20,10 @@ interface NotificationListItemProps {
   onPress?: () => void;
   onUserPress?: (userId: string) => void;
   showDivider?: boolean;
+  /** Optional plan/event title to show below the action (e.g. "Sunday Run") */
+  planTitle?: string | null;
+  /** Optional relative time to show on the right (e.g. "2h", "Yesterday") */
+  timeLabel?: string;
 }
 
 export default function NotificationListItem({
@@ -28,6 +32,8 @@ export default function NotificationListItem({
   onPress,
   onUserPress,
   showDivider = true,
+  planTitle,
+  timeLabel,
 }: NotificationListItemProps) {
   const cachedUser = userCache[interaction.source_user_id];
   const user = cachedUser || interaction.user;
@@ -97,24 +103,27 @@ export default function NotificationListItem({
 
         {/* Text */}
         <View style={styles.textContainer}>
-          <Text style={styles.text}>
+          <Text style={styles.text} numberOfLines={2}>
             <Text style={styles.userName} onPress={handleUserPress}>
               {userName}
             </Text>
             {' '}
             <Text style={styles.actionText}>{getInteractionText()}</Text>
+            {planTitle ? ` on ${planTitle}` : ''}
           </Text>
         </View>
 
-        {/* Right: Icon */}
-        {getInteractionIcon() && (
+        {/* Right: Time or icon */}
+        {timeLabel !== undefined && timeLabel !== '' ? (
+          <Text style={styles.timeRight}>{timeLabel}</Text>
+        ) : getInteractionIcon() ? (
           <Ionicons
             name={getInteractionIcon() as any}
             size={20}
             color="#8E8E93"
             style={styles.icon}
           />
-        )}
+        ) : null}
       </View>
 
       {/* Bottom: Divider */}
@@ -135,11 +144,13 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1,
+    marginLeft: 12,
+    minWidth: 0,
   },
   text: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#1C1C1E',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   userName: {
     fontWeight: '600',
@@ -147,6 +158,11 @@ const styles = StyleSheet.create({
   actionText: {
     fontWeight: '400',
     color: '#8E8E93',
+  },
+  timeRight: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginLeft: 8,
   },
   icon: {
     marginLeft: 8,
