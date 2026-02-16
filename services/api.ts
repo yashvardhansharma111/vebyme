@@ -330,6 +330,14 @@ class ApiService {
           (error as any).statusCode = 404;
           throw error;
         }
+        // 404 on /user/me = session/user no longer exists (e.g. account deleted); caller should clear auth and show login
+        if (response.status === 404 && endpoint.includes('/user/me')) {
+          const error = new Error(data.message || 'User not found');
+          (error as any).isExpected = true;
+          (error as any).isSessionInvalid = true;
+          (error as any).statusCode = 404;
+          throw error;
+        }
 
         // Categorize errors by status code
         const error = new Error(data.message || `Request failed with status ${response.status}`);
@@ -337,7 +345,7 @@ class ApiService {
 
         // Only log 404 for endpoints we don't treat as expected
         const isExpectedTicket404 = endpoint.match(/^\/ticket\/[^/]+\/[^/]+$/) && !endpoint.includes('by-id');
-        if (response.status !== 404 || (!endpoint.includes('/user/profile/') && !endpoint.includes('/analytics/business/event/') && !endpoint.includes('/ticket/guest-list/') && !isExpectedTicket404)) {
+        if (response.status !== 404 || (!endpoint.includes('/user/profile/') && !endpoint.includes('/analytics/business/event/') && !endpoint.includes('/ticket/guest-list/') && !endpoint.includes('/user/me') && !isExpectedTicket404)) {
           if (response.status >= 500) {
             console.error('❌ Server Error:', response.status, data);
           } else if (response.status >= 400) {

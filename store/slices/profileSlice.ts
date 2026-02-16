@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiService } from '@/services/api';
+import { logout } from '@/store/slices/authSlice';
 import { RootState } from '../store';
 
 interface UserProfile {
@@ -43,7 +44,7 @@ const initialState: ProfileState = {
 // Get current user profile
 export const fetchCurrentUser = createAsyncThunk(
   'profile/fetchCurrentUser',
-  async (session_id: string, { rejectWithValue }) => {
+  async (session_id: string, { rejectWithValue, dispatch }) => {
     try {
       const response = await apiService.getCurrentUser(session_id);
       if (response.data) {
@@ -54,6 +55,10 @@ export const fetchCurrentUser = createAsyncThunk(
       }
       throw new Error('Failed to fetch user');
     } catch (error: any) {
+      // Session/user no longer exists (e.g. account deleted) — clear auth so user can log in again
+      if (error?.isSessionInvalid === true || (error?.statusCode === 404 && error?.message === 'User not found')) {
+        await dispatch(logout());
+      }
       return rejectWithValue(error.message);
     }
   }
