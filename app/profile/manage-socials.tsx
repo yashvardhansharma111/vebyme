@@ -60,9 +60,9 @@ export default function ManageSocialsScreen() {
     }
     const sm = (currentUser as any).social_media || {};
     setSocials([
-      { ...INITIAL_SOCIALS[0], value: sm.instagram || '', enabled: !!sm.instagram },
-      { ...INITIAL_SOCIALS[1], value: sm.x || sm.twitter || '', enabled: !!(sm.x || sm.twitter) },
-      { ...INITIAL_SOCIALS[2], value: sm.snapchat || '', enabled: !!sm.snapchat },
+      { ...INITIAL_SOCIALS[0], value: sm.instagram || '', enabled: true },
+      { ...INITIAL_SOCIALS[1], value: sm.x || sm.twitter || '', enabled: true },
+      { ...INITIAL_SOCIALS[2], value: sm.snapchat || '', enabled: true },
     ]);
     setLoading(false);
   }, [currentUser]);
@@ -128,12 +128,16 @@ export default function ManageSocialsScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {socials.map((social) => (
             <View key={social.id} style={styles.socialBlock}>
-              
-              {/* Input Gray Box */}
+              <Text style={styles.platformLabel}>
+                {social.id === 'instagram' ? 'Instagram' : social.id === 'x' ? 'X (Twitter)' : 'Snapchat'}
+              </Text>
               <View style={styles.inputWrapper}>
                 <View style={styles.iconContainer}>
                   {social.isCustomIcon ? (
@@ -220,14 +224,21 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 100,
+    paddingBottom: 120,
+    flexGrow: 1,
   },
   
   // Social Block
   socialBlock: {
-    marginBottom: 8,
+    marginBottom: 24,
+    minHeight: 100,
   },
-  
+  platformLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 10,
+  },
   // Input Wrapper (The Gray Box)
   inputWrapper: {
     flexDirection: 'row',

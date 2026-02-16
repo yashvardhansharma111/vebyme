@@ -170,13 +170,8 @@ export default function MyProfileScreen() {
             )}
           </View>
 
-          {/* Group 2: Preferences */}
+          {/* Group 2: Preferences – Location Preferences hidden for now */}
           <View style={styles.menuGroup}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/location-preference')}>
-              <Ionicons name="location-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Location Preferences</Text>
-            </TouchableOpacity>
-            <View style={styles.divider} />
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/manage-socials')}>
               <Ionicons name="logo-instagram" size={22} color="#1C1C1E" style={styles.menuIcon} />
               <Text style={styles.menuText}>Manage Socials</Text>
@@ -274,9 +269,9 @@ export default function MyProfileScreen() {
         {/* Blur View acts as the overlay background */}
         <BlurView intensity={25} tint="dark" style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>You're about to Logout !</Text>
+            <Text style={styles.modalTitle}>Confirm Logout</Text>
             <Text style={styles.modalDescription}>
-              You can log back in anytime using your email or phone number.
+              You can login back using your phone number.
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity 

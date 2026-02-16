@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Colors, borderRadius } from '@/constants/theme';
+import { Colors, borderRadius, Fonts } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setChatUnreadCount } from '@/store/slices/chatSlice';
 import { apiService } from '@/services/api';
@@ -249,17 +249,29 @@ export default function ChatScreen() {
       ? (eventImageUrl || item.author_image)
       : (item.other_user?.profile_image || item.author_image);
 
+    const isAnnouncement = !!(item.is_announcement_group || item.group_name === 'Announcement Group');
+
     return (
       <TouchableOpacity
-        style={styles.chatItem}
+        style={[styles.chatItem, isAnnouncement && styles.chatItemAnnouncement]}
         onPress={() => handleChatPress(item)}
         activeOpacity={0.7}
       >
-        <Avatar
-          uri={displayImage || null}
-          size={52}
-          style={styles.avatar}
-        />
+        {item.is_group ? (
+          <View style={styles.eventPhotoWrap}>
+            {displayImage ? (
+              <Image source={{ uri: displayImage }} style={styles.eventPhoto} resizeMode="cover" />
+            ) : (
+              <View style={[styles.eventPhoto, styles.eventPhotoPlaceholder]} />
+            )}
+          </View>
+        ) : (
+          <Avatar
+            uri={displayImage || null}
+            size={52}
+            style={styles.avatar}
+          />
+        )}
         <View style={styles.chatInfo}>
           <View style={styles.chatHeader}>
             <Text style={styles.chatName} numberOfLines={1}>
@@ -429,8 +441,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 34,
     fontWeight: '800',
+    fontFamily: Fonts?.sans,
     color: '#1C1C1E',
   },
   
@@ -454,8 +467,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E', // Dark active
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
+    fontFamily: Fonts?.sans,
     color: '#1C1C1E',
   },
   tabTextActive: {
@@ -492,6 +506,26 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
   },
+  chatItemAnnouncement: {
+    backgroundColor: '#F2F2F7',
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  eventPhotoWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginRight: 16,
+    backgroundColor: '#F2F2F2',
+  },
+  eventPhoto: {
+    width: 52,
+    height: 52,
+  },
+  eventPhotoPlaceholder: {
+    backgroundColor: '#E5E5EA',
+  },
   avatar: {
     width: 52,
     height: 52,
@@ -510,19 +544,22 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   chatName: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
+    fontFamily: Fonts?.sans,
     color: '#1C1C1E',
     flex: 1,
     marginRight: 8,
   },
   timestamp: {
     fontSize: 12,
+    fontFamily: Fonts?.sans,
     color: '#8E8E93',
     fontWeight: '400',
   },
   lastMessage: {
     fontSize: 14,
+    fontFamily: Fonts?.sans,
     color: '#666666',
     lineHeight: 20,
   },
