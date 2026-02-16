@@ -287,18 +287,23 @@ export default function ChatScreen() {
     );
   };
 
-  // Redirect to login screen when not authenticated (Chat → Login CTA)
-  useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace('/login');
-    }
-  }, [isAuthenticated, router]);
-
+  // Chat → Login CTA when not authenticated (no auto-redirect; show CTA)
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Chats</Text>
+        </View>
+        <View style={styles.loginCtaContainer}>
+          <Text style={styles.loginCtaTitle}>Log in to view your chats</Text>
+          <Text style={styles.loginCtaSubtext}>Sign in to see and continue conversations</Text>
+          <TouchableOpacity
+            style={styles.loginCtaButton}
+            onPress={() => router.replace('/login')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginCtaButtonText}>Log in</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -436,10 +441,43 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerTitle: {
-    fontSize: 34,
+    fontSize: 40,
     fontWeight: '800',
     fontFamily: Fonts?.sans,
     color: '#1C1C1E',
+  },
+  loginCtaContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loginCtaTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: Fonts?.sans,
+    color: '#1C1C1E',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  loginCtaSubtext: {
+    fontSize: 15,
+    fontFamily: Fonts?.sans,
+    color: '#8E8E93',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  loginCtaButton: {
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 30,
+  },
+  loginCtaButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: Fonts?.sans,
+    color: '#FFFFFF',
   },
   
   // Tabs Styles
@@ -509,7 +547,7 @@ const styles = StyleSheet.create({
   eventPhotoWrap: {
     width: 52,
     height: 52,
-    borderRadius: 10,
+    borderRadius: 0,
     overflow: 'hidden',
     marginRight: 16,
     backgroundColor: '#F2F2F2',

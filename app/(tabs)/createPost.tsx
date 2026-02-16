@@ -42,8 +42,15 @@ const SUB_CATEGORY_TAGS: { [key: string]: string[] } = {
 export default function CreatePostScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+
+  // Redirect to login when not authenticated (Create Post → Login Screen)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, router]);
 
   // Form state
   const [description, setDescription] = useState('');

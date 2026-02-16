@@ -82,8 +82,15 @@ interface Pass {
 export default function CreateBusinessPostScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
+
+  // Redirect to login when not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, router]);
 
   // Check if user is business user
   const isBusinessUser = currentUser?.is_business === true;
