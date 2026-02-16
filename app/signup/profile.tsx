@@ -1,5 +1,6 @@
 import { apiService } from '@/services/api';
 import { updateProfile } from '@/store/slices/profileSlice';
+import CalendarPicker from '@/components/CalendarPicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -23,6 +24,13 @@ import {
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
+function formatDOB(date: Date): string {
+  const d = date.getDate().toString().padStart(2, '0');
+  const m = (date.getMonth() + 1).toString().padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
 export default function SignupProfileScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -30,6 +38,7 @@ export default function SignupProfileScreen() {
 
   const [name, setName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
+  const [dobDate, setDobDate] = useState<Date | null>(null);
   const [gender, setGender] = useState<string>('');
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -37,6 +46,7 @@ export default function SignupProfileScreen() {
   
   // Modal State
   const [showGenderPicker, setShowGenderPicker] = useState(false);
+  const [showDobPicker, setShowDobPicker] = useState(false);
 
   const genders = ['Male', 'Female', 'Other'];
 
@@ -87,6 +97,18 @@ export default function SignupProfileScreen() {
       Alert.alert('Validation', 'Please enter your name');
       return;
     }
+    if (!dateOfBirth.trim()) {
+      Alert.alert('Validation', 'Please select your date of birth');
+      return;
+    }
+    if (!gender) {
+      Alert.alert('Validation', 'Please select your gender');
+      return;
+    }
+    if (!bio.trim()) {
+      Alert.alert('Validation', 'Please add a short bio');
+      return;
+    }
 
     if (!user?.session_id) {
       Alert.alert('Error', 'Session not found');
@@ -99,16 +121,9 @@ export default function SignupProfileScreen() {
       const profileData: any = {
         name: name.trim(),
         bio: bio.trim(),
+        gender: gender.toLowerCase(),
+        dob: dateOfBirth,
       };
-      
-      if (dateOfBirth) {
-         // You might want to format this or validate it before sending
-         // profileData.dob = dateOfBirth; 
-      }
-
-      if (gender) {
-        profileData.gender = gender.toLowerCase();
-      }
 
       if (profileImage) {
         profileData.profile_image = profileImage;
@@ -182,17 +197,15 @@ export default function SignupProfileScreen() {
 
                 {/* Date of Birth */}
                 <View style={styles.inputGroup}>
-                    <View style={styles.input}>
-                        <TextInput
-                            style={styles.inputText}
-                            placeholder="Date of Birth (DD/MM/YYYY)"
-                            placeholderTextColor="#9CA3AF"
-                            value={dateOfBirth}
-                            onChangeText={setDateOfBirth}
-                            keyboardType="numbers-and-punctuation"
-                        />
+                    <TouchableOpacity
+                        style={styles.input}
+                        onPress={() => setShowDobPicker(true)}
+                    >
+                        <Text style={[styles.inputText, !dateOfBirth && styles.placeholderText]}>
+                            {dateOfBirth || 'Date of Birth (DD/MM/YYYY)'}
+                        </Text>
                         <Ionicons name="calendar-outline" size={22} color="#6B7280" />
-                    </View>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Gender */}
@@ -242,6 +255,19 @@ export default function SignupProfileScreen() {
         </View>
 
         {/* --- MODALS --- */}
+
+        {/* DOB Calendar Picker */}
+        <CalendarPicker
+          visible={showDobPicker}
+          selectedDate={dobDate}
+          onDateSelect={(date) => {
+            setDobDate(date);
+            setDateOfBirth(formatDOB(date));
+            setShowDobPicker(false);
+          }}
+          onClose={() => setShowDobPicker(false)}
+          maximumDate={new Date()}
+        />
 
         {/* Gender Selection Modal */}
         <Modal visible={showGenderPicker} transparent animationType="fade">

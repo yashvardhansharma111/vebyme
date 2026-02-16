@@ -15,7 +15,6 @@ import { Colors, borderRadius, Fonts } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setChatUnreadCount } from '@/store/slices/chatSlice';
 import { apiService } from '@/services/api';
-import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 
 type TabType = 'their_plans' | 'my_plans' | 'groups' | 'my_events' | 'unread';
@@ -58,13 +57,10 @@ export default function ChatScreen() {
   const [groups, setGroups] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user?.user_id) {
       loadChats();
-    } else {
-      setShowLoginModal(true);
     }
   }, [isAuthenticated, user]);
 
@@ -291,20 +287,19 @@ export default function ChatScreen() {
     );
   };
 
+  // Redirect to login screen when not authenticated (Chat → Login CTA)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, router]);
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Chats</Text>
         </View>
-        <LoginModal
-          visible={showLoginModal}
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={() => {
-            setShowLoginModal(false);
-            loadChats();
-          }}
-        />
       </SafeAreaView>
     );
   }

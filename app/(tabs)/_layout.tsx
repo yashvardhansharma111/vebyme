@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import React, { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
@@ -8,6 +8,7 @@ import { fetchUnreadCount } from '@/store/slices/notificationsSlice';
 import { fetchChatUnreadCount } from '@/store/slices/chatSlice';
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+  const router = useRouter();
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
   const dispatch = useAppDispatch();
@@ -95,6 +96,10 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
       <TouchableOpacity 
         style={styles.actionButton} 
         onPress={() => {
+          if (!isAuthenticated) {
+            router.replace('/login');
+            return;
+          }
           // Business users go to createBusinessPost, regular users go to createPost
           if (isBusinessUser) {
             navigation.navigate('createBusinessPost');

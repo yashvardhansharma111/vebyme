@@ -66,9 +66,17 @@ export default function LoginScreen() {
     }
   }, [step]);
 
+  const phoneDigits = (phone || '').replace(/\D/g, '');
+  const canSendOtp = phoneDigits.length >= 10;
+  const canVerifyOtp = (otp || '').trim().length >= 4 && !!otpId;
+
   const handleSendOTP = async () => {
     if (!phone.trim()) {
       showSnackbar('Please enter your phone number', { position: 'top', duration: 3000 });
+      return;
+    }
+    if (phoneDigits.length < 10) {
+      showSnackbar('Please enter a valid 10-digit phone number', { position: 'top', duration: 3000 });
       return;
     }
 
@@ -226,9 +234,9 @@ export default function LoginScreen() {
               )}
 
               <TouchableOpacity
-                style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                style={[styles.primaryButton, (isLoading || (step === 'phone' ? !canSendOtp : !canVerifyOtp)) && styles.buttonDisabled]}
                 onPress={step === 'phone' ? handleSendOTP : handleVerifyOTP}
-                disabled={isLoading || (step === 'otp' && otp.length !== 4)}
+                disabled={isLoading || (step === 'phone' ? !canSendOtp : !canVerifyOtp)}
               >
                 {isLoading ? (
                   <ActivityIndicator color="#FFFFFF" />

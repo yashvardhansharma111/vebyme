@@ -357,7 +357,7 @@ export default function BusinessPostsScreen() {
                       }}
                       onRegisterPress={async () => {
                         if (!isAuthenticated || !user?.user_id) {
-                          setShowLoginModal(true);
+                          router.push('/login');
                           return;
                         }
                         if (rawPost?.user_id === user?.user_id) {
@@ -398,12 +398,12 @@ export default function BusinessPostsScreen() {
                       }}
                       onRequireAuth={() => {
                         if (!isAuthenticated) {
-                          setShowLoginModal(true);
+                          router.push('/login');
                         }
                       }}
                       onSharePress={() => {
                         if (!isAuthenticated) {
-                          setShowLoginModal(true);
+                          router.push('/login');
                           return;
                         }
                         setSharedBusinessPlan({

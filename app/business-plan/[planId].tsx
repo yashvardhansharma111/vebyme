@@ -235,7 +235,7 @@ export default function BusinessPlanDetailScreen() {
 
   const handleRegister = async () => {
     if (!user?.user_id || !user?.access_token) {
-      Alert.alert('Login Required', 'Please log in to register for this event');
+      router.push('/login');
       return;
     }
 

@@ -58,9 +58,17 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
     onClose();
   };
 
+  const phoneDigits = (phone || '').replace(/\D/g, '');
+  const canSendOtp = phoneDigits.length >= 10;
+  const canVerifyOtp = (otp || '').trim().length >= 4 && !!otpId;
+
   const handleSendOTP = async () => {
     if (!phone.trim()) {
       showSnackbar('Please enter your phone number', { position: 'top', duration: 3000 });
+      return;
+    }
+    if (phoneDigits.length < 10) {
+      showSnackbar('Please enter a valid 10-digit phone number', { position: 'top', duration: 3000 });
       return;
     }
 
@@ -145,9 +153,9 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
                   autoFocus
                 />
                 <TouchableOpacity
-                  style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                  style={[styles.primaryButton, (isLoading || !canSendOtp) && styles.buttonDisabled]}
                   onPress={handleSendOTP}
-                  disabled={isLoading}
+                  disabled={isLoading || !canSendOtp}
                 >
                   {isLoading ? (
                     <ActivityIndicator color="#FFF" />
@@ -172,9 +180,9 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
                   autoFocus
                 />
                 <TouchableOpacity
-                  style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                  style={[styles.primaryButton, (isLoading || !canVerifyOtp) && styles.buttonDisabled]}
                   onPress={handleVerifyOTP}
-                  disabled={isLoading}
+                  disabled={isLoading || !canVerifyOtp}
                 >
                   {isLoading ? (
                     <ActivityIndicator color="#FFF" />

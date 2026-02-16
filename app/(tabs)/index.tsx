@@ -13,7 +13,6 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { clearPostCreated } from '@/store/slices/postCreatedSlice';
 import { useSnackbar } from '@/context/SnackbarContext';
-import LoginModal from '@/components/LoginModal';
 import ShareToChatModal from '@/components/ShareToChatModal';
 import { Colors } from '@/constants/theme';
 import Avatar from '@/components/Avatar';
@@ -108,7 +107,6 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBusinessShareModal, setShowBusinessShareModal] = useState(false);
   const [sharedBusinessPlan, setSharedBusinessPlan] = useState<{
     planId: string;
@@ -429,7 +427,7 @@ export default function HomeScreen() {
                   if (isAuthenticated) {
                     router.push('/profile');
                   } else {
-                    setShowLoginModal(true);
+                    router.push('/login');
                   }
                 }}
               >
@@ -512,7 +510,7 @@ export default function HomeScreen() {
                           registerButtonGreyed={rawPost?.user_id === user?.user_id}
                           onRegisterPress={async () => {
                             if (!isAuthenticated || !user?.user_id) {
-                              setShowLoginModal(true);
+                              router.push('/login');
                               return;
                             }
                             if (rawPost?.user_id === user?.user_id) {
@@ -552,11 +550,11 @@ export default function HomeScreen() {
                             }
                           }}
                           onRequireAuth={() => {
-                            if (!isAuthenticated) setShowLoginModal(true);
+                            if (!isAuthenticated) router.push('/login');
                           }}
                           onSharePress={() => {
                             if (!isAuthenticated) {
-                              setShowLoginModal(true);
+                              router.push('/login');
                               return;
                             }
                             setSharedBusinessPlan({
@@ -658,11 +656,11 @@ export default function HomeScreen() {
                       if (isAuthenticated) {
                         router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
                       } else {
-                        setShowLoginModal(true);
+                        router.push('/login');
                       }
                     }}
                     onRequireAuth={() => {
-                      if (!isAuthenticated) setShowLoginModal(true);
+                      if (!isAuthenticated) router.push('/login');
                     }}
                   />
                 ))
@@ -675,7 +673,7 @@ export default function HomeScreen() {
                   style={styles.createCtaButton}
                   onPress={() => {
                     if (!isAuthenticated) {
-                      setShowLoginModal(true);
+                      router.push('/login');
                       return;
                     }
                     if (currentUser?.is_business) {
@@ -700,15 +698,6 @@ export default function HomeScreen() {
           pointerEvents="none"
         />
       </View>
-      <LoginModal
-        visible={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={() => {
-          setShowLoginModal(false);
-          // Reload feed after login
-          loadFeed();
-        }}
-      />
       {sharedBusinessPlan && (
         <ShareToChatModal
           visible={showBusinessShareModal}
