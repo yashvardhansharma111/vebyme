@@ -22,6 +22,7 @@ import NotificationCard from '@/components/NotificationCard';
 import NotificationListItem from '@/components/NotificationListItem';
 import GroupedPlanCard from '@/components/GroupedPlanCard';
 import SummaryCard from '@/components/SummaryCard';
+import NormalUserEventCard from '@/components/NormalUserEventCard';
 
 interface Interaction {
   notification_id: string;
@@ -530,21 +531,83 @@ export default function NotificationsScreen() {
     }
   };
 
-  // Normal user: Notification 1st iteration — list only (Today, Yesterday, Earlier), real data
+  // Normal user: Notification 1st iteration — stacked cards (3 states) + list below, all real data
+  const renderNormalUserStack = () => {
+    if (groupedPlanCards.length === 0) return null;
+    return (
+      <View style={styles.groupedCardsContainer}>
+        {/* State 1: Summary card (stacked) */}
+        {viewMode === 'summary' && (
+          <SummaryCard
+            totalCount={groupedPlanCards.length}
+            avatars={getAllAvatars()}
+            eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
+            onPress={handleSummaryCardPress}
+          />
+        )}
+        {/* State 2 & 3: Event cards list / one expanded */}
+        {(viewMode === 'eventsList' || viewMode === 'eventDetail') &&
+          groupedPlanCards.map((group) => {
+            const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+            return (
+              <NormalUserEventCard
+                key={group.post_id}
+                post_id={group.post_id}
+                post={group.post}
+                interactions={group.interactions}
+                created_at={group.created_at}
+                userCache={userCache}
+                isExpanded={isExpanded}
+                onExpand={() => handleEventCardPress(group.post_id)}
+                onUserPress={openUserProfile}
+                formatRelativeTime={formatRelativeTime}
+                hideCountBadge={viewedCardIds.has(group.post_id)}
+                currentUserId={user?.user_id}
+                onStartChat={async (otherUserId) => {
+                  if (!user?.user_id || !group.post?.plan_id) return;
+                  try {
+                    const res = await apiService.createIndividualChat(
+                      group.post.plan_id,
+                      user.user_id,
+                      otherUserId
+                    );
+                    const groupId = (res as any)?.data?.group_id ?? (res as any)?.group_id;
+                    if (groupId) {
+                      router.push({ pathname: '/chat/[groupId]', params: { groupId } } as any);
+                    }
+                  } catch (e: any) {
+                    Alert.alert('Error', e?.message || 'Could not start chat');
+                  }
+                }}
+                onCreateGroup={async ({ groupName, memberIds }) => {
+                  if (!user?.user_id) return;
+                  try {
+                    const res = await apiService.createGroup(
+                      group.post_id,
+                      user.user_id,
+                      memberIds,
+                      groupName
+                    );
+                    const groupId = (res as any)?.data?.group_id ?? (res as any)?.group_id;
+                    if (groupId) {
+                      router.push({ pathname: '/chat/group/[groupId]', params: { groupId } } as any);
+                    }
+                  } catch (e: any) {
+                    Alert.alert('Error', e?.message || 'Could not create group');
+                  }
+                }}
+              />
+            );
+          })}
+      </View>
+    );
+  };
+
   const renderNormalUserList = () => {
     const hasAny =
       timeGroupedNotifications.today.length > 0 ||
       timeGroupedNotifications.yesterday.length > 0 ||
       timeGroupedNotifications.earlierSections.length > 0;
-
-    if (!hasAny) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No notifications yet</Text>
-          <Text style={styles.emptySubtext}>When someone reacts, comments or joins your plans, you’ll see it here</Text>
-        </View>
-      );
-    }
 
     const renderItem = (interaction: InteractionWithPlan, isLast: boolean) => (
       <NotificationListItem
@@ -567,6 +630,15 @@ export default function NotificationsScreen() {
         showDivider={!isLast}
       />
     );
+
+    if (!hasAny && groupedPlanCards.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No notifications yet</Text>
+          <Text style={styles.emptySubtext}>When someone reacts, comments or joins your plans, you’ll see it here</Text>
+        </View>
+      );
+    }
 
     return (
       <View style={styles.listContainer}>
@@ -619,8 +691,22 @@ export default function NotificationsScreen() {
         <View style={styles.headerLeft}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
-        {isBusinessUser && (
-          viewMode !== 'summary' ? (
+        {(isBusinessUser || (!isBusinessUser && groupedPlanCards.length > 0)) && (
+          isBusinessUser ? (
+            viewMode !== 'summary' ? (
+              <TouchableOpacity
+                style={styles.closeStackButton}
+                onPress={handleCloseStack}
+                accessibilityLabel="Close stack"
+              >
+                <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.editButton}>
+                <Ionicons name="create-outline" size={22} color="#FFD700" />
+              </TouchableOpacity>
+            )
+          ) : viewMode !== 'summary' ? (
             <TouchableOpacity
               style={styles.closeStackButton}
               onPress={handleCloseStack}
@@ -628,11 +714,7 @@ export default function NotificationsScreen() {
             >
               <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.editButton}>
-              <Ionicons name="create-outline" size={22} color="#FFD700" />
-            </TouchableOpacity>
-          )
+          ) : null
         )}
       </View>
 
@@ -779,8 +861,11 @@ export default function NotificationsScreen() {
             </>
           )
         ) : (
-          /* Normal user: Notification 1st iteration — list only */
-          renderNormalUserList()
+          /* Normal user: Notification 1st iteration — stacked cards (3 states) + list below */
+          <>
+            {renderNormalUserStack()}
+            {renderNormalUserList()}
+          </>
         )}
       </ScrollView>
 

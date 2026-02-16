@@ -10,58 +10,53 @@ interface SummaryCardProps {
   onPress: () => void;
 }
 
+const AVATAR_SIZE = 40;
+
 export default function SummaryCard({
   totalCount,
   avatars,
   eventDescription,
   onPress,
 }: SummaryCardProps) {
-  // DPs first: non-null avatars first, up to 3
   const displayAvatars = [...avatars]
     .filter((a) => a != null && a !== '')
     .slice(0, 3);
   const showCount = totalCount > 1 ? `+${totalCount}` : `${totalCount}`;
+  const descriptionText = eventDescription?.trim().replace(/\s*vybeme!?\s*$/i, '').trim() || '';
 
   return (
     <View style={styles.outerWrapper}>
-      {/* Back card (stacked effect) */}
+      {/* Behind card (Frame1984077337) – only bottom visible */}
       <View style={styles.backCard} />
+      {/* Front card (Frame1984077336) – real data */}
       <TouchableOpacity
         style={styles.card}
         onPress={onPress}
         activeOpacity={0.9}
       >
-        {/* Upper left: stacked DPs first, then +N badge on rightmost */}
-        <View style={styles.topRow}>
-          <View style={styles.avatarsRow}>
-            {displayAvatars.slice(0, 3).map((avatar, idx) => (
-              <View
-                key={idx}
-                style={[
-                  styles.avatarWrapper,
-                  { zIndex: 3 - idx },
-                  idx > 0 && { marginLeft: -12 },
-                ]}
-              >
-                <Avatar uri={avatar} size={32} />
+        <View style={styles.frameWrapper}>
+          <View style={styles.frameContainer}>
+            <View style={styles.ellipseParent}>
+              {displayAvatars.slice(0, 3).map((avatar, idx) => (
+                <View
+                  key={idx}
+                  style={[styles.frameChildWrap, idx > 0 && styles.frameItemLayout]}
+                >
+                  <Avatar uri={avatar} size={AVATAR_SIZE} />
+                </View>
+              ))}
+              <View style={[styles.placeholderTextWrapper, styles.frameItemLayout]}>
+                <Text style={styles.placeholderText}>{showCount}</Text>
               </View>
-            ))}
-            {displayAvatars.length === 0 && (
-              <View style={[styles.avatarWrapper, { marginLeft: 0 }]}>
-                <Avatar uri={null} size={32} />
-              </View>
-            )}
-            <View style={styles.badgeOnEdge}>
-              <Text style={styles.badgeText}>{showCount}</Text>
             </View>
           </View>
         </View>
-
-        {/* Description then "vybeme!" on next line (no title in first state) */}
-        <Text style={styles.description} numberOfLines={4}>
-          {eventDescription?.trim().replace(/\s*vybeme!?\s*$/i, '').trim() || ''}
-        </Text>
-        <Text style={styles.vybemeLine}>vybeme!</Text>
+        <View style={styles.leavingToOotyWrapper}>
+          <Text style={styles.leavingToOotyContainer}>
+            <Text style={styles.leavingToOoty}>{descriptionText}{descriptionText ? ' ' : ''}</Text>
+            <Text style={styles.vybeme}>vybeme! </Text>
+          </Text>
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -70,72 +65,108 @@ export default function SummaryCard({
 const styles = StyleSheet.create({
   outerWrapper: {
     position: 'relative',
-    marginBottom: 12,
+    marginBottom: 20,
+    paddingBottom: 14,
   },
+  /* Frame1984077337 – card behind, only downside visible */
   backCard: {
     position: 'absolute',
-    left: 8,
-    top: 22,
-    right: 8,
-    height: 80,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    left: 0,
+    right: 0,
+    bottom: -14,
+    width: '100%',
+    height: 86,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 225 },
+    shadowOpacity: 0,
+    shadowRadius: 63,
+    elevation: 63,
+    backgroundColor: '#E8E8ED',
     borderRadius: 16,
-    padding: 16,
+    zIndex: 0,
+  },
+  /* Frame1984077336 – upper card */
+  card: {
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 4,
+    elevation: 57,
     position: 'relative',
+    zIndex: 1,
   },
-  topRow: {
+  frameWrapper: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  avatarsRow: {
-    flexDirection: 'row',
+    alignSelf: 'stretch',
     alignItems: 'center',
   },
-  avatarWrapper: {
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+  frameContainer: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 72 },
+    shadowOpacity: 0.02,
+    shadowRadius: 64,
+    elevation: 64,
+    borderRadius: 100,
+    flexDirection: 'row',
+    backgroundColor: '#fff',
   },
-  badgeOnEdge: {
-    marginLeft: -4,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 14,
-    minWidth: 28,
-    height: 28,
+  ellipseParent: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    zIndex: 10,
   },
-  badgeText: {
-    fontSize: 12,
+  frameChildWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#fff',
+    overflow: 'hidden',
+  },
+  frameItemLayout: {
+    marginLeft: -16,
+    width: 40,
+    height: 40,
+  },
+  placeholderTextWrapper: {
+    borderRadius: 20,
+    backgroundColor: '#252525',
+    borderStyle: 'solid',
+    borderColor: '#fff',
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    letterSpacing: -1.3,
+    lineHeight: 19,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  leavingToOotyWrapper: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  leavingToOotyContainer: {
+    letterSpacing: -0.3,
+    lineHeight: 22,
+    color: '#3b3c3d',
+    textAlign: 'left',
+    fontSize: 16,
+    alignSelf: 'stretch',
+  },
+  leavingToOoty: {
+    fontWeight: '400',
+  },
+  vybeme: {
     fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  description: {
-    fontSize: 13,
-    color: '#1C1C1E',
-    lineHeight: 18,
-    marginBottom: 4,
-  },
-  vybemeLine: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1C1C1E',
   },
 });
