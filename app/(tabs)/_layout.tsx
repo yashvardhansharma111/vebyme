@@ -118,14 +118,19 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBarContainer: {
     position: 'absolute',
-    bottom: 30, // Floats above bottom
+    bottom: 30,
     left: 20,
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: 'transparent',
-    zIndex: 100, // Ensure it sits on top of the gradient
+    zIndex: 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 12,
   },
   pillContainer: {
     flexDirection: 'row',

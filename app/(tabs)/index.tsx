@@ -40,9 +40,9 @@ function ProfileAvatar() {
   );
 }
 
-const FILTERS = ['Clubs', 'Today', 'Tomorrow', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
-const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel', 'Comedy', 'Sports'];
-const TEMPORAL_FILTERS = ['Today', 'Tomorrow'];
+const FILTERS = ['Running', 'Social', 'Fitness', 'Sports', 'Today', 'Tomorrow', 'Weekend'];
+const CATEGORY_FILTERS = ['Running', 'Social', 'Fitness', 'Sports'];
+const TEMPORAL_FILTERS = ['Today', 'Tomorrow', 'Weekend'];
 
 function isEventDateInRange(eventDate: string | Date | undefined, filter: string): boolean {
   if (!eventDate) return false;
@@ -51,8 +51,10 @@ function isEventDateInRange(eventDate: string | Date | undefined, filter: string
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
   const eventDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayOfWeek = d.getDay(); // 0 = Sunday, 6 = Saturday
   if (filter === 'Today') return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
   if (filter === 'Tomorrow') return eventDayStart >= tomorrowStart && eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000;
+  if (filter === 'Weekend') return dayOfWeek === 0 || dayOfWeek === 6;
   return false;
 }
 
@@ -406,13 +408,10 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <View style={styles.locationContainer}>
               <View style={styles.locationIconBg}>
-                <Ionicons name="location-sharp" size={18} color="#FFF" />
+                <Ionicons name="location-sharp" size={18} color={Colors.light.primary} />
               </View>
               <View style={{ marginLeft: 10 }}>
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={styles.locationTitle}>Indiranagar</Text>
-                  <Ionicons name="chevron-down" size={16} color="#FFF" style={{ marginLeft: 4 }} />
-                </TouchableOpacity>
+                <Text style={styles.locationTitle}>Indiranagar</Text>
                 <Text style={styles.locationSubtitle}>Bengaluru</Text>
               </View>
             </View>
@@ -422,7 +421,7 @@ export default function HomeScreen() {
                   style={styles.qrScannerButton}
                   onPress={() => router.push('/qr-scanner')}
                 >
-                  <Ionicons name="qr-code-outline" size={24} color="#FFF" />
+                  <Ionicons name="qr-code-outline" size={24} color={Colors.light.primary} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -474,102 +473,109 @@ export default function HomeScreen() {
               <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
             }
           >
-            {/* Single full-length business card (index hero) */}
-            {businessEvents.length > 0 && (() => {
-              const item = businessEvents[0];
-              const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
-              return (
-                <View style={styles.heroCardWrap}>
-                  <BusinessCard
-                    key={item.id}
-                    plan={{
-                      plan_id: item.id,
-                      title: item.event.title,
-                      description: item.event.description,
-                      media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                      category_main: rawPost?.category_main || '',
-                      category_sub: item.event.tags || rawPost?.tags || [],
-                      location_text: rawPost?.location_text || '',
-                      date: rawPost?.date || rawPost?.timestamp || new Date(),
-                      time: rawPost?.time || '',
-                      passes: rawPost?.passes || [],
-                      add_details: rawPost?.add_details || [],
-                    }}
-                    user={item.user}
-                    attendeesCount={rawPost?.joins_count ?? 0}
-                    interactedUsers={item.event?.interacted_users}
-                    isSwipeable={false}
-                    containerStyle={styles.heroBusinessCard}
-                    showArrowButton={true}
-                    onArrowPress={() => router.push('/business-posts')}
-                    onPress={() => {
-                      router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
-                    }}
-                    hideRegisterButton={false}
-                    registerButtonGreyed={rawPost?.user_id === user?.user_id}
-                    onRegisterPress={async () => {
-                      if (!isAuthenticated || !user?.user_id) {
-                        setShowLoginModal(true);
-                        return;
-                      }
-                      if (rawPost?.user_id === user?.user_id) {
-                        Alert.alert('Cannot Register', "You can't register for your own event.");
-                        return;
-                      }
-                      if (rawPost?.is_women_only) {
-                        const gender = (currentUser?.gender || '').toLowerCase();
-                        if (gender !== 'female') {
-                          showSnackbar('The post is for women only');
-                          return;
-                        }
-                      }
-                      try {
-                        const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
-                        if (alreadyRegistered) {
-                          Alert.alert(
-                            'Already Registered',
-                            "You are already registered for this event. You can check your pass from your profile."
-                          );
-                          return;
-                        }
-                        const response = await apiService.registerForEvent(item.id, user.user_id);
-                          if (response.success && response.data?.ticket) {
-                            const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                            router.push({
-                              pathname: '/ticket/[ticketId]',
-                              params: {
-                                ticketId: response.data.ticket.ticket_id,
-                                planId: item.id,
-                                ticketData: ticketData
+            {/* Business plans – horizontally scrollable */}
+            {businessEvents.length > 0 && (
+              <View style={styles.businessHorizontalWrap}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.businessHorizontalContent}
+                >
+                  {businessEvents.map((item) => {
+                    const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
+                    return (
+                      <View key={item.id} style={styles.businessHorizontalCard}>
+                        <BusinessCard
+                          plan={{
+                            plan_id: item.id,
+                            title: item.event.title,
+                            description: item.event.description,
+                            media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                            category_main: rawPost?.category_main || '',
+                            category_sub: item.event.tags || rawPost?.tags || [],
+                            location_text: rawPost?.location_text || '',
+                            date: rawPost?.date || rawPost?.timestamp || new Date(),
+                            time: rawPost?.time || '',
+                            passes: rawPost?.passes || [],
+                            add_details: rawPost?.add_details || [],
+                          }}
+                          user={item.user}
+                          attendeesCount={rawPost?.joins_count ?? 0}
+                          interactedUsers={item.event?.interacted_users}
+                          isSwipeable={false}
+                          containerStyle={styles.businessHorizontalCardInner}
+                          showArrowButton={false}
+                          onPress={() => {
+                            router.push({ pathname: '/business-plan/[planId]', params: { planId: item.id } } as any);
+                          }}
+                          hideRegisterButton={false}
+                          registerButtonGreyed={rawPost?.user_id === user?.user_id}
+                          onRegisterPress={async () => {
+                            if (!isAuthenticated || !user?.user_id) {
+                              setShowLoginModal(true);
+                              return;
+                            }
+                            if (rawPost?.user_id === user?.user_id) {
+                              Alert.alert('Cannot Register', "You can't register for your own event.");
+                              return;
+                            }
+                            if (rawPost?.is_women_only) {
+                              const gender = (currentUser?.gender || '').toLowerCase();
+                              if (gender !== 'female') {
+                                showSnackbar('The post is for women only');
+                                return;
                               }
-                            } as any);
-                          }
-                      } catch (error: any) {
-                        Alert.alert('Registration Failed', error.message || 'Failed to register for event');
-                      }
-                    }}
-                    onRequireAuth={() => {
-                      if (!isAuthenticated) setShowLoginModal(true);
-                    }}
-                    onSharePress={() => {
-                      if (!isAuthenticated) {
-                        setShowLoginModal(true);
-                        return;
-                      }
-                      setSharedBusinessPlan({
-                        planId: item.id,
-                        title: item.event.title,
-                        description: item.event.description,
-                        media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                        tags: item.event.tags || rawPost?.tags,
-                        category_main: rawPost?.category_main,
-                      });
-                      setShowBusinessShareModal(true);
-                    }}
-                  />
-                </View>
-              );
-            })()}
+                            }
+                            try {
+                              const alreadyRegistered = await apiService.hasTicketForPlan(item.id, user.user_id);
+                              if (alreadyRegistered) {
+                                Alert.alert(
+                                  'Already Registered',
+                                  "You are already registered for this event. You can check your pass from your profile."
+                                );
+                                return;
+                              }
+                              const response = await apiService.registerForEvent(item.id, user.user_id);
+                              if (response.success && response.data?.ticket) {
+                                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                                router.push({
+                                  pathname: '/ticket/[ticketId]',
+                                  params: {
+                                    ticketId: response.data.ticket.ticket_id,
+                                    planId: item.id,
+                                    ticketData: ticketData
+                                  }
+                                } as any);
+                              }
+                            } catch (error: any) {
+                              Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+                            }
+                          }}
+                          onRequireAuth={() => {
+                            if (!isAuthenticated) setShowLoginModal(true);
+                          }}
+                          onSharePress={() => {
+                            if (!isAuthenticated) {
+                              setShowLoginModal(true);
+                              return;
+                            }
+                            setSharedBusinessPlan({
+                              planId: item.id,
+                              title: item.event.title,
+                              description: item.event.description,
+                              media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
+                              tags: item.event.tags || rawPost?.tags,
+                              category_main: rawPost?.category_main,
+                            });
+                            setShowBusinessShareModal(true);
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
 
             {isLoading && businessEvents.length === 0 && (
               <View style={styles.loadingContainer}>
@@ -580,7 +586,14 @@ export default function HomeScreen() {
             {!isLoading && businessEvents.length === 0 && !error && (
               <View style={styles.heroCardWrap}>
                 <View style={styles.heroPlaceholderCard}>
-                  <Text style={styles.heroPlaceholderText}>No business plans right now</Text>
+                  <Text style={styles.heroPlaceholderText}>No plans in your area</Text>
+                  <TouchableOpacity
+                    style={styles.createPlanCta}
+                    onPress={() => router.push('/(tabs)/createPost')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.createPlanCtaText}>Create a plan</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -621,8 +634,14 @@ export default function HomeScreen() {
                 </View>
               ) : events.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No posts yet</Text>
-                  <Text style={styles.emptySubtext}>Be the first to create a post!</Text>
+                  <Text style={styles.emptyText}>No plans in your area</Text>
+                  <TouchableOpacity
+                    style={styles.createPlanCta}
+                    onPress={() => router.push('/(tabs)/createPost')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.createPlanCtaText}>Create a plan</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 events.map((item) => (
@@ -780,8 +799,8 @@ const styles = StyleSheet.create({
   },
   locationContainer: { flexDirection: 'row', alignItems: 'center' },
   locationIconBg: { backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 12 },
-  locationTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
-  locationSubtitle: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+  locationTitle: { fontSize: 18, fontWeight: '700', color: '#1C1C1E' },
+  locationSubtitle: { fontSize: 13, color: '#1C1C1E' },
   headerAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' },
   guestAvatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)', backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   stickyFilterWrap: {
@@ -838,6 +857,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
     marginRight: 16,
   },
+  businessHorizontalWrap: {
+    marginBottom: 20,
+  },
+  businessHorizontalContent: {
+    paddingHorizontal: 20,
+    paddingRight: 20,
+    gap: 16,
+  },
+  businessHorizontalCard: {
+    width: SCREEN_WIDTH * 0.85,
+    maxWidth: 360,
+    marginRight: 16,
+  },
+  businessHorizontalCardInner: {
+    width: '100%',
+    marginHorizontal: 0,
+  },
   heroCardWrap: {
     marginBottom: 20,
     paddingHorizontal: 20,
@@ -856,6 +892,18 @@ const styles = StyleSheet.create({
   heroPlaceholderText: {
     fontSize: 16,
     color: '#666',
+    marginBottom: 16,
+  },
+  createPlanCta: {
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 24,
+  },
+  createPlanCtaText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
   seeOthersButton: {
     flexDirection: 'row',

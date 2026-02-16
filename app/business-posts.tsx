@@ -267,21 +267,14 @@ export default function BusinessPostsScreen() {
         />
 
         <SafeAreaView style={styles.safeArea}>
-          {/* Header with Back Button */}
-          {/* Header – fixed at top */}
-          <View style={styles.header}>
+          {/* Back button + Filter tags in one row – no header title */}
+          <View style={styles.headerWithFilters}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
             >
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Business Plans</Text>
-            <View style={styles.placeholder} />
-          </View>
-
-          {/* Categories – sticky below header */}
-          <View style={styles.stickyFilterWrap}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
               {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter) => {
                 const isActive = activeFilter === filter;
@@ -322,8 +315,14 @@ export default function BusinessPostsScreen() {
               </View>
             ) : events.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No business plans found</Text>
-                <Text style={styles.emptySubtext}>Check back later for new business events!</Text>
+                <Text style={styles.emptyText}>No plans in your area</Text>
+                <TouchableOpacity
+                  style={styles.createPlanCta}
+                  onPress={() => router.push('/(tabs)/createBusinessPost')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.createPlanCtaText}>Create a plan</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={styles.feed}>
@@ -478,6 +477,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
+  headerWithFilters: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    gap: 12,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -511,7 +517,8 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     zIndex: 10,
   },
-  filterScroll: { marginBottom: 16 },
+  filterScroll: {
+    flex: 1, marginBottom: 16 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   activeFilterText: { color: '#FFF', fontWeight: '600' },
@@ -559,6 +566,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
     marginBottom: 8,
+  },
+  createPlanCta: {
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 24,
+    marginTop: 16,
+  },
+  createPlanCtaText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
   emptySubtext: {
     fontSize: 14,

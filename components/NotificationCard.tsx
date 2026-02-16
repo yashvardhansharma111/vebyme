@@ -93,10 +93,10 @@ export default function NotificationCard({
       </View>
 
       {/* Title */}
-      <Text style={styles.title}>{postTitle}</Text>
+      <Text style={styles.title} numberOfLines={2}>{postTitle}</Text>
 
-      {/* Description */}
-      <Text style={styles.description}>{postText}</Text>
+      {/* Description – truncate to 3 lines */}
+      <Text style={styles.description} numberOfLines={3}>{postText}</Text>
 
       {/* Interactions List - tap name to open profile */}
       <View style={styles.interactionsList}>
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   title: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1C1C1E',
     marginBottom: 10,
