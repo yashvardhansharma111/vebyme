@@ -624,22 +624,20 @@ class ApiService {
     return data;
   }
 
-  // Business Plan APIs
+  // Business Plan APIs – always use /business-post/create (with FormData or JSON)
   async createBusinessPlan(accessToken: string, planData: any, formData?: FormData) {
-    // If FormData is provided, use it (for file uploads)
+    const url = `${this.baseUrl}/business-post/create`;
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${accessToken}`,
+    };
+
     if (formData) {
-      const headers: Record<string, string> = {
-        'Authorization': `Bearer ${accessToken}`,
-      };
-      // Don't set Content-Type - let browser set it with boundary for FormData
-      
-      const url = `${this.baseUrl}/business-post/create`;
+      // Don't set Content-Type – let runtime set boundary for FormData
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: formData,
       });
-      
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = 'Failed to create business plan';
@@ -651,18 +649,28 @@ class ApiService {
         }
         throw new Error(errorMessage);
       }
-      
       return await response.json();
     }
-    
-    // Otherwise use JSON
-    return this.request<any>('/plan/business', {
+
+    // No files: send JSON to same endpoint so backend uses full business-post logic
+    headers['Content-Type'] = 'application/json';
+    const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      headers,
       body: JSON.stringify(planData),
     });
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = 'Failed to create business plan';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    return await response.json();
   }
 
   async getBusinessPlan(planId: string) {
