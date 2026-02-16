@@ -28,6 +28,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const DAY_TAGS = ['Today', 'Tomorrow', 'Weekend'];
 const TIME_TAGS = ['Morning', 'Evening', 'Night'];
 const CATEGORY_TAGS = ['Music', 'Cafe', 'Clubs'];
+const CATEGORY_ICONS: { [key: string]: keyof typeof Ionicons.glyphMap } = {
+  Music: 'musical-notes',
+  Cafe: 'cafe',
+  Clubs: 'wine',
+};
 const SUB_CATEGORY_TAGS: { [key: string]: string[] } = {
   Music: ['Rave', 'Concert', 'DJ', 'Karaoke', 'Rooftop'],
   Cafe: ['Coffee', 'Brunch', 'Dessert', 'Work', 'Study'],
@@ -56,6 +61,8 @@ export default function CreatePostScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [planId, setPlanId] = useState<string | null>(null);
+  const [descriptionHeight, setDescriptionHeight] = useState(100);
+  const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -388,12 +395,13 @@ export default function CreatePostScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Title – top */}
+          {/* Event Title */}
           <View style={styles.section}>
-            <Text style={styles.label}>Title (Optional)</Text>
+            <Text style={styles.label}>Event Title</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter a title..."
+              placeholder="Enter a title (optional)"
+              placeholderTextColor="#8E8E93"
               value={title}
               onChangeText={setTitle}
               maxLength={30}
@@ -401,24 +409,25 @@ export default function CreatePostScreen() {
             <Text style={styles.charCount}>{title.length}/30</Text>
           </View>
 
-          {/* Description – below title */}
+          {/* Event Description – expands as text increases */}
           <View style={styles.section}>
-            <Text style={styles.label}>What are you up to?</Text>
+            <Text style={styles.label}>Event Description</Text>
             <TextInput
-              style={styles.textArea}
+              style={[styles.textArea, { minHeight: Math.max(100, descriptionHeight) }]}
               multiline
-              numberOfLines={4}
               placeholder="Share your plan..."
+              placeholderTextColor="#8E8E93"
               value={description}
               onChangeText={setDescription}
+              onContentSizeChange={(e) => setDescriptionHeight(e.nativeEvent.contentSize.height)}
               textAlignVertical="top"
             />
           </View>
 
-          {/* Media */}
+          {/* Media – compact Add Media button */}
           <View style={styles.section}>
             <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
-              <Ionicons name="add" size={24} color="#666" />
+              <Ionicons name="add" size={20} color="#666" />
               <Text style={styles.addMediaText}>Add Media</Text>
             </TouchableOpacity>
             {media.length > 0 && (
@@ -492,7 +501,8 @@ export default function CreatePostScreen() {
               <Text style={styles.label}>Number of People</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter number of people"
+                placeholder="e.g. 4"
+                placeholderTextColor="#8E8E93"
                 value={numPeople}
                 onChangeText={setNumPeople}
                 keyboardType="number-pad"
@@ -505,7 +515,8 @@ export default function CreatePostScreen() {
             <Text style={styles.label}>External Plan Link</Text>
             <TextInput
               style={styles.input}
-              placeholder="https://externalink.com/saddled"
+              placeholder="https://example.com/event"
+              placeholderTextColor="#8E8E93"
               value={externalLink}
               onChangeText={setExternalLink}
               keyboardType="url"
@@ -513,25 +524,40 @@ export default function CreatePostScreen() {
             />
           </View>
 
-          {/* Women Only Toggle */}
+          {/* Additional Settings – dropdown with Women's Only */}
           <View style={styles.section}>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleLabelContainer}>
-                <Text style={styles.label}>Women Only Post</Text>
-                {isWomenOnly && (
-                  <Text style={styles.toggleDescription}>
-                    Everyone would see and show your plan, but only women will be able to join and
-                    repost.
-                  </Text>
-                )}
-              </View>
-              <Switch
-                value={isWomenOnly}
-                onValueChange={setIsWomenOnly}
-                trackColor={{ false: '#E5E5EA', true: '#A855F7' }}
-                thumbColor="#FFF"
+            <TouchableOpacity
+              style={styles.additionalSettingsHeader}
+              onPress={() => setAdditionalSettingsExpanded((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sectionTitle}>Additional Settings</Text>
+              <Ionicons
+                name={additionalSettingsExpanded ? 'chevron-up' : 'chevron-down'}
+                size={22}
+                color="#666"
               />
-            </View>
+            </TouchableOpacity>
+            {additionalSettingsExpanded && (
+              <View style={styles.additionalSettingsContent}>
+                <View style={styles.toggleRow}>
+                  <View style={styles.toggleLabelContainer}>
+                    <Text style={styles.label}>Women&apos;s Only Post</Text>
+                    {isWomenOnly && (
+                      <Text style={styles.toggleDescription}>
+                        Everyone would see your plan, but only women will be able to join and repost.
+                      </Text>
+                    )}
+                  </View>
+                  <Switch
+                    value={isWomenOnly}
+                    onValueChange={setIsWomenOnly}
+                    trackColor={{ false: '#E5E5EA', true: '#A855F7' }}
+                    thumbColor="#FFF"
+                  />
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Tags Section */}
@@ -590,7 +616,7 @@ export default function CreatePostScreen() {
               </View>
             </View>
 
-            {/* CATEGORY Tags */}
+            {/* CATEGORY Tags – with icons, white pills */}
             <View style={styles.tagSection}>
               <Text style={styles.tagLabel}>CATEGORY</Text>
               <View style={styles.tagRow}>
@@ -598,18 +624,24 @@ export default function CreatePostScreen() {
                   <TouchableOpacity
                     key={tag}
                     style={[
-                      styles.tagButton,
-                      selectedCategory === tag && styles.tagButtonSelected,
+                      styles.tagButtonCategory,
+                      selectedCategory === tag && styles.tagButtonCategorySelected,
                     ]}
                     onPress={() => {
                       setSelectedCategory(selectedCategory === tag ? '' : tag);
                       setSelectedSubCategory('');
                     }}
                   >
+                    <Ionicons
+                      name={CATEGORY_ICONS[tag] || 'ellipse'}
+                      size={16}
+                      color={selectedCategory === tag ? '#FFF' : '#666'}
+                      style={{ marginRight: 6 }}
+                    />
                     <Text
                       style={[
-                        styles.tagButtonText,
-                        selectedCategory === tag && styles.tagButtonTextSelected,
+                        styles.tagButtonTextCategory,
+                        selectedCategory === tag && styles.tagButtonTextCategorySelected,
                       ]}
                     >
                       {tag}
@@ -619,7 +651,7 @@ export default function CreatePostScreen() {
               </View>
             </View>
 
-            {/* SUB-CATEGORY Tags (shown when category is selected) */}
+            {/* SUB-CATEGORY Tags – white pills with icons (text only for sub) */}
             {selectedCategory && SUB_CATEGORY_TAGS[selectedCategory] && (
               <View style={styles.tagSection}>
                 <Text style={styles.tagLabel}>SUB-CATEGORY</Text>
@@ -628,15 +660,15 @@ export default function CreatePostScreen() {
                     <TouchableOpacity
                       key={tag}
                       style={[
-                        styles.tagButton,
-                        selectedSubCategory === tag && styles.tagButtonSelected,
+                        styles.tagButtonCategory,
+                        selectedSubCategory === tag && styles.tagButtonCategorySelected,
                       ]}
                       onPress={() => setSelectedSubCategory(selectedSubCategory === tag ? '' : tag)}
                     >
                       <Text
                         style={[
-                          styles.tagButtonText,
-                          selectedSubCategory === tag && styles.tagButtonTextSelected,
+                          styles.tagButtonTextCategory,
+                          selectedSubCategory === tag && styles.tagButtonTextCategorySelected,
                         ]}
                       >
                         {tag}
@@ -748,17 +780,19 @@ const styles = StyleSheet.create({
   addMediaButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: '#E5E5EA',
     borderStyle: 'dashed',
   },
   addMediaText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
-    marginLeft: 8,
+    marginLeft: 6,
   },
   mediaContainer: {
     flexDirection: 'row',
@@ -880,6 +914,42 @@ const styles = StyleSheet.create({
   },
   tagButtonTextSelected: {
     color: '#FFF',
+  },
+  tagButtonCategory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  tagButtonCategorySelected: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  tagButtonTextCategory: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+  },
+  tagButtonTextCategorySelected: {
+    color: '#FFF',
+  },
+  additionalSettingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  additionalSettingsContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   bottomButtons: {
     position: 'absolute',

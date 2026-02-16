@@ -1045,7 +1045,29 @@ export default function CreateBusinessPostScreen() {
 
           {ticketsEnabled && (
             <View style={styles.passesSection}>
-              {/* Fixed Add Media row (for first pass ticket image) */}
+              {/* Ticket selection UI: Add Media, Add Type, Preview Ticket */}
+              <View style={styles.ticketActionsRow}>
+                <TouchableOpacity
+                  style={styles.ticketActionButton}
+                  onPress={() => passes[0] && !(editMode && passes[0].isExisting) ? handleAddPassImage(0) : undefined}
+                  disabled={editMode && passes[0]?.isExisting}
+                >
+                  <Ionicons name="image-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.ticketActionButtonText}>Add Media</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.ticketActionButton} onPress={addPass}>
+                  <Ionicons name="add-circle-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.ticketActionButtonText}>Add Type</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.ticketActionButton}
+                  onPress={() => { setPreviewPassIndex(0); setShowTicketPreview(true); }}
+                >
+                  <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.ticketActionButtonText}>Preview Ticket</Text>
+                </TouchableOpacity>
+              </View>
+              {/* First pass ticket image (when added) */}
               {passes[0] && !(editMode && passes[0].isExisting) && (
                 <TouchableOpacity
                   style={styles.addMediaOptionButton}
@@ -1061,7 +1083,7 @@ export default function CreateBusinessPostScreen() {
                   ) : (
                     <>
                       <Ionicons name="add" size={20} color="#666" />
-                      <Text style={styles.addMediaOptionText}>+ Add Media</Text>
+                      <Text style={styles.addMediaOptionText}>+ Add ticket image</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1116,21 +1138,9 @@ export default function CreateBusinessPostScreen() {
                   </View>
                 );
               })}
-              <View style={styles.addTypePreviewRow}>
-                <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
-                  <Text style={styles.addPassText}>+ Add Type</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.previewTicketButton}
-                  onPress={() => {
-                    setPreviewPassIndex(0);
-                    setShowTicketPreview(true);
-                  }}
-                >
-                  <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
-                  <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.addPassButton} onPress={addPass}>
+                <Text style={styles.addPassText}>+ Add another ticket type</Text>
+              </TouchableOpacity>
             </View>
           )}
           </View>
@@ -1251,36 +1261,35 @@ export default function CreateBusinessPostScreen() {
                 </View>
               );
             })}
+
+            {/* Women's Only & Allow Viewing Guest List – inside Additional Settings */}
+            <View style={styles.additionalTogglesBlock}>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Women&apos;s Only</Text>
+                <Switch
+                  value={womenOnly}
+                  onValueChange={setWomenOnly}
+                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
+                  thumbColor="#FFF"
+                />
+              </View>
+              {womenOnly && (
+                <Text style={styles.womenOnlyInfo}>
+                  Your event will be visible to everyone but only women will be able to register.
+                </Text>
+              )}
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Allow Viewing Guest List</Text>
+                <Switch
+                  value={!hideGuestListFromViewers}
+                  onValueChange={(v) => setHideGuestListFromViewers(!v)}
+                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            </View>
             </>
             )}
-          </View>
-
-          {/* Additional Toggles */}
-          <View style={styles.sectionCard}>
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Women&apos;s Only</Text>
-            <Switch
-              value={womenOnly}
-              onValueChange={setWomenOnly}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
-          {womenOnly && (
-            <Text style={styles.womenOnlyInfo}>
-              Your event will be visible to everyone but only women will be able to register.
-            </Text>
-          )}
-
-          <View style={styles.toggleRow}>
-            <Text style={styles.toggleLabel}>Allow Viewing Guest List</Text>
-            <Switch
-              value={!hideGuestListFromViewers}
-              onValueChange={(v) => setHideGuestListFromViewers(!v)}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
           </View>
 
           {/* Ticket Preview Modal */}
@@ -1695,6 +1704,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000',
   },
+  additionalTogglesBlock: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
   womenOnlyInfo: {
     fontSize: 13,
     color: '#6B7280',
@@ -1880,6 +1895,29 @@ const styles = StyleSheet.create({
   passPriceInRow: {
     width: 100,
     marginBottom: 0,
+  },
+  ticketActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  ticketActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  ticketActionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   addTypePreviewRow: {
     flexDirection: 'row',
