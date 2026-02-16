@@ -901,6 +901,12 @@ class ApiService {
     });
   }
 
+  async getChatUnreadCount(user_id: string) {
+    return this.request<{ unread_count: number }>(`/chat/unread-counter?user_id=${user_id}`, {
+      method: 'GET',
+    });
+  }
+
   // Chat/Group APIs
   async createGroup(post_id: string, created_by: string, member_ids: string[], group_name?: string) {
     return this.request<{ group_id: string }>('/chat/group/create', {

@@ -444,7 +444,7 @@ export default function GroupChatScreen() {
             );
           })()}
           <Text style={styles.headerName} numberOfLines={1}>
-            {groupDetails?.group_name || 'Group'}
+            {groupDetails?.plan?.title || groupDetails?.group_name || 'Group'}
           </Text>
         </TouchableOpacity>
 

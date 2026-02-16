@@ -3,6 +3,7 @@ import authReducer from './slices/authSlice';
 import profileReducer from './slices/profileSlice';
 import notificationsReducer from './slices/notificationsSlice';
 import postCreatedReducer from './slices/postCreatedSlice';
+import chatReducer from './slices/chatSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     profile: profileReducer,
     notifications: notificationsReducer,
     postCreated: postCreatedReducer,
+    chat: chatReducer,
   },
 });
 

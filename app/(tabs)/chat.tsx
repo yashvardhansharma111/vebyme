@@ -12,7 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors, borderRadius } from '@/constants/theme';
-import { useAppSelector } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { setChatUnreadCount } from '@/store/slices/chatSlice';
 import { apiService } from '@/services/api';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
@@ -47,6 +48,7 @@ interface ChatItem {
 
 export default function ChatScreen() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
@@ -135,6 +137,14 @@ export default function ChatScreen() {
         finalGroups = [...announcementItems, ...nonAnnouncement];
 
         setGroups(finalGroups);
+
+        // Update global chat unread count for tab badge (sum across all lists)
+        const totalUnread = [
+          ...(response.data.their_plans || []),
+          ...(response.data.my_plans || []),
+          ...finalGroups,
+        ].reduce((sum, item) => sum + (item?.unread_count ?? 0), 0);
+        dispatch(setChatUnreadCount(totalUnread));
       }
     } catch (error: any) {
       console.error('[Chat] Error loading chats:', error);
@@ -225,8 +235,9 @@ export default function ChatScreen() {
   };
 
   const renderChatItem = ({ item }: { item: ChatItem }) => {
-    const displayName = item.is_group 
-      ? item.group_name 
+    // Event/plan chats: show event name (plan_title); otherwise group_name or other user
+    const displayName = item.is_group
+      ? (item.plan_title || item.group_name)
       : (item.other_user?.name || item.author_name);
 
     // Groups from post/event: use that event's image as group DP

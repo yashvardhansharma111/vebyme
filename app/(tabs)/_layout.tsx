@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchUnreadCount } from '@/store/slices/notificationsSlice';
+import { fetchChatUnreadCount } from '@/store/slices/chatSlice';
 
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const { currentUser } = useAppSelector((state) => state.profile);
@@ -12,10 +13,12 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const unreadCount = useAppSelector((state) => state.notifications.unreadCount);
+  const chatUnreadCount = useAppSelector((state) => state.chat.unreadCount);
 
   useEffect(() => {
     if (isAuthenticated && user?.user_id) {
       dispatch(fetchUnreadCount(user.user_id));
+      dispatch(fetchChatUnreadCount(user.user_id));
     }
   }, [dispatch, isAuthenticated, user?.user_id]);
 
@@ -72,6 +75,13 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                   <View style={styles.notificationsBadge}>
                     <Text style={styles.notificationsBadgeText} numberOfLines={1}>
                       {unreadCount > 99 ? '99+' : String(unreadCount)}
+                    </Text>
+                  </View>
+                )}
+                {route.name === 'chat' && chatUnreadCount > 0 && (
+                  <View style={styles.notificationsBadge}>
+                    <Text style={styles.notificationsBadgeText} numberOfLines={1}>
+                      {chatUnreadCount > 99 ? '99+' : String(chatUnreadCount)}
                     </Text>
                   </View>
                 )}
