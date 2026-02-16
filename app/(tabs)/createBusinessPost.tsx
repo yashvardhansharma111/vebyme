@@ -53,7 +53,6 @@ const ADDITIONAL_SETTINGS = [
   { id: 'starting_point', label: 'Starting Point', icon: 'navigate', placeholder: 'e.g. Alienkind Indiranagar' },
   { id: 'dress_code', label: 'Dress Code', icon: 'shirt', placeholder: 'e.g. Cafe Joggers' },
   { id: 'music_type', label: 'Music Type', icon: 'musical-notes', placeholder: 'e.g. Electronic' },
-  { id: 'parking', label: 'Parking', icon: 'car', placeholder: 'e.g. Available' },
   { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
   { id: 'links', label: 'Links', icon: 'link', placeholder: 'https://...' },
   { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
@@ -83,7 +82,7 @@ export default function CreateBusinessPostScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState('Bengaluru');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [timeEnabled, setTimeEnabled] = useState(false);
@@ -121,7 +120,7 @@ export default function CreateBusinessPostScreen() {
     setTitle('');
     setDescription('');
     setMedia([]);
-    setLocation('');
+    setLocation('Bengaluru');
     setSelectedDate(null);
     setShowDatePicker(false);
     setTimeEnabled(false);
@@ -840,11 +839,11 @@ export default function CreateBusinessPostScreen() {
             )}
           </View>
 
-          {/* Location – pill-shaped */}
+          {/* Location – default Bengaluru; no device location access */}
           <View style={styles.sectionCard}>
             <TextInput
               style={styles.locationInputPill}
-              placeholder="Bohemians Indiranagar, 1st Main"
+              placeholder="e.g. Cubbon Park, Bengaluru"
               value={location}
               onChangeText={setLocation}
               placeholderTextColor="#999"
