@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '@/components/Avatar';
 import ShareToChatModal from '@/components/ShareToChatModal';
 
@@ -42,10 +43,10 @@ function domainFromUrl(str: string): string | null {
 function isUrl(str: string): boolean {
   return /^https?:\/\/\S+/i.test(str.trim()) || /^[\w.-]+\.\w{2,}(\/.*)?$/i.test(str.trim());
 }
-const HERO_ASPECT = 4 / 3; // natural-ish image ratio
-const HERO_HEIGHT = SCREEN_WIDTH * HERO_ASPECT;
-const HERO_OVERLAP_PERCENT = 0.1; // white space covers lower 10% of image
-const CONTENT_PADDING_H = 5;
+// Match web mobile: hero ~60vh, content sheet overlaps slightly
+const HERO_HEIGHT = Math.max(280, SCREEN_HEIGHT * 0.6);
+const HERO_OVERLAP = 24; // overlap of white sheet over hero (web ~2vh)
+const CONTENT_PADDING_H = 20; // web px-5
 import GuestListModal from '@/components/GuestListModal';
 
 // Ticket background assets for pass cards
@@ -328,7 +329,7 @@ export default function BusinessPlanDetailScreen() {
   const heroImageUri = planMedia[0]?.url || 'https://picsum.photos/id/1011/800/1200';
 
   const detailPills = plan.add_details?.filter((d) => d.detail_type !== 'google_drive_link') ?? [];
-  const overlayHeight = HERO_HEIGHT * HERO_OVERLAP_PERCENT;
+  const overlayHeight = HERO_OVERLAP;
   const distanceSubtitle = plan.add_details?.find((d) => d.detail_type === 'distance')?.title
     || plan.add_details?.find((d) => d.detail_type === 'distance')?.description
     || null;
@@ -345,7 +346,7 @@ export default function BusinessPlanDetailScreen() {
     <View style={styles.container}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 72 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero – image from very top; no white header; sticky bar floats over */}
@@ -387,8 +388,10 @@ export default function BusinessPlanDetailScreen() {
           />
         </View>
 
-        {/* White overlay + content – bg is image + white; text section on top of overlay */}
-        <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 16 }]}>
+        {/* White overlay + content – gradient then white; text section on top (match web mobile) */}
+        <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 8 }]}>
+          <LinearGradient colors={['rgba(255,255,255,0.7)', '#FFFFFF']} style={StyleSheet.absoluteFill} pointerEvents="none" />
+          <View style={styles.contentOverlayInner}>
           <Text style={styles.title}>{plan.title}</Text>
           <Text style={styles.description}>{plan.description}</Text>
 
@@ -496,34 +499,34 @@ export default function BusinessPlanDetailScreen() {
             </View>
           )}
 
-          {/* View Pass (if user has ticket), else Register (or greyed if organizer) – content continues below */}
-          {userHasTicket === true && (
-            <TouchableOpacity style={styles.registerButton} onPress={handleViewPass}>
-              <Text style={styles.registerButtonText}>View Pass</Text>
-            </TouchableOpacity>
-          )}
-          {userHasTicket !== true && !isOwnEvent && (
-            <TouchableOpacity style={styles.registerButton} onPress={handleRegister}>
-              <Text style={styles.registerButtonText}>Register</Text>
-            </TouchableOpacity>
-          )}
-          {userHasTicket !== true && isOwnEvent && (
-            <TouchableOpacity style={[styles.registerButton, styles.registerButtonGreyed]} disabled>
-              <Text style={[styles.registerButtonText, styles.registerButtonTextGreyed]}>Register</Text>
-            </TouchableOpacity>
-          )}
+          </View>
         </View>
       </ScrollView>
+
+      {/* Fixed bottom bar – Register / View Pass (match web mobile) */}
+      <View style={[styles.bottomBarWrap, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        {userHasTicket === true && (
+          <TouchableOpacity style={styles.bottomBarButton} onPress={handleViewPass}>
+            <Text style={styles.registerButtonText}>View Pass</Text>
+          </TouchableOpacity>
+        )}
+        {userHasTicket !== true && !isOwnEvent && (
+          <TouchableOpacity style={styles.bottomBarButton} onPress={handleRegister}>
+            <Text style={styles.registerButtonText}>Register</Text>
+          </TouchableOpacity>
+        )}
+        {userHasTicket !== true && isOwnEvent && (
+          <TouchableOpacity style={[styles.bottomBarButton, styles.registerButtonGreyed]} disabled>
+            <Text style={[styles.registerButtonText, styles.registerButtonTextGreyed]}>Register</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Sticky header: back (blur), user pill (blur), share (blur) – all in one line */}
       <View style={[styles.stickyHeaderOverlay, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
         <View style={styles.headerRowSingle}>
-          <TouchableOpacity style={styles.backButtonTouch} onPress={() => router.back()}>
-            <BlurView intensity={60} tint="light" style={styles.iconBlur}>
-              <View style={styles.backButtonCircle}>
-                <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
-              </View>
-            </BlurView>
+          <TouchableOpacity style={styles.backButtonTouch} onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={styles.organizerPillWrapSingle} collapsable={false}>
             <BlurView intensity={60} tint="light" style={styles.organizerPillBlur}>
@@ -653,8 +656,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
   },
-  scroll: { flex: 1, backgroundColor: 'transparent' },
-  scrollContent: { paddingBottom: 40 },
+  scroll: { flex: 1, backgroundColor: '#FFF' },
+  scrollContent: { paddingBottom: 40, flexGrow: 1 },
   heroWrap: {
     width: SCREEN_WIDTH,
     overflow: 'hidden',
@@ -781,7 +784,7 @@ const styles = StyleSheet.create({
   },
   organizerTime: {
     fontSize: 12,
-    color: '#6B7280',
+    color: '#1C1C1E',
     marginTop: 2,
   },
   carouselDots: {
@@ -814,15 +817,22 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   contentOverlay: {
-    backgroundColor: '#FFF',
+    position: 'relative',
+    backgroundColor: 'transparent',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
+    overflow: 'hidden',
     paddingHorizontal: CONTENT_PADDING_H,
-    paddingBottom: 40,
+    paddingBottom: 16,
+  },
+  contentOverlayInner: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 8,
+    paddingTop: 12,
   },
   venueDateCard: {
-    backgroundColor: '#E8E8E8',
-    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
     padding: 14,
     marginTop: 12,
     marginBottom: 16,
@@ -862,13 +872,13 @@ const styles = StyleSheet.create({
   categoryPillHeading: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   categoryPillValue: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#1C1C1E',
+    fontWeight: '600',
+    color: '#6B7280',
     lineHeight: 18,
   },
   categoryPillLink: {
@@ -1079,5 +1089,22 @@ const styles = StyleSheet.create({
   },
   registerButtonTextGreyed: {
     color: '#8E8E93',
+  },
+  bottomBarWrap: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFF',
+    paddingHorizontal: CONTENT_PADDING_H,
+    paddingTop: 12,
+  },
+  bottomBarButton: {
+    backgroundColor: '#1C1C1E',
+    paddingVertical: 14,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
 });

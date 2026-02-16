@@ -163,13 +163,14 @@ function BusinessCardBase({
   };
 
   return (
-    <TouchableOpacity
-      style={[styles.cardWrapper, containerStyle]}
-      onPress={onPress}
-      activeOpacity={0.98}
-    >
-      {/* 1. Image top 70% – when pillsAboveCard, marginTop leaves room for pills above */}
-      <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove]}>
+    <View style={styles.cardOuterWrapper}>
+      <TouchableOpacity
+        style={[styles.cardWrapper, containerStyle]}
+        onPress={onPress}
+        activeOpacity={0.98}
+      >
+        {/* 1. Image top 70% – when pillsAboveCard, marginTop leaves room for pills above */}
+        <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove]}>
         <View style={styles.imageSection}>
           {mainImage ? (
             <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
@@ -222,12 +223,14 @@ function BusinessCardBase({
                     <Text style={[styles.registerButtonText, registerButtonGreyed && styles.registerButtonTextGreyed]}>Register</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-                  <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
-                  <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
-                </TouchableOpacity>
+                <View style={styles.footerIconRow}>
+                  <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
+                    <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
+                    <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -292,7 +295,8 @@ function BusinessCardBase({
           {attendeesCount > 0 && <Text style={styles.interactedPlus}>+{attendeesCount}</Text>}
         </TouchableOpacity>
       )}
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -513,6 +517,10 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'visible',
   },
+  cardOuterWrapper: {
+    paddingHorizontal: 0,
+    paddingVertical: 18,
+  },
   cardInner: {
     flex: 1,
     borderRadius: 24,
@@ -579,7 +587,7 @@ const styles = StyleSheet.create({
   },
   organizerPill: {
     position: 'absolute',
-    top: -10,
+    top: -20,
     left: 10,
     zIndex: 10,
     flexDirection: 'row',
@@ -698,18 +706,25 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     gap: 10,
     minHeight: 44,
     marginTop: 4,
   },
   registerButton: {
+    flex: 1,
+    maxWidth: '65%',
     height: 44,
     paddingHorizontal: 24,
     backgroundColor: '#1C1C1E',
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  footerIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   registerButtonText: {
     color: '#FFF',
