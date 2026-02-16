@@ -1,6 +1,8 @@
 import { apiService } from '@/services/api';
 import { useAppSelector } from '@/store/hooks';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { Ionicons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
@@ -272,6 +274,72 @@ export default function TicketScreen() {
     } catch (_) {}
   };
 
+  // Pill items: must run unconditionally (before any early return) to satisfy Rules of Hooks
+  type PillType = 'category' | 'distance' | 'starting_point' | 'dress_code' | 'music_type' | 'f&b' | 'other';
+  const pillItems = useMemo(() => {
+    if (!ticket?.plan) return [];
+
+    const plan = ticket.plan;
+    const details = plan?.add_details ?? [];
+
+    // API stores: title = field label ("Distance"), description = user value ("5km"). Show value only.
+    const getValue = (d?: { title?: string; description?: string }) =>
+      (d?.description ?? d?.title ?? '').trim();
+
+    const hasValue = (v?: string) =>
+      !!v && v.trim() !== '' && v.trim() !== '—';
+
+    const pills: { type: PillType; label: string }[] = [];
+
+    const category =
+      plan?.category_main ||
+      (plan?.category_sub && plan.category_sub[0]) ||
+      '';
+
+    if (hasValue(category)) {
+      pills.push({ type: 'category', label: category });
+    }
+
+    const find = (t: string) =>
+      details.find((d) => d.detail_type === t);
+
+    const priority: PillType[] = [
+      'distance',
+      'starting_point',
+      'dress_code',
+      'music_type',
+      'f&b',
+    ];
+
+    for (const type of priority) {
+      const value = getValue(find(type));
+      if (hasValue(value)) pills.push({ type, label: value });
+      if (pills.length === 4) return pills;
+    }
+
+    const skip = new Set([
+      'distance',
+      'starting_point',
+      'dress_code',
+      'music_type',
+      'f&b',
+      'google_drive_link',
+      'link',
+      'url',
+    ]);
+
+    for (const d of details) {
+      if (skip.has(d.detail_type)) continue;
+      const value = getValue(d);
+      if (!hasValue(value)) continue;
+
+      pills.push({ type: 'other', label: value });
+      if (pills.length === 4) break;
+    }
+
+    return pills;
+  }, [ticket]);
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -321,23 +389,23 @@ export default function TicketScreen() {
     return 'Ticket';
   })();
 
-  // Pills: Price, Distance, F&B, Music (from plan add_details + passes)
-  const pillItems = (() => {
-    const plan = ticket.plan as TicketData['plan'] & { add_details?: Array<{ detail_type: string; title?: string; description?: string }> };
-    const addDetails = plan?.add_details || [];
-    const passes = plan?.passes || [];
-    const detailBy = (t: string) => addDetails.find((d) => d.detail_type === t);
-    const priceLabel = ticket.price_paid > 0 ? `₹${ticket.price_paid}` : (passes[0]?.price != null && passes[0].price > 0) ? `₹${passes[0].price}` : 'Free';
-    const distanceLabel = detailBy('distance')?.title || detailBy('distance')?.description || plan?.location_text || '—';
-    const fbLabel = detailBy('f&b')?.title || detailBy('f&b')?.description || '—';
-    const musicLabel = plan?.category_main || (plan?.category_sub && plan.category_sub[0]) || 'Event';
-    return [
-      { icon: 'pricetag-outline' as const, label: priceLabel },
-      { icon: 'navigate-outline' as const, label: distanceLabel },
-      { icon: 'restaurant-outline' as const, label: fbLabel },
-      { icon: 'musical-notes-outline' as const, label: musicLabel },
-    ];
-  })();
+  const renderPillIcon = (type: PillType, label: string, size: number = 18, color: string = '#1C1C1E') => {
+    const p = { size, color };
+    if (type === 'category') {
+      const l = label.toLowerCase();
+      if (l.includes('sport')) return <FontAwesome5 name="basketball-ball" {...p} />;
+      if (l.includes('fitness') || l.includes('training') || l.includes('gym')) return <FontAwesome5 name="dumbbell" {...p} />;
+      if (l.includes('social') || l.includes('community')) return <FontAwesome5 name="glass-cheers" {...p} />;
+      if (l.includes('running') || l.includes('run')) return <FontAwesome5 name="running" {...p} />;
+      return <FontAwesome5 name="tag" {...p} />;
+    }
+    if (type === 'starting_point') return <FontAwesome5 name="flag-checkered" {...p} />;
+    if (type === 'distance') return <FontAwesome5 name="running" {...p} />;
+    if (type === 'dress_code') return <Ionicons name="shirt-outline" {...p} />;
+    if (type === 'music_type') return <FontAwesome5 name="music" {...p} />;
+    if (type === 'f&b') return <MaterialIcons name="fastfood" {...p} />;
+    return <FontAwesome5 name="circle" {...p} />;
+  };
 
   const effectivePlanId = ticket.plan?.plan_id || planId;
   const groupId = (ticket.plan as { group_id?: string | null })?.group_id;
@@ -353,13 +421,18 @@ export default function TicketScreen() {
         style={StyleSheet.absoluteFill}
       />
       <SafeAreaView style={styles.safeRoot} edges={['top']}>
+        {/* Header with back button on the left, left of "Booking Confirmed" */}
+        <View style={[styles.headerRow, { paddingTop: insets.top + 8 }]}>
+          <TouchableOpacity style={styles.headerBackBtn} onPress={() => router.back()} hitSlop={12}>
+            <Ionicons name="chevron-back" size={26} color="rgba(255,255,255,0.98)" />
+          </TouchableOpacity>
+          <Text style={styles.pageTitle}>Booking Confirmed</Text>
+        </View>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 + 120 + insets.bottom }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Title */}
-          <Text style={styles.pageTitle}>Booking Confirmed</Text>
 
           {/* Centered block: ticket card + overlapping details – ref wraps image + QR section so save includes QR */}
           <View style={styles.centeredBlock}>
@@ -406,7 +479,7 @@ export default function TicketScreen() {
                 <View style={styles.infoLeft}>
                   {pillItems.map((item, idx) => (
                     <View key={idx} style={styles.pill}>
-                      <Ionicons name={item.icon} size={18} color="#1C1C1E" />
+                      {renderPillIcon(item.type, item.label)}
                       <Text style={styles.pillLabel} numberOfLines={1}>{item.label}</Text>
                     </View>
                   ))}
@@ -488,6 +561,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     alignItems: 'center',
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  headerBackBtn: {
+    padding: 4,
+  },
   centeredBlock: {
     width: '100%',
     alignSelf: 'center',
@@ -497,8 +579,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.98)',
-    marginBottom: 20,
-    alignSelf: 'flex-start',
+    marginLeft: 8,
   },
   ticketCardWrap: {
     marginBottom: 0,
