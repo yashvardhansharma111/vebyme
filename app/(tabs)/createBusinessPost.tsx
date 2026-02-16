@@ -34,6 +34,13 @@ import ShareToChatModal from '@/components/ShareToChatModal';
 
 const CATEGORY_TAGS = ['Running', 'Sports', 'Fitness/Training', 'Social/Community'];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  'Running': 'walk-outline',
+  'Sports': 'basketball-outline',
+  'Fitness/Training': 'barbell-outline',
+  'Social/Community': 'people-outline',
+};
+
 // Previously used categories – hidden per design; uncomment to restore
 // const CATEGORY_TAGS_OLD = ['Music', 'Cafe', 'Clubs', 'Sports', 'Comedy', 'Travel'];
 // const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
@@ -116,6 +123,7 @@ export default function CreateBusinessPostScreen() {
   const [startAmPm, setStartAmPm] = useState<'AM' | 'PM'>('AM');
   const [endAmPm, setEndAmPm] = useState<'AM' | 'PM'>('PM');
   const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
+  const [descriptionHeight, setDescriptionHeight] = useState(100);
   const isEditFlowRef = useRef(false);
   const insets = useSafeAreaInsets();
 
@@ -788,32 +796,35 @@ export default function CreateBusinessPostScreen() {
         style={styles.keyboardView}
       >
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-          {/* Title – top */}
+          {/* Title – with label */}
           <View style={styles.sectionCard}>
+            <Text style={styles.fieldLabel}>Title</Text>
             <TextInput
               style={styles.titleInput}
-              placeholder="Title"
+              placeholder="e.g. Sunday 5K Run"
               value={title}
               onChangeText={setTitle}
               placeholderTextColor="#999"
             />
           </View>
 
-          {/* Description – below title, multiline */}
+          {/* Event Description – label + expands as text increases */}
           <View style={styles.sectionCard}>
+            <Text style={styles.fieldLabel}>Event Description</Text>
             <TextInput
-              style={styles.descriptionInput}
+              style={[styles.descriptionInput, { minHeight: Math.max(100, descriptionHeight) }]}
               placeholder="Join the run club for another 5k at Bohemians Indiranagar. Runs, Coffees, and some groovy music on the house."
               value={description}
               onChangeText={setDescription}
               multiline
-              numberOfLines={4}
+              onContentSizeChange={(e) => setDescriptionHeight(e.nativeEvent.contentSize.height + 24)}
               placeholderTextColor="#999"
             />
           </View>
 
-          {/* Media - up to 5 images */}
+          {/* Media - with section label; Add Media as smaller button */}
           <View style={[styles.sectionCard, styles.mediaSection]}>
+            <Text style={styles.fieldLabel}>Media</Text>
             {media.length > 0 ? (
               <View style={styles.mediaList}>
                 {media.map((item, index) => (
@@ -835,15 +846,16 @@ export default function CreateBusinessPostScreen() {
                 )}
               </View>
             ) : (
-              <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
-                <Ionicons name="add" size={24} color="#666" />
-                <Text style={styles.addMediaText}> Add Media</Text>
+              <TouchableOpacity style={styles.addMediaButtonSmall} onPress={handleAddMedia}>
+                <Ionicons name="add" size={20} color="#666" />
+                <Text style={styles.addMediaTextSmall}>Add Media</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Location – default Bengaluru; no device location access */}
+          {/* Location */}
           <View style={styles.sectionCard}>
+            <Text style={styles.fieldLabel}>Location</Text>
             <TextInput
               style={styles.locationInputPill}
               placeholder="e.g. Cubbon Park, Bengaluru"
@@ -960,9 +972,9 @@ export default function CreateBusinessPostScreen() {
           )}
           </View>
 
-          {/* Category – select category then expand subcategories */}
+          {/* Category – icons in pills; pills white when unselected */}
           <View style={[styles.section, styles.sectionCard]}>
-            <Text style={styles.sectionTitle}>CATEGORY</Text>
+            <Text style={styles.sectionTitle}>Category</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.categoryContainer}>
                 {CATEGORY_TAGS.map((category) => (
@@ -979,6 +991,12 @@ export default function CreateBusinessPostScreen() {
                       );
                     }}
                   >
+                    <Ionicons
+                      name={(CATEGORY_ICONS[category] || 'pricetag-outline') as any}
+                      size={18}
+                      color={selectedCategory === category ? '#FFF' : '#1C1C1E'}
+                      style={styles.categoryChipIcon}
+                    />
                     <Text
                       style={[
                         styles.categoryChipText,
@@ -1657,10 +1675,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
   },
+  addMediaButtonSmall: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    borderStyle: 'dashed',
+    borderRadius: 20,
+  },
+  addMediaTextSmall: {
+    marginLeft: 6,
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+  },
   addMediaText: {
     marginLeft: 8,
     fontSize: 14,
     color: '#666',
+  },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
   input: {
     fontSize: 14,
@@ -1771,18 +1812,26 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   categoryChip: {
-    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   categoryChipSelected: {
     backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  categoryChipIcon: {
+    marginRight: 8,
   },
   categoryChipText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#1C1C1E',
   },
   categoryChipTextSelected: {
     color: '#FFF',
@@ -1806,15 +1855,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   subcategoryChipSelected: {
     backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
   },
   subcategoryChipText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#666',
+    color: '#1C1C1E',
   },
   subcategoryChipTextSelected: {
     color: '#FFF',
