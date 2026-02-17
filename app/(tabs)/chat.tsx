@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   eventPhotoWrap: {
     width: 52,
     height: 52,
-    borderRadius: 0,
+    borderRadius: 24,
     overflow: 'hidden',
     marginRight: 16,
     backgroundColor: '#F2F2F2',
@@ -590,6 +590,7 @@ const styles = StyleSheet.create({
   eventPhoto: {
     width: 52,
     height: 52,
+    borderRadius: 24,
   },
   eventPhotoPlaceholder: {
     backgroundColor: '#E5E5EA',

@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
   headerAvatarWrap: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 2,
     borderColor: '#FFF',
     overflow: 'hidden',
@@ -927,7 +927,7 @@ const styles = StyleSheet.create({
   headerGroupImage: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 24,
   },
   headerMemberStack: {
     flexDirection: 'row',
