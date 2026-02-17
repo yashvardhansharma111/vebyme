@@ -109,9 +109,14 @@ export default function NotificationsScreen() {
       }
 
       const response = await apiService.getNotifications(user.user_id);
-      if (response.data) {
-        setNotifications(response.data);
-        // Always start in summary view (Level 1)
+      // API returns { success, message, data: array }; use .data when present
+      const list = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+      if (list.length >= 0) {
+        setNotifications(list);
+        const totalInteractions = list.reduce((acc: number, g: any) => acc + (g?.interactions?.length ?? 0), 0);
+        const individualTypes = ['post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled', 'registration_successful', 'plan_shared_chat'];
+        const individualCount = list.reduce((acc: number, g: any) => acc + (g?.interactions?.filter((i: any) => i?.type && individualTypes.includes(i.type))?.length ?? 0), 0);
+        console.log('[Notifications] loadNotifications: groups=', list.length, 'total interactions=', totalInteractions, 'individual (spec) types=', individualCount);
         setViewMode('summary');
         setSelectedEventId(null);
       }
@@ -385,7 +390,7 @@ export default function NotificationsScreen() {
     });
 
   // All interactions as flat list for individual notifications below the cards
-  // Individual list: only these spec types (business gets all 6 including registered; regular no registered)
+  // General Notifications: Business User (6) | Regular User (5) — see spec tables
   const BUSINESS_INDIVIDUAL_TYPES = ['post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled'];
   const REGULAR_INDIVIDUAL_TYPES = ['registration_successful', 'event_ended', 'free_event_cancelled', 'paid_event_cancelled', 'plan_shared_chat'];
   const allowedListTypes = isBusinessUser ? BUSINESS_INDIVIDUAL_TYPES : REGULAR_INDIVIDUAL_TYPES;
@@ -462,6 +467,10 @@ export default function NotificationsScreen() {
   };
 
   const timeGroupedNotifications = groupNotificationsByTime(allInteractionsForList);
+
+  if (__DEV__ && allInteractionsForList.length > 0) {
+    console.log('[Notifications] individual list count=', allInteractionsForList.length, 'isBusiness=', isBusinessUser, 'types=', allInteractionsForList.map((i: any) => i.type));
+  }
 
   const handleNotificationPress = (interaction: InteractionWithPlan) => {
     if (interaction.notification_id && user?.user_id) {
