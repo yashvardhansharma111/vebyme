@@ -89,6 +89,7 @@ export default function BusinessPostsScreen() {
     plan: JoinModalPlan;
     author: JoinModalAuthor;
   } | null>(null);
+  const [plansUserHasTicket, setPlansUserHasTicket] = useState<Record<string, boolean>>({});
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
@@ -240,8 +241,28 @@ export default function BusinessPostsScreen() {
         setBusinessPostsData(businessPlans);
         const formatted = await formatFeedData(businessPlans);
         setEvents(formatted);
+
+        if (user?.user_id && businessPlans.length > 0) {
+          const planIds = businessPlans.map((p: any) => p.repost_data?.original_plan_id || p.post_id);
+          const uniqueIds = Array.from(new Set(planIds));
+          const ticketMap: Record<string, boolean> = {};
+          await Promise.all(
+            uniqueIds.map(async (planId) => {
+              try {
+                const hasTicket = await apiService.hasTicketForPlan(planId, user.user_id);
+                ticketMap[planId] = hasTicket;
+              } catch {
+                ticketMap[planId] = false;
+              }
+            })
+          );
+          setPlansUserHasTicket(ticketMap);
+        } else {
+          setPlansUserHasTicket({});
+        }
       } else {
         setBusinessPostsData([]);
+        setPlansUserHasTicket({});
         setEvents([]);
       }
     } catch (err: any) {
@@ -346,8 +367,9 @@ export default function BusinessPostsScreen() {
                         title: item.event.title,
                         description: item.event.description,
                         media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                        category_main: rawPost?.category_main || '',
-                        category_sub: item.event.tags || rawPost?.tags || [],
+                        category_main: rawPost?.category_main ?? '',
+                        category_sub: rawPost?.category_sub || item.event.tags || rawPost?.tags || [],
+                        temporal_tags: rawPost?.temporal_tags || [],
                         location_text: rawPost?.location_text || '',
                         date: rawPost?.date || rawPost?.timestamp || new Date(),
                         time: rawPost?.time || '',
@@ -359,7 +381,7 @@ export default function BusinessPostsScreen() {
                       interactedUsers={item.event?.interacted_users}
                       isSwipeable={true}
                       hideRegisterButton={false}
-                      registerButtonGreyed={rawPost?.user_id === user?.user_id}
+                      registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId]}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                       }}

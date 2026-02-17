@@ -93,6 +93,7 @@ interface FormattedEvent {
     tags: string[];
     image: string;
     is_repost?: boolean;
+    repost_data?: { original_plan_id?: string } | null;
     original_author_name?: string;
     original_post_title?: string;
     original_post_description?: string;
@@ -105,6 +106,7 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [businessEvents, setBusinessEvents] = useState<FormattedEvent[]>([]);
   const [businessPostsData, setBusinessPostsData] = useState<any[]>([]); // Store raw post data for BusinessCard
+  const [plansUserHasTicket, setPlansUserHasTicket] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -344,9 +346,30 @@ export default function HomeScreen() {
 
         setBusinessEvents(businessPlans);
         setEvents(regularPlans);
+
+        // For logged-in user, check which business plans they've already joined (have ticket)
+        if (user?.user_id && rawBusinessPosts.length > 0) {
+          const planIds = rawBusinessPosts.map((p: any) => p.repost_data?.original_plan_id || p.post_id);
+          const uniqueIds = Array.from(new Set(planIds));
+          const ticketMap: Record<string, boolean> = {};
+          await Promise.all(
+            uniqueIds.map(async (planId) => {
+              try {
+                const hasTicket = await apiService.hasTicketForPlan(planId, user.user_id);
+                ticketMap[planId] = hasTicket;
+              } catch {
+                ticketMap[planId] = false;
+              }
+            })
+          );
+          setPlansUserHasTicket(ticketMap);
+        } else {
+          setPlansUserHasTicket({});
+        }
       } else {
         setBusinessEvents([]);
         setBusinessPostsData([]);
+        setPlansUserHasTicket({});
         setEvents([]);
       }
     } catch (err: any) {
@@ -477,8 +500,9 @@ export default function HomeScreen() {
                             title: item.event.title,
                             description: item.event.description,
                             media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                            category_main: rawPost?.category_main || '',
-                            category_sub: item.event.tags || rawPost?.tags || [],
+                            category_main: rawPost?.category_main ?? '',
+                            category_sub: rawPost?.category_sub || item.event.tags || rawPost?.tags || [],
+                            temporal_tags: rawPost?.temporal_tags || [],
                             location_text: rawPost?.location_text || '',
                             date: rawPost?.date || rawPost?.timestamp || new Date(),
                             time: rawPost?.time || '',
@@ -497,7 +521,7 @@ export default function HomeScreen() {
                             router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}
                           hideRegisterButton={false}
-                          registerButtonGreyed={rawPost?.user_id === user?.user_id}
+                          registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId]}
                           onRegisterPress={async () => {
                             if (!isAuthenticated || !user?.user_id) {
                               router.push('/login');

@@ -28,6 +28,7 @@ interface BusinessCardProps {
     time?: string;
     category_main?: string;
     category_sub?: string[];
+    temporal_tags?: string[];
     add_details?: Array<{ detail_type: string; title?: string; description?: string }>;
     passes?: Array<{
       pass_id: string;
@@ -118,19 +119,24 @@ function BusinessCardBase({
   const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
   const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
   const locationLabel = plan.location_text?.trim();
-  // Event tags: price, distance, F&B, location; then category_main and category_sub for proper tag viewing
-  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location' | 'category'; label: string }[] = [];
+  // Event tags: price, distance, F&B, location; category_main, category_sub; then temporal (day/time)
+  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location' | 'category' | 'temporal'; label: string }[] = [];
   if (firstTicketPrice != null && firstTicketPrice > 0) cardTags.push({ type: 'price', label: `₹${firstTicketPrice}` });
   if (distanceLabel) cardTags.push({ type: 'distance', label: distanceLabel });
   if (fbLabel) cardTags.push({ type: 'fb', label: fbLabel });
   if (locationLabel) cardTags.push({ type: 'location', label: locationLabel });
-  if (plan.category_main && cardTags.length < 4) cardTags.push({ type: 'category', label: plan.category_main });
-  if (plan.category_sub?.length && cardTags.length < 4) {
+  if (plan.category_main) cardTags.push({ type: 'category', label: plan.category_main });
+  if (plan.category_sub?.length) {
     for (const sub of plan.category_sub) {
-      if (sub && cardTags.length < 4) cardTags.push({ type: 'category', label: sub });
+      if (sub) cardTags.push({ type: 'category', label: sub });
     }
   }
-  const tagsToShow = cardTags.slice(0, 6);
+  if (plan.temporal_tags?.length) {
+    for (const t of plan.temporal_tags) {
+      if (t) cardTags.push({ type: 'temporal', label: t });
+    }
+  }
+  const tagsToShow = cardTags.slice(0, 8);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = async () => {
@@ -223,11 +229,13 @@ function BusinessCardBase({
                 nestedScrollEnabled
               >
                 {tagsToShow.map((item, index) => (
-                  <View key={`${item.type}-${index}`} style={styles.tag}>
+                  <View key={`${item.type}-${index}-${item.label}`} style={styles.tag}>
                     {item.type === 'price' ? (
                       <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
                     ) : item.type === 'category' ? (
                       <Ionicons name="pricetag-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
+                    ) : item.type === 'temporal' ? (
+                      <Ionicons name="time-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
                     ) : (
                       <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
                     )}

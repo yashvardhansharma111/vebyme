@@ -39,6 +39,12 @@ const SUB_CATEGORY_TAGS: { [key: string]: string[] } = {
   Clubs: ['Nightclub', 'Bar', 'Pub', 'Lounge', 'Dance'],
 };
 
+const DESCRIPTION_MAX_WORDS = 250;
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 export default function CreatePostScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -68,8 +74,10 @@ export default function CreatePostScreen() {
   const [editMode, setEditMode] = useState(false);
   const [planId, setPlanId] = useState<string | null>(null);
   const [descriptionHeight, setDescriptionHeight] = useState(100);
-  const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
   const openedFromMyPlansRef = useRef(false);
+
+  const descriptionWordCount = wordCount(description);
+  const descriptionAtLimit = descriptionWordCount >= DESCRIPTION_MAX_WORDS;
 
   useEffect(() => {
     if (user?.session_id && !currentUser) {
@@ -137,6 +145,15 @@ export default function CreatePostScreen() {
 
     loadPlanData();
   }, []);
+
+  const handleDescriptionChange = (text: string) => {
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    if (words.length > DESCRIPTION_MAX_WORDS) {
+      setDescription(words.slice(0, DESCRIPTION_MAX_WORDS).join(' '));
+      return;
+    }
+    setDescription(text);
+  };
 
   const handleAddMedia = () => {
     Alert.alert('Add Image', 'Choose source', [
@@ -252,7 +269,7 @@ export default function CreatePostScreen() {
       formData.append('title', title || description.substring(0, 30) || 'New Post');
       formData.append('is_women_only', isWomenOnly.toString());
       formData.append('post_type', postType);
-      if (postType === 'group' && numPeople) {
+      if (numPeople) {
         formData.append('num_people', numPeople);
       }
 
@@ -442,12 +459,26 @@ export default function CreatePostScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Event Title */}
+          {/* Description – top, 250 words */}
           <View style={styles.section}>
-            <Text style={styles.label}>Event Title</Text>
             <TextInput
-              style={styles.input}
-              placeholder="Enter a title (optional)"
+              style={[styles.textArea, styles.inputGray, { minHeight: Math.max(100, descriptionHeight) }]}
+              multiline
+              placeholder="Description"
+              placeholderTextColor="#8E8E93"
+              value={description}
+              onChangeText={handleDescriptionChange}
+              onContentSizeChange={(e) => setDescriptionHeight(e.nativeEvent.contentSize.height)}
+              textAlignVertical="top"
+            />
+            <Text style={styles.wordCount}>{descriptionWordCount}/{DESCRIPTION_MAX_WORDS} words</Text>
+          </View>
+
+          {/* Title (optional) */}
+          <View style={styles.section}>
+            <TextInput
+              style={[styles.input, styles.inputGray]}
+              placeholder="Title (optional)"
               placeholderTextColor="#8E8E93"
               value={title}
               onChangeText={setTitle}
@@ -456,25 +487,10 @@ export default function CreatePostScreen() {
             <Text style={styles.charCount}>{title.length}/30</Text>
           </View>
 
-          {/* Event Description – expands as text increases */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Event Description</Text>
-            <TextInput
-              style={[styles.textArea, { minHeight: Math.max(100, descriptionHeight) }]}
-              multiline
-              placeholder="Share your plan..."
-              placeholderTextColor="#8E8E93"
-              value={description}
-              onChangeText={setDescription}
-              onContentSizeChange={(e) => setDescriptionHeight(e.nativeEvent.contentSize.height)}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Media – compact Add Media button */}
+          {/* Add Media – white button */}
           <View style={styles.section}>
             <TouchableOpacity style={styles.addMediaButton} onPress={handleAddMedia}>
-              <Ionicons name="add" size={20} color="#666" />
+              <Ionicons name="add" size={20} color="#1C1C1E" />
               <Text style={styles.addMediaText}>Add Media</Text>
             </TouchableOpacity>
             {media.length > 0 && (
@@ -500,208 +516,50 @@ export default function CreatePostScreen() {
             )}
           </View>
 
-          {/* Post Type */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Post Type</Text>
-            <View style={styles.radioGroup}>
-              <TouchableOpacity
-                style={[
-                  styles.radioButton,
-                  postType === 'individual' && styles.radioButtonSelected,
-                ]}
-                onPress={() => setPostType('individual')}
-              >
-                <View
-                  style={[
-                    styles.radioCircle,
-                    postType === 'individual' && styles.radioCircleSelected,
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.radioText,
-                    postType === 'individual' && styles.radioTextSelected,
-                  ]}
-                >
-                  Individual Post
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.radioButton, postType === 'group' && styles.radioButtonSelected]}
-                onPress={() => setPostType('group')}
-              >
-                <View
-                  style={[styles.radioCircle, postType === 'group' && styles.radioCircleSelected]}
-                />
-                <Text
-                  style={[styles.radioText, postType === 'group' && styles.radioTextSelected]}
-                >
-                  Group Post
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {/* Women only – toggle */}
+          <View style={[styles.section, styles.toggleRow]}>
+            <Text style={styles.label}>Women only post</Text>
+            <Switch
+              value={isWomenOnly}
+              onValueChange={setIsWomenOnly}
+              trackColor={{ false: '#E5E5EA', true: '#A855F7' }}
+              thumbColor="#FFF"
+            />
           </View>
 
-          {/* Number of People (for group posts) */}
-          {postType === 'group' && (
-            <View style={styles.section}>
-              <Text style={styles.label}>Number of People</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 4"
-                placeholderTextColor="#8E8E93"
-                value={numPeople}
-                onChangeText={setNumPeople}
-                keyboardType="number-pad"
-              />
-            </View>
-          )}
-
-          {/* Additional Settings – dropdown with Women's Only */}
+          {/* Number of people */}
           <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.additionalSettingsHeader}
-              onPress={() => setAdditionalSettingsExpanded((prev) => !prev)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.sectionTitle}>Additional Settings</Text>
-              <Ionicons
-                name={additionalSettingsExpanded ? 'chevron-up' : 'chevron-down'}
-                size={22}
-                color="#666"
-              />
-            </TouchableOpacity>
-            {additionalSettingsExpanded && (
-              <View style={styles.additionalSettingsContent}>
-                <View style={styles.toggleRow}>
-                  <View style={styles.toggleLabelContainer}>
-                    <Text style={styles.label}>Women&apos;s Only Post</Text>
-                    {isWomenOnly && (
-                      <Text style={styles.toggleDescription}>
-                        Everyone would see your plan, but only women will be able to join and repost.
-                      </Text>
-                    )}
-                  </View>
-                  <Switch
-                    value={isWomenOnly}
-                    onValueChange={setIsWomenOnly}
-                    trackColor={{ false: '#E5E5EA', true: '#A855F7' }}
-                    thumbColor="#FFF"
-                  />
-                </View>
-              </View>
-            )}
+            {/* <Text style={styles.label}>Number of people</Text> */}
+            <TextInput
+              style={[styles.input, styles.inputGray]}
+              placeholder="Number of people"
+              placeholderTextColor="#8E8E93"
+              value={numPeople}
+              onChangeText={setNumPeople}
+              keyboardType="number-pad"
+            />
           </View>
 
-          {/* Tags Section */}
+          {/* Tags – day, time, category in gray box; pills white, selected black */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Add Tags</Text>
-
-            {/* DAY Tags */}
-            <View style={styles.tagSection}>
-              <Text style={styles.tagLabel}>DAY</Text>
-              <View style={styles.tagRow}>
-                {DAY_TAGS.map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tagButton,
-                      selectedDay === tag && styles.tagButtonSelected,
-                    ]}
-                    onPress={() => setSelectedDay(selectedDay === tag ? '' : tag)}
-                  >
-                    <Text
-                      style={[
-                        styles.tagButtonText,
-                        selectedDay === tag && styles.tagButtonTextSelected,
-                      ]}
-                    >
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* TIME Tags */}
-            <View style={styles.tagSection}>
-              <Text style={styles.tagLabel}>TIME</Text>
-              <View style={styles.tagRow}>
-                {TIME_TAGS.map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tagButton,
-                      selectedTime === tag && styles.tagButtonSelected,
-                    ]}
-                    onPress={() => setSelectedTime(selectedTime === tag ? '' : tag)}
-                  >
-                    <Text
-                      style={[
-                        styles.tagButtonText,
-                        selectedTime === tag && styles.tagButtonTextSelected,
-                      ]}
-                    >
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* CATEGORY Tags – with icons, white pills */}
-            <View style={styles.tagSection}>
-              <Text style={styles.tagLabel}>CATEGORY</Text>
-              <View style={styles.tagRow}>
-                {CATEGORY_TAGS.map((tag) => (
-                  <TouchableOpacity
-                    key={tag}
-                    style={[
-                      styles.tagButtonCategory,
-                      selectedCategory === tag && styles.tagButtonCategorySelected,
-                    ]}
-                    onPress={() => {
-                      setSelectedCategory(selectedCategory === tag ? '' : tag);
-                      setSelectedSubCategory('');
-                    }}
-                  >
-                    <Ionicons
-                      name={CATEGORY_ICONS[tag] || 'ellipse'}
-                      size={16}
-                      color={selectedCategory === tag ? '#FFF' : '#666'}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      style={[
-                        styles.tagButtonTextCategory,
-                        selectedCategory === tag && styles.tagButtonTextCategorySelected,
-                      ]}
-                    >
-                      {tag}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* SUB-CATEGORY Tags – white pills with icons (text only for sub) */}
-            {selectedCategory && SUB_CATEGORY_TAGS[selectedCategory] && (
+            <Text style={styles.sectionTitle}>Tags</Text>
+            <View style={styles.tagsGrayBox}>
               <View style={styles.tagSection}>
-                <Text style={styles.tagLabel}>SUB-CATEGORY</Text>
+                <Text style={styles.tagLabel}>DAY</Text>
                 <View style={styles.tagRow}>
-                  {SUB_CATEGORY_TAGS[selectedCategory].map((tag) => (
+                  {DAY_TAGS.map((tag) => (
                     <TouchableOpacity
                       key={tag}
                       style={[
-                        styles.tagButtonCategory,
-                        selectedSubCategory === tag && styles.tagButtonCategorySelected,
+                        styles.tagPillWhite,
+                        selectedDay === tag && styles.tagPillSelected,
                       ]}
-                      onPress={() => setSelectedSubCategory(selectedSubCategory === tag ? '' : tag)}
+                      onPress={() => setSelectedDay(selectedDay === tag ? '' : tag)}
                     >
                       <Text
                         style={[
-                          styles.tagButtonTextCategory,
-                          selectedSubCategory === tag && styles.tagButtonTextCategorySelected,
+                          styles.tagPillTextWhite,
+                          selectedDay === tag && styles.tagPillTextSelected,
                         ]}
                       >
                         {tag}
@@ -710,7 +568,93 @@ export default function CreatePostScreen() {
                   ))}
                 </View>
               </View>
-            )}
+
+              <View style={styles.tagSection}>
+                <Text style={styles.tagLabel}>TIME</Text>
+                <View style={styles.tagRow}>
+                  {TIME_TAGS.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        styles.tagPillWhite,
+                        selectedTime === tag && styles.tagPillSelected,
+                      ]}
+                      onPress={() => setSelectedTime(selectedTime === tag ? '' : tag)}
+                    >
+                      <Text
+                        style={[
+                          styles.tagPillTextWhite,
+                          selectedTime === tag && styles.tagPillTextSelected,
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.tagSection}>
+                <Text style={styles.tagLabel}>CATEGORY</Text>
+                <View style={styles.tagRow}>
+                  {CATEGORY_TAGS.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={[
+                        styles.tagPillWhite,
+                        selectedCategory === tag && styles.tagPillSelected,
+                      ]}
+                      onPress={() => {
+                        setSelectedCategory(selectedCategory === tag ? '' : tag);
+                        setSelectedSubCategory('');
+                      }}
+                    >
+                      <Ionicons
+                        name={CATEGORY_ICONS[tag] || 'ellipse'}
+                        size={16}
+                        color={selectedCategory === tag ? '#FFF' : '#1C1C1E'}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          styles.tagPillTextWhite,
+                          selectedCategory === tag && styles.tagPillTextSelected,
+                        ]}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {selectedCategory && SUB_CATEGORY_TAGS[selectedCategory] && (
+                <View style={styles.tagSection}>
+                  <Text style={styles.tagLabel}>SUB-CATEGORY</Text>
+                  <View style={styles.tagRow}>
+                    {SUB_CATEGORY_TAGS[selectedCategory].map((tag) => (
+                      <TouchableOpacity
+                        key={tag}
+                        style={[
+                          styles.tagPillWhite,
+                          selectedSubCategory === tag && styles.tagPillSelected,
+                        ]}
+                        onPress={() => setSelectedSubCategory(selectedSubCategory === tag ? '' : tag)}
+                      >
+                        <Text
+                          style={[
+                            styles.tagPillTextWhite,
+                            selectedSubCategory === tag && styles.tagPillTextSelected,
+                          ]}
+                        >
+                          {tag}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
         </ScrollView>
 
@@ -742,7 +686,7 @@ export default function CreatePostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFF',
   },
   header: {
     flexDirection: 'row',
@@ -785,24 +729,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textArea: {
-    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     fontSize: 16,
     color: '#1C1C1E',
     minHeight: 100,
     textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+  },
+  inputGray: {
+    backgroundColor: '#F2F2F7',
   },
   input: {
-    backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     fontSize: 16,
     color: '#1C1C1E',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+  },
+  wordCount: {
+    fontSize: 12,
+    color: '#8E8E93',
+    marginTop: 4,
+    textAlign: 'right',
   },
   charCount: {
     fontSize: 12,
@@ -824,7 +771,7 @@ const styles = StyleSheet.create({
   },
   addMediaText: {
     fontSize: 14,
-    color: '#666',
+    color: '#1C1C1E',
     marginLeft: 6,
   },
   mediaContainer: {
@@ -902,16 +849,12 @@ const styles = StyleSheet.create({
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  toggleLabelContainer: {
-    flex: 1,
-    marginRight: 16,
-  },
-  toggleDescription: {
-    fontSize: 12,
-    color: '#8E8E93',
-    marginTop: 4,
+  tagsGrayBox: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 16,
+    padding: 16,
   },
   tagSection: {
     marginBottom: 20,
@@ -928,46 +871,23 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  tagButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F2F2F7',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  tagButtonSelected: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
-  },
-  tagButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  tagButtonTextSelected: {
-    color: '#FFF',
-  },
-  tagButtonCategory: {
+  tagPillWhite: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
-  tagButtonCategorySelected: {
+  tagPillSelected: {
     backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
   },
-  tagButtonTextCategory: {
+  tagPillTextWhite: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#1C1C1E',
   },
-  tagButtonTextCategorySelected: {
+  tagPillTextSelected: {
     color: '#FFF',
   },
   additionalSettingsHeader: {
