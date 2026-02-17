@@ -68,7 +68,7 @@ export default function LoginScreen() {
 
   const phoneDigits = (phone || '').replace(/\D/g, '');
   const canSendOtp = phoneDigits.length >= 10;
-  const OTP_LENGTH = 6;
+  const OTP_LENGTH = 4;
   const canVerifyOtp = (otp || '').trim().length >= OTP_LENGTH && !!otpId;
 
   const handleSendOTP = async () => {
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   otpCircle: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.25)',
     backgroundColor: 'rgba(255,255,255,0.08)',
