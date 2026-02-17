@@ -295,16 +295,16 @@ export default function CreatePostScreen() {
         formData.append('category_sub', selectedCategory.toLowerCase());
       }
 
-      // Add media files
+      // Add media files (use uri as-is on iOS to avoid upload getting stuck)
       media.forEach((item, index) => {
         const fileUri = item.uri;
-        const fileName = fileUri.split('/').pop() || `media_${index}.${item.type === 'video' ? 'mp4' : 'jpg'}`;
+        const fileName = (typeof fileUri === 'string' ? fileUri.split('/').pop() : null) || `media_${index}.${item.type === 'video' ? 'mp4' : 'jpg'}`;
         const fileType = item.type === 'video' ? 'video/mp4' : 'image/jpeg';
-        
-        // React Native FormData format
+
+        // React Native FormData format - do not strip file:// on iOS
         // @ts-ignore - FormData type issue for React Native
         formData.append('files', {
-          uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
+          uri: fileUri,
           name: fileName,
           type: fileType,
         } as any);

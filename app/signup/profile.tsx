@@ -72,7 +72,7 @@ export default function SignupProfileScreen() {
           const formData = new FormData();
           // @ts-ignore
           formData.append('file', {
-            uri: Platform.OS === 'ios' ? asset.uri.replace('file://', '') : asset.uri,
+            uri: asset.uri,
             name: 'profile.jpg',
             type: 'image/jpeg',
           });

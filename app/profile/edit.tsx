@@ -77,6 +77,7 @@ export default function EditProfileScreen() {
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: false,
             quality: 0.8,
+            allowsMultipleSelection: false,
           });
         }
 
@@ -88,8 +89,11 @@ export default function EditProfileScreen() {
           // Get file URI
           const fileUri = asset.uri;
           
-          // Get file name and type - ensure proper MIME type for JPG and PNG
-          let fileName = asset.fileName || asset.uri.split('/').pop() || `profile_${Date.now()}.jpg`;
+          // Get file name and type - ensure valid filename on iOS (asset.fileName can be undefined)
+          let fileName = asset.fileName || (typeof asset.uri === 'string' ? asset.uri.split('/').pop() : null) || `profile_${Date.now()}.jpg`;
+          if (!fileName || !/\.(jpg|jpeg|png|gif|webp)$/i.test(fileName)) {
+            fileName = `profile_${Date.now()}.jpg`;
+          }
           let fileType = asset.type || 'image/jpeg';
           
           // Determine MIME type from file extension if not provided or if type is invalid (e.g., just "image")
@@ -121,10 +125,10 @@ export default function EditProfileScreen() {
             const file = new File([blob], fileName, { type: fileType });
             formData.append('file', file);
           } else {
-            // For native platforms (iOS/Android), use React Native FormData format
+            // For native (iOS/Android): use uri as returned by ImagePicker (do not strip file:// on iOS)
             // @ts-ignore - React Native FormData format
             formData.append('file', {
-              uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
+              uri: fileUri,
               name: fileName,
               type: fileType,
             } as any);
@@ -165,9 +169,9 @@ export default function EditProfileScreen() {
       }
     };
 
-    // On iOS, present the native picker after the modal has dismissed to avoid presentation issues
+    // On iOS, present the native picker after the modal has fully dismissed to avoid presentation issues
     if (Platform.OS === 'ios') {
-      setTimeout(() => runPicker(), 400);
+      setTimeout(() => runPicker(), 500);
     } else {
       await runPicker();
     }

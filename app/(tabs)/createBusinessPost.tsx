@@ -591,7 +591,7 @@ export default function CreateBusinessPostScreen() {
       if (media.length > 0) {
         media.forEach((item, index) => {
           formData.append('files', {
-            uri: Platform.OS === 'ios' ? item.uri.replace('file://', '') : item.uri,
+            uri: item.uri,
             type: item.type === 'video' ? 'video/mp4' : 'image/jpeg',
             name: `media-${index}.${item.type === 'video' ? 'mp4' : 'jpg'}`,
           } as any);
