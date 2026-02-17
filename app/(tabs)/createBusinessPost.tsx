@@ -1187,9 +1187,8 @@ export default function CreateBusinessPostScreen() {
                 return (
                   <View key={pass.pass_id} style={styles.passCard}>
                     <View style={styles.passHeader}>
-                      <Text style={styles.passTitle}>Pass {index + 1}</Text>
                       {!editMode && (
-                        <TouchableOpacity onPress={() => removePass(index)}>
+                        <TouchableOpacity onPress={() => removePass(index)} style={styles.passCloseOnly}>
                           <Ionicons name="close" size={20} color="#666" />
                         </TouchableOpacity>
                       )}
@@ -1206,7 +1205,7 @@ export default function CreateBusinessPostScreen() {
                       <TextInput
                         style={[styles.passInput, styles.passPriceInRow]}
                         placeholder="Price"
-                        value={pass.price >= 0 ? pass.price.toString() : ''}
+                        value={pass.price > 0 ? pass.price.toString() : ''}
                         onChangeText={(text) => !isExistingTicket && updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
                         keyboardType="numeric"
                         placeholderTextColor="#999"
@@ -2058,16 +2057,19 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   passCard: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#F2F2F7',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
   passHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  passCloseOnly: {
+    padding: 4,
   },
   passTitle: {
     fontSize: 16,
@@ -2078,7 +2080,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#000',
     padding: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: '#E5E5EA',
     borderRadius: 8,
     marginBottom: 12,
   },

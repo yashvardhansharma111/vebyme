@@ -376,11 +376,11 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
       >
         <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
-          <View style={styles.galleryContentWrap} pointerEvents="box-none">
+          <View style={[styles.galleryContentWrap, { margin: 20 }]} pointerEvents="box-none">
             {hasEventImage && event?.image && (
-              <View style={styles.galleryCenterWrap}>
+              <TouchableOpacity style={styles.galleryCenterWrap} activeOpacity={1} onPress={() => {}}>
                 <Image source={{ uri: event.image }} style={styles.galleryImageCentered} resizeMode="contain" />
-              </View>
+              </TouchableOpacity>
             )}
             <TouchableOpacity
               style={styles.galleryCloseButton}
@@ -735,7 +735,7 @@ const styles = StyleSheet.create({
   },
   galleryCloseButton: {
     position: 'absolute',
-    top: 28,
+    top: 0,
     left: 0,
     zIndex: 10,
     width: 44,

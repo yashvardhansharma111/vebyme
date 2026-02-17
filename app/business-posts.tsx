@@ -340,6 +340,7 @@ export default function BusinessPostsScreen() {
                       key={item.id}
                       containerStyle={styles.businessCardInList}
                       pillsAboveCard
+                      compactVerticalPadding
                       plan={{
                         plan_id: effectivePlanId,
                         title: item.event.title,
@@ -510,11 +511,11 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   businessCardInList: {
-    /* Same hack as event card: feed has paddingTop so pills sticking above card have room */
+    marginBottom: 8,
   },
   feed: {
-    paddingTop: 20,
-    paddingBottom: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
   safeArea: {
     flex: 1,
