@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import Avatar from './Avatar';
 
 interface SummaryCardProps {
@@ -8,6 +9,8 @@ interface SummaryCardProps {
   /** Event description shown in state one; "vybeme!" is shown on the next line */
   eventDescription: string;
   onPress: () => void;
+  /** When true show "My Plans" icon; when false show "Tickets and Passes" icon (top left) */
+  isBusinessUser?: boolean;
 }
 
 const AVATAR_SIZE = 40;
@@ -17,6 +20,7 @@ export default function SummaryCard({
   avatars,
   eventDescription,
   onPress,
+  isBusinessUser = false,
 }: SummaryCardProps) {
   const displayAvatars = [...avatars]
     .filter((a) => a != null && a !== '')
@@ -34,6 +38,12 @@ export default function SummaryCard({
         onPress={onPress}
         activeOpacity={0.9}
       >
+        {/* Icon top left: Tickets & Passes (regular user only); no icon for business user */}
+        {!isBusinessUser && (
+          <View style={styles.iconTopLeft}>
+            <Ionicons name="ticket-outline" size={22} color="#8E8E93" />
+          </View>
+        )}
         <View style={styles.frameWrapper}>
           <View style={styles.frameContainer}>
             <View style={styles.ellipseParent}>
@@ -52,7 +62,7 @@ export default function SummaryCard({
           </View>
         </View>
         <View style={styles.leavingToOotyWrapper}>
-          <Text style={styles.leavingToOotyContainer}>
+          <Text style={styles.leavingToOotyContainer} numberOfLines={3} ellipsizeMode="tail">
             <Text style={styles.leavingToOoty}>{descriptionText}{descriptionText ? ' ' : ''}</Text>
             <Text style={styles.vybeme}>vybeme! </Text>
           </Text>
@@ -76,7 +86,7 @@ const styles = StyleSheet.create({
     bottom: -8,
     height: 70,
     backgroundColor: '#EDEDED',
-    borderRadius: 20,
+    borderRadius: 24,
     zIndex: 0,
   },  
   /* Frame1984077336 – upper card */
@@ -85,14 +95,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingVertical: 22,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 8,
     zIndex: 1,
-  },  
+  },
+  iconTopLeft: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    zIndex: 2,
+  },
   frameWrapper: {
     flexDirection: 'row',
     alignSelf: 'stretch',

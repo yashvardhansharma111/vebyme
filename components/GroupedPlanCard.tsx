@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator, Modal, ScrollView, Share, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Avatar from './Avatar';
@@ -277,6 +277,31 @@ export default function GroupedPlanCard({
     });
   };
 
+  const handleDownloadData = async (e: any) => {
+    e?.stopPropagation?.();
+    if (guests.length === 0) return;
+    const header = 'Name,Type';
+    const rows = guests.map((g) => `${(g.name || '').replace(/,/g, ' ')},${g.is_returning ? 'Returning' : 'First-timer'}`);
+    const csv = [header, ...rows].join('\n');
+    try {
+      await Share.share({
+        message: csv,
+        title: 'Registrations',
+      });
+    } catch (err: any) {
+      if (err?.message !== 'User did not share') {
+        Alert.alert('Error', err?.message || 'Failed to share data');
+      }
+    }
+  };
+
+  const handleViewTicketDistribution = (e: any) => {
+    e?.stopPropagation?.();
+    if (planId) {
+      router.push({ pathname: '/analytics/event/[planId]', params: { planId } } as any);
+    }
+  };
+
   const handleAddToAnnouncementGroup = () => {
     const toAdd = guests.filter(
       (g) =>
@@ -288,13 +313,6 @@ export default function GroupedPlanCard({
       onAddToCommunity(toAdd);
     }
     setShowAddToCommunityModal(false);
-  };
-
-  const handleViewTicketDistribution = (e: any) => {
-    e?.stopPropagation?.();
-    if (planId) {
-      router.push({ pathname: '/analytics/event/[planId]', params: { planId } } as any);
-    }
   };
 
   // Stacking offset effect
@@ -325,7 +343,7 @@ export default function GroupedPlanCard({
         </View>
 
         {/* Description - Show in Level 2 (collapsed) and Level 3 (expanded) */}
-        <Text style={styles.description} numberOfLines={expanded && showInteractions ? undefined : 2}>
+        <Text style={styles.description} numberOfLines={expanded && showInteractions ? 4 : 3}>
           {postText}
         </Text>
 
@@ -360,15 +378,16 @@ export default function GroupedPlanCard({
                 <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
               </TouchableOpacity>
             </View>
-            {/* View Ticket Distribution - always visible for accessibility (Notifications → Plan Card → View Ticket Distribution) */}
-            <TouchableOpacity
-              style={styles.viewTicketDistributionInline}
-              onPress={handleViewTicketDistribution}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.viewTicketDistributionInlineText}>View Ticket Distribution</Text>
-              <Ionicons name="chevron-forward" size={16} color="#2563EB" />
-            </TouchableOpacity>
+            {/* View Ticket Distribution - State 3 only (above registered list) */}
+            {expanded && showInteractions && planId && (
+              <TouchableOpacity
+                style={styles.viewTicketDistributionButton}
+                onPress={handleViewTicketDistribution}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.viewTicketDistributionButtonText}>View Ticket Distribution</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
 
@@ -404,19 +423,10 @@ export default function GroupedPlanCard({
           </View>
         )}
 
-        {/* View Ticket Distribution + Registered section (when expanded and we have a plan) */}
+        {/* Registered section (when expanded and we have a plan) - State 3: list then Add to Community + Download below */}
         {expanded && showInteractions && planId && (
           <>
-            <TouchableOpacity
-              style={styles.viewTicketDistributionButton}
-              onPress={handleViewTicketDistribution}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.viewTicketDistributionButtonText}>View Ticket Distribution</Text>
-            </TouchableOpacity>
-
             <View style={styles.registeredSection}>
-              <Text style={styles.registeredSectionTitle}>Registered</Text>
               {loadingGuests ? (
                 <View style={styles.guestsLoading}>
                   <ActivityIndicator size="small" color="#8E8E93" />
@@ -445,6 +455,29 @@ export default function GroupedPlanCard({
                     </Text>
                   </TouchableOpacity>
                 ))
+              )}
+              {guests.length >= 2 && (
+                <View style={styles.registeredActionRow}>
+                  {onAddToCommunity && (
+                    <TouchableOpacity
+                      style={styles.registeredActionButton}
+                      onPress={handleAddToCommunityPress}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.registeredActionButtonText}>Add to Community</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={styles.registeredActionButtonIcon}
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      handleDownloadData();
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="download-outline" size={22} color="#1C1C1E" />
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
           </>
@@ -691,24 +724,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  viewTicketDistributionInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    marginTop: 8,
-    paddingVertical: 6,
-  },
-  viewTicketDistributionInlineText: {
-    color: '#2563EB',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   registeredSection: {
     marginTop: 16,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F2F2F7',
+  },
+  registeredActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  registeredActionButton: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  registeredActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  registeredActionButtonIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#E5E5EA',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   registeredSectionTitle: {
     fontSize: 13,

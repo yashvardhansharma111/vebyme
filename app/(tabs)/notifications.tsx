@@ -78,6 +78,7 @@ export default function NotificationsScreen() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [viewedCardIds, setViewedCardIds] = useState<Set<string>>(new Set());
   const announcementMembersLoadedRef = useRef(false);
+  const userNotFoundIdsRef = useRef<Set<string>>(new Set());
   const router = useRouter();
   const dispatch = useAppDispatch();
   
@@ -172,6 +173,9 @@ export default function NotificationsScreen() {
     if (userCache[user_id]) {
       return userCache[user_id];
     }
+    if (userNotFoundIdsRef.current.has(user_id)) {
+      return userCache[user_id] ?? { name: 'Unknown', profile_image: null };
+    }
 
     setLoadingUsers((prev) => new Set(prev).add(user_id));
 
@@ -191,7 +195,13 @@ export default function NotificationsScreen() {
         return userData;
       }
     } catch (error: any) {
-      console.error(`Error fetching user ${user_id}:`, error);
+      const isNotFound = error?.message?.includes('User not found') || error?.message?.includes('not found');
+      if (isNotFound) {
+        userNotFoundIdsRef.current.add(user_id);
+        setUserCache((prev) => ({ ...prev, [user_id]: { name: 'Unknown', profile_image: null } }));
+      } else {
+        console.error(`Error fetching user ${user_id}:`, error);
+      }
       setLoadingUsers((prev) => {
         const newSet = new Set(prev);
         newSet.delete(user_id);
@@ -206,7 +216,11 @@ export default function NotificationsScreen() {
       const userIds = new Set<string>();
       notifications.forEach((group) => {
         group.interactions.forEach((interaction) => {
-          if (interaction.source_user_id && !userCache[interaction.source_user_id]) {
+          if (
+            interaction.source_user_id &&
+            !userCache[interaction.source_user_id] &&
+            !userNotFoundIdsRef.current.has(interaction.source_user_id)
+          ) {
             userIds.add(interaction.source_user_id);
           }
         });
@@ -543,6 +557,7 @@ export default function NotificationsScreen() {
             avatars={getAllAvatars()}
             eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
             onPress={handleSummaryCardPress}
+            isBusinessUser={false}
           />
         )}
         {/* State 2 & 3: Event cards list / one expanded */}
@@ -685,9 +700,11 @@ export default function NotificationsScreen() {
     );
   };
 
+  const isState1Summary = viewMode === 'summary' && groupedPlanCards.length > 0;
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+      <View style={[styles.header, isState1Summary && styles.headerNoSeparator]}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
@@ -742,6 +759,7 @@ export default function NotificationsScreen() {
                       avatars={getAllAvatars()}
                       eventDescription={groupedPlanCards[0].post?.description ?? groupedPlanCards[0].post?.title ?? ''}
                       onPress={handleSummaryCardPress}
+                      isBusinessUser={true}
                     />
                   )}
                   {(viewMode === 'eventsList' || viewMode === 'eventDetail') && (
@@ -990,6 +1008,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
+  },
+  headerNoSeparator: {
+    borderBottomWidth: 0,
   },
   headerLeft: {
     flexDirection: 'row',
