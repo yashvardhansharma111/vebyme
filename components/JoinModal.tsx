@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Pressable,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -48,7 +49,7 @@ interface JoinModalProps {
   planId: string;
   plan: JoinModalPlan;
   author: JoinModalAuthor;
-  onSuccess: (messageOrEmoji: string) => void | Promise<void>;
+  onSuccess: (messageOrEmoji: string, type?: 'emoji' | 'message') => void | Promise<void>;
   /** If true, uses event registration (registerForEvent); one action per user is enforced by backend */
   isEvent?: boolean;
 }
@@ -74,8 +75,28 @@ export default function JoinModal({
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [actionSent, setActionSent] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const inputRef = useRef<TextInput>(null);
   const tags = getPlanDisplayTags(plan);
+
+  useEffect(() => {
+    const show = Platform.OS === 'ios' 
+      ? Keyboard.addListener('keyboardWillShow', (e) => {
+          setKeyboardHeight(e.endCoordinates.height);
+        }) 
+      : Keyboard.addListener('keyboardDidShow', (e) => {
+          setKeyboardHeight(e.endCoordinates.height);
+        });
+    
+    const hide = Platform.OS === 'ios' 
+      ? Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0)) 
+      : Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const handleClose = () => {
     if (loading) return;
@@ -84,12 +105,12 @@ export default function JoinModal({
     onClose();
   };
 
-  const submitAction = async (payload: string) => {
+  const submitAction = async (payload: string, type: 'emoji' | 'message') => {
     if (actionSent || loading || !payload.trim()) return;
     setLoading(true);
     setActionSent(true);
     try {
-      await onSuccess(payload.trim());
+      await onSuccess(payload.trim(), type);
       handleClose();
     } catch (_) {
       setActionSent(false);
@@ -99,13 +120,13 @@ export default function JoinModal({
   };
 
   const handleEmojiPress = (emoji: string) => {
-    submitAction(emoji);
+    submitAction(emoji, 'emoji');
   };
 
   const handleSendMessage = () => {
     const text = message.trim();
     if (!text || actionSent || loading) return;
-    submitAction(text);
+    submitAction(text, 'message');
   };
 
   const timeLabel = author.time || '';
@@ -119,83 +140,125 @@ export default function JoinModal({
       statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={handleClose}>
-        <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+        {/* Background Blur/Color */}
+        <View style={StyleSheet.absoluteFill}>
+          {Platform.OS === 'android' ? (
+            <View style={styles.androidBg} />
+          ) : (
+            <BlurView intensity={95} tint="dark" style={StyleSheet.absoluteFill} />
+          )}
+        </View>
+
+        {/* Main KeyboardAvoidingView */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+          style={styles.keyboardAvoidingView}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <Pressable style={styles.centered} onPress={(e) => e.stopPropagation()}>
-            {/* Focused post card + emoji row as one card (emoji at bottom border of post) */}
-            <View style={styles.postCard}>
-              {/* Author pill */}
-              <View style={styles.authorPill}>
-                <Avatar uri={author.avatar ?? undefined} size={36} />
-                <View style={styles.authorInfo}>
-                  <Text style={styles.authorName} numberOfLines={1}>{author.name}</Text>
-                  {timeLabel ? <Text style={styles.authorTime} numberOfLines={1}>{timeLabel}</Text> : null}
+          {/* Container with fixed spacing from top */}
+          <View style={styles.mainContainer}>
+            {/* Card Section - Fixed at top */}
+            <View style={styles.cardSection}>
+              {/* Post card: user pill on top border, content (description 4 lines), space for tags, reaction pill on bottom border */}
+              <View style={styles.postCardWrapper} collapsable={false}>
+                {/* User pill – on top border of post */}
+                <View style={styles.authorPillOnBorder}>
+                  <Avatar uri={author.avatar ?? undefined} size={36} />
+                  <View style={styles.authorInfo}>
+                    <Text style={styles.authorName} numberOfLines={1}>
+                      {author.name}
+                    </Text>
+                    {timeLabel ? (
+                      <Text style={styles.authorTime} numberOfLines={1}>
+                        {timeLabel}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View style={styles.postCard}>
+                  <Text style={styles.postTitle}>{plan.title || 'Untitled Plan'}</Text>
+                  <Text
+                    style={styles.postDescription}
+                    numberOfLines={4}
+                    ellipsizeMode="tail"
+                  >
+                    {plan.description || 'No description'}
+                  </Text>
+                  {tags.length > 0 && (
+                    <View style={styles.tagsRowWithSpace}>
+                      {tags.map((tag) => (
+                        <View key={tag} style={styles.tagPill}>
+                          <Ionicons
+                            name={(TAG_ICONS[tag] || 'ellipse') as any}
+                            size={12}
+                            color="#3C3C43"
+                          />
+                          <Text style={styles.tagText} numberOfLines={1}>
+                            {tag}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+
+                {/* Reaction pill – on bottom border of post (same pill style as user pill) */}
+                <View style={styles.reactionPillOnBorder}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.reactionPillContent}
+                  >
+                    {EMOJI_OPTIONS.map((emoji) => (
+                      <TouchableOpacity
+                        key={emoji}
+                        style={styles.emojiButton}
+                        onPress={() => handleEmojiPress(emoji)}
+                        disabled={loading || actionSent}
+                      >
+                        <Text style={styles.emojiText}>{emoji}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               </View>
-              <Text style={styles.postTitle}>{plan.title || 'Untitled Plan'}</Text>
-              <Text style={styles.postDescription}>{plan.description || 'No description'}</Text>
-              {tags.length > 0 && (
-                <View style={styles.tagsRow}>
-                  {tags.map((tag) => (
-                    <View key={tag} style={styles.tagPill}>
-                      <Ionicons name={(TAG_ICONS[tag] || 'ellipse') as any} size={12} color="#3C3C43" />
-                      <Text style={styles.tagText} numberOfLines={1}>{tag}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              {/* Emoji row – at bottom border of post, inside same card */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.emojiRow}
-                style={styles.emojiRowWrap}
-              >
-                {EMOJI_OPTIONS.map((emoji) => (
-                  <TouchableOpacity
-                    key={emoji}
-                    style={styles.emojiButton}
-                    onPress={() => handleEmojiPress(emoji)}
-                    disabled={loading || actionSent}
-                  >
-                    <Text style={styles.emojiText}>{emoji}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
             </View>
 
-            {/* Message input + send */}
-            <View style={styles.inputRow}>
-              <TextInput
-                ref={inputRef}
-                style={styles.input}
-                placeholder="Send a message"
-                placeholderTextColor="#8E8E93"
-                value={message}
-                onChangeText={setMessage}
-                editable={!actionSent && !loading}
-                multiline={false}
-                returnKeyType="send"
-                onSubmitEditing={handleSendMessage}
-                autoFocus={true}
-              />
-              <TouchableOpacity
-                style={[styles.sendButton, (!message.trim() || loading || actionSent) && styles.sendButtonDisabled]}
-                onPress={handleSendMessage}
-                disabled={!message.trim() || loading || actionSent}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <Ionicons name="arrow-forward" size={22} color="#FFF" />
-                )}
-              </TouchableOpacity>
+            {/* Input Section - Pushes up with keyboard */}
+            <View style={[styles.inputSection, { paddingBottom: keyboardHeight + 16 }]}>
+              <View style={styles.inputRow} collapsable={false}>
+                <TextInput
+                  ref={inputRef}
+                  style={styles.input}
+                  placeholder="Send a message"
+                  placeholderTextColor="#8E8E93"
+                  value={message}
+                  onChangeText={setMessage}
+                  editable={!actionSent && !loading}
+                  multiline={false}
+                  returnKeyType="send"
+                  onSubmitEditing={handleSendMessage}
+                  autoFocus={true}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.sendButton,
+                    (!message.trim() || loading || actionSent) &&
+                      styles.sendButtonDisabled,
+                  ]}
+                  onPress={handleSendMessage}
+                  disabled={!message.trim() || loading || actionSent}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#FFF" />
+                  ) : (
+                    <Ionicons name="arrow-forward" size={22} color="#FFF" />
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </Pressable>
+          </View>
         </KeyboardAvoidingView>
       </Pressable>
     </Modal>
@@ -205,42 +268,73 @@ export default function JoinModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
-  keyboardView: {
+  keyboardAvoidingView: {
     flex: 1,
     width: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  centered: {
+  mainContainer: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    paddingTop: 56,
+  },
+  cardSection: {
+    flexShrink: 0,
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  inputSection: {
+    flexShrink: 0,
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 16,
+  },
+  androidBg: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F3F3F3',
+  },
+  postCardWrapper: {
     width: '100%',
     maxWidth: 360,
-    paddingHorizontal: 24,
-    alignItems: 'stretch',
+    marginBottom: 52,
+    position: 'relative',
+    flexShrink: 0,
+  },
+  authorPillOnBorder: {
+    position: 'absolute',
+    top: -20,
+    left: 18,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F3F3',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 18,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 6,
   },
   postCard: {
     backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 18,
-    paddingTop: 14,
+    paddingTop: 28,
+    paddingBottom: 44,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 24,
     elevation: 12,
-  },
-  authorPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#F3F3F3',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 18,
-    marginBottom: 12,
-    gap: 8,
+    overflow: 'visible',
   },
   authorInfo: {
     maxWidth: 160,
@@ -272,6 +366,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  tagsRowWithSpace: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
   tagPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -287,15 +387,29 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     maxWidth: 90,
   },
-  emojiRowWrap: {
-    marginTop: 4,
-  },
-  emojiRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    gap: 8,
+  reactionPillOnBorder: {
+    position: 'absolute',
+    bottom: -22,
+    left: 18,
+    right: 18,
+    zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F3F3',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  reactionPillContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   emojiButton: {
     width: 44,
@@ -311,8 +425,10 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
     gap: 10,
+    flexShrink: 0,
+    width: '100%',
+    maxWidth: 360,
   },
   input: {
     flex: 1,

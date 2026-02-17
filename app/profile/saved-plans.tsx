@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
-import PostInteractionModal from '@/components/PostInteractionModal';
+import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/components/JoinModal';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 
@@ -171,8 +172,7 @@ export default function SavedPlansScreen() {
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const [plans, setPlans] = useState<(SavedPlan & { user?: any })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showInteractionModal, setShowInteractionModal] = useState(false);
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<(SavedPlan & { user?: any }) | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
@@ -200,18 +200,12 @@ export default function SavedPlansScreen() {
     }
   };
 
-  const handleJoinPress = (postId: string) => {
+  const handleJoinPress = (plan: SavedPlan & { user?: any }) => {
     if (!isAuthenticated) {
       setShowLoginModal(true);
       return;
     }
-    setSelectedPostId(postId);
-    setShowInteractionModal(true);
-  };
-
-  const handleInteractionSuccess = () => {
-    // Optionally refresh the plans or show a success message
-    // The modal will close automatically
+    setSelectedPlan(plan);
   };
 
   if (loading) {
@@ -249,22 +243,52 @@ export default function SavedPlansScreen() {
               onUserPress={(userId: string) => {
                 router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
               }}
-              onJoinPress={handleJoinPress}
+              onJoinPress={() => handleJoinPress(plan)}
             />
           ))
         )}
       </ScrollView>
 
-      {/* Post Interaction Modal */}
-      <PostInteractionModal
-        visible={showInteractionModal}
-        onClose={() => {
-          setShowInteractionModal(false);
-          setSelectedPostId(null);
-        }}
-        postId={selectedPostId || ''}
-        onSuccess={handleInteractionSuccess}
-      />
+      {selectedPlan && user?.user_id && (
+        <JoinModal
+          visible={!!selectedPlan}
+          onClose={() => setSelectedPlan(null)}
+          planId={selectedPlan.post_id}
+          plan={{
+            plan_id: selectedPlan.post_id,
+            title: selectedPlan.title,
+            description: selectedPlan.description,
+            category_sub: selectedPlan.tags || [],
+          } as JoinModalPlan}
+          author={{
+            name: selectedPlan.user?.name || 'Host',
+            avatar: selectedPlan.user?.profile_image ?? null,
+            time: selectedPlan.timestamp
+              ? (() => {
+                  try {
+                    const d = typeof selectedPlan.timestamp === 'string' ? new Date(selectedPlan.timestamp) : selectedPlan.timestamp;
+                    return `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                  } catch {
+                    return '';
+                  }
+                })()
+              : undefined,
+          } as JoinModalAuthor}
+          onSuccess={async (payload, type) => {
+            try {
+              if (type === 'emoji') {
+                await apiService.createJoinRequestWithReaction(selectedPlan.post_id, user.user_id, payload);
+              } else {
+                await apiService.createJoinRequestWithComment(selectedPlan.post_id, user.user_id, payload);
+              }
+              setSelectedPlan(null);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to send');
+              throw err;
+            }
+          }}
+        />
+      )}
 
       {/* Login Modal */}
       <LoginModal

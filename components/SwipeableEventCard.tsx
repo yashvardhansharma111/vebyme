@@ -4,7 +4,7 @@ import { Animated, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
-import PostInteractionModal from './PostInteractionModal';
+import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from './JoinModal';
 import RepostModal from './RepostModal';
 import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
@@ -174,7 +174,7 @@ export { EventCard };
 // --- The Swipe Wrapper ---
 export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
-  const [showInteractionModal, setShowInteractionModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
@@ -285,7 +285,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           onRequireAuth={onRequireAuth}
           onJoinPress={() => {
             if (isAuthenticated) {
-              setShowInteractionModal(true);
+              setShowJoinModal(true);
             } else {
               onRequireAuth?.();
             }
@@ -300,14 +300,39 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           onImagePress={hasEventImage ? () => setShowImageGallery(true) : undefined}
         />
       </Swipeable>
-      <PostInteractionModal
-        visible={showInteractionModal}
-        onClose={() => setShowInteractionModal(false)}
-        postId={postId || event?.id}
-        onSuccess={() => {
-          // Refresh feed or update UI
-        }}
-      />
+      {showJoinModal && (postId || event?.id) && (
+        <JoinModal
+          visible={showJoinModal}
+          onClose={() => setShowJoinModal(false)}
+          planId={postId || event?.id}
+          plan={{
+            plan_id: postId || event?.id,
+            title: originalPostTitle || event?.title || 'Untitled',
+            description: originalPostDescription || event?.description || '',
+            category_sub: event?.tags || [],
+          } as JoinModalPlan}
+          author={{
+            name: user?.name || 'Host',
+            avatar: user?.avatar ?? null,
+            time: user?.time,
+          } as JoinModalAuthor}
+          onSuccess={async (payload, type) => {
+            if (!authUser?.user_id) return;
+            const id = postId || event?.id;
+            try {
+              if (type === 'emoji') {
+                await apiService.createJoinRequestWithReaction(id, authUser.user_id, payload);
+              } else {
+                await apiService.createJoinRequestWithComment(id, authUser.user_id, payload);
+              }
+              setShowJoinModal(false);
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to send');
+              throw err;
+            }
+          }}
+        />
+      )}
       <RepostModal
         visible={showRepostModal}
         onClose={() => setShowRepostModal(false)}
