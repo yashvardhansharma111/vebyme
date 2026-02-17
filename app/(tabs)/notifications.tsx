@@ -385,8 +385,8 @@ export default function NotificationsScreen() {
     });
 
   // All interactions as flat list for individual notifications below the cards
-  // Only show spec types; exclude event_ended_registered from list (already in stacked cards)
-  const BUSINESS_INDIVIDUAL_TYPES = ['post_live', 'event_ended', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled'];
+  // Individual list: only these spec types (business gets all 6 including registered; regular no registered)
+  const BUSINESS_INDIVIDUAL_TYPES = ['post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled'];
   const REGULAR_INDIVIDUAL_TYPES = ['registration_successful', 'event_ended', 'free_event_cancelled', 'paid_event_cancelled', 'plan_shared_chat'];
   const allowedListTypes = isBusinessUser ? BUSINESS_INDIVIDUAL_TYPES : REGULAR_INDIVIDUAL_TYPES;
   const allInteractionsForList = notifications.flatMap((group) =>
