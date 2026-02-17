@@ -65,7 +65,6 @@ const ADDITIONAL_SETTINGS = [
   { id: 'dress_code', label: 'Dress Code', icon: 'shirt', placeholder: 'e.g. Cafe Joggers' },
   { id: 'music_type', label: 'Music Type', icon: 'musical-notes', placeholder: 'e.g. Electronic' },
   { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
-  { id: 'links', label: 'Links', icon: 'link', placeholder: 'https://...' },
   { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
   { id: 'additional_info', label: 'Additional Info', icon: 'information-circle', placeholder: 'Heading and description' },
 ];

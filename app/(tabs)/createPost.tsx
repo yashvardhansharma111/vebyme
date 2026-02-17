@@ -55,7 +55,6 @@ export default function CreatePostScreen() {
   // Form state
   const [description, setDescription] = useState('');
   const [title, setTitle] = useState('');
-  const [externalLink, setExternalLink] = useState('');
   const [isWomenOnly, setIsWomenOnly] = useState(false);
   const [postType, setPostType] = useState<'individual' | 'group'>('individual');
   const [numPeople, setNumPeople] = useState('');
@@ -103,7 +102,6 @@ export default function CreatePostScreen() {
           // Pre-fill form fields
           if (planData.title) setTitle(planData.title);
           if (planData.description) setDescription(planData.description);
-          if (planData.external_link) setExternalLink(planData.external_link);
           if (planData.is_women_only) setIsWomenOnly(planData.is_women_only);
           if (planData.post_type) setPostType(planData.post_type);
           if (planData.num_people) setNumPeople(planData.num_people.toString());
@@ -252,7 +250,6 @@ export default function CreatePostScreen() {
       formData.append('description', description);
       // Title is required by backend, use description as fallback if not provided
       formData.append('title', title || description.substring(0, 30) || 'New Post');
-      if (externalLink) formData.append('external_link', externalLink);
       formData.append('is_women_only', isWomenOnly.toString());
       formData.append('post_type', postType);
       if (postType === 'group' && numPeople) {
@@ -312,7 +309,6 @@ export default function CreatePostScreen() {
                 // Reset form
                 setDescription('');
                 setTitle('');
-                setExternalLink('');
                 setIsWomenOnly(false);
                 setPostType('individual');
                 setNumPeople('');
@@ -344,7 +340,6 @@ export default function CreatePostScreen() {
                 // Reset form
                 setDescription('');
                 setTitle('');
-                setExternalLink('');
                 setIsWomenOnly(false);
                 setPostType('individual');
                 setNumPeople('');
@@ -561,20 +556,6 @@ export default function CreatePostScreen() {
               />
             </View>
           )}
-
-          {/* External Link */}
-          <View style={styles.section}>
-            <Text style={styles.label}>External Plan Link</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="https://example.com/event"
-              placeholderTextColor="#8E8E93"
-              value={externalLink}
-              onChangeText={setExternalLink}
-              keyboardType="url"
-              autoCapitalize="none"
-            />
-          </View>
 
           {/* Additional Settings – dropdown with Women's Only */}
           <View style={styles.section}>
