@@ -105,6 +105,7 @@ export default function BusinessPlanDetailScreen() {
   const [showShareModal, setShowShareModal] = useState(false);
   const [userHasTicket, setUserHasTicket] = useState<boolean | null>(null);
   const galleryScrollRef = useRef<ScrollView>(null);
+  const heroScrollRef = useRef<ScrollView>(null);
   const screenWidth = Dimensions.get('window').width;
   const galleryPaddingH = 24;
   const galleryPaddingV = 20;
@@ -343,56 +344,84 @@ export default function BusinessPlanDetailScreen() {
     return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
   };
 
-  const heroTotalHeight = SCREEN_HEIGHT * 0.7;
+  const heroTotalHeight = HERO_HEIGHT;
 
   return (
     <View style={styles.container}>
-      {/* Hero – fixed, does not scroll; photos stay in place */}
-      <View style={[styles.heroWrap, { height: heroTotalHeight }]}>
-        {mediaCount > 1 ? (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(e) => {
-              const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setHeroImageIndex(i);
-            }}
-            style={styles.heroScroll}
-            contentContainerStyle={[styles.heroScrollContent, { height: heroTotalHeight }]}
-          >
-            {planMedia.map((item, i) => (
-              <Image key={i} source={{ uri: item.url }} style={[styles.heroImageSlide, { height: heroTotalHeight }]} resizeMode="cover" />
-            ))}
-          </ScrollView>
-        ) : (
-          <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: heroTotalHeight }]} resizeMode="cover" />
-        )}
-
-        <View style={[styles.topSafe, { bottom: 24, top: undefined }]}>
-          {mediaCount > 1 && (
-            <View style={styles.carouselDots}>
-              {planMedia.map((_, i) => (
-                <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
+      {/* HERO – fixed to screen */}
+      <View
+        style={[
+          styles.heroWrap,
+          {
+            height: HERO_HEIGHT,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+          },
+        ]}
+      >
+          {mediaCount > 1 ? (
+            <ScrollView
+              ref={heroScrollRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setHeroImageIndex(i);
+              }}
+              style={styles.heroScroll}
+              contentContainerStyle={[styles.heroScrollContent, { height: heroTotalHeight }]}
+            >
+              {planMedia.map((item, i) => (
+                <Image key={i} source={{ uri: item.url }} style={[styles.heroImageSlide, { height: heroTotalHeight }]} resizeMode="cover" />
               ))}
-            </View>
+            </ScrollView>
+          ) : (
+            <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: heroTotalHeight }]} resizeMode="cover" />
           )}
-        </View>
 
-        <TouchableOpacity
-          style={StyleSheet.absoluteFill}
-          activeOpacity={1}
-          onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
-        />
+          <View style={[styles.topSafe, { bottom: 24, top: undefined }]}>
+            {mediaCount > 1 && (
+              <View style={styles.carouselDots}>
+                {planMedia.map((_, i) => (
+                  <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
+                ))}
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
+          />
       </View>
 
-      {/* Text section – separate scrollable entity; only this scrolls, hero stays fixed */}
+      {/* ScrollView only for white card */}
       <ScrollView
-        style={styles.textSectionScroll}
-        contentContainerStyle={[styles.textSectionScrollContent, { paddingBottom: 72 + insets.bottom }]}
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: HERO_HEIGHT - TEXT_SHEET_OVERLAP,
+          paddingBottom: 100,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.contentOverlay, styles.contentOverlayShadow, { marginTop: -TEXT_SHEET_OVERLAP, paddingTop: TEXT_SHEET_OVERLAP + 16, paddingHorizontal: CONTENT_PADDING_H + 8, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#FFF' }]}>
+        {/* WHITE CARD */}
+        <View
+          style={[
+            styles.contentOverlay,
+            styles.contentOverlayShadow,
+            {
+              paddingTop: TEXT_SHEET_OVERLAP + 16,
+              paddingHorizontal: CONTENT_PADDING_H + 8,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              backgroundColor: '#FFF',
+            },
+          ]}
+        >
           <LinearGradient colors={['rgba(255,255,255,0.7)', '#FFFFFF']} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <View style={styles.contentOverlayInner}>
           <Text style={styles.title}>{plan.title}</Text>
@@ -666,14 +695,9 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#FFF' },
   scrollContent: { paddingBottom: 40, flexGrow: 1 },
   textSectionScroll: {
-    position: 'absolute',
-    top: SCREEN_HEIGHT * 0.7,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 50,
-    elevation: 50,
+    flex: 1,
   },
+  
   textSectionScrollContent: {
     flexGrow: 1,
   },
