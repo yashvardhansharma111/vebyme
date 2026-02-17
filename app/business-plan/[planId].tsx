@@ -836,7 +836,7 @@ const styles = StyleSheet.create({
   },
   organizerTime: {
     fontSize: 11,
-    color: '#8E8E93',
+    color: '#1C1C1E',
     marginTop: 2,
   },
   carouselDots: {
@@ -896,24 +896,24 @@ const styles = StyleSheet.create({
   venueDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     marginBottom: 10,
   },
   venueDateIcon: {
     marginRight: 8,
   },
-  venueDateTextWrap: { flex: 1, minWidth: 0, alignItems: 'center' },
+  venueDateTextWrap: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
   venueDateTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1C1C1E',
-    textAlign: 'center',
+    textAlign: 'left',
   },
   venueDateSubtitle: {
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   categoryPillsWrap: {
     flexDirection: 'row',

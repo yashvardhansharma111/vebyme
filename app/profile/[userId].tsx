@@ -25,6 +25,7 @@ import { fetchUserProfile, fetchUserStats } from '@/store/slices/profileSlice';
 import { apiService } from '@/services/api';
 import { extractInstagramIdFromUrl, getInstagramProfileUrl } from '@/utils/social';
 import { WebView } from 'react-native-webview';
+import { EventCard } from '@/components/SwipeableEventCard';
 
 function resolveProfileImageUri(uri: string | null | undefined): string | null {
   if (!uri || !uri.trim()) return null;
@@ -110,7 +111,7 @@ export default function OtherUserProfileScreen() {
 
   const { width: screenWidth } = useWindowDimensions();
   const topSectionHeight = screenHeight * 0.5;
-  const blurHeight = 177;
+  const overlapPx = Math.round(topSectionHeight * 0.05);
   const contentWidth = screenWidth - 30;
   const recentPlanCardWidth = Math.min(screenWidth * 0.78, 320);
 
@@ -194,7 +195,7 @@ export default function OtherUserProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* 1. Top section: profile image, blur on bottom 60% */}
+        {/* 1. Top section: profile image only (no blur) */}
         <View key="top-section" style={[styles.topSection, { height: topSectionHeight }]}>
           {showProfileImage ? (
             <Image
@@ -207,15 +208,7 @@ export default function OtherUserProfileScreen() {
             <View style={styles.profileBackgroundPlaceholder} />
           )}
 
-          {/* Blur overlays (Figma: two wrappers) */}
-          <View style={[styles.blurWrapperFigma, { top: topSectionHeight - blurHeight * 2 }]} pointerEvents="none">
-            <BlurView intensity={80} tint="light" style={styles.blurviewFigma} />
-          </View>
-          <View style={[styles.blurWrapperFigma, { top: topSectionHeight - blurHeight }]} pointerEvents="none">
-            <BlurView intensity={80} tint="light" style={styles.blurviewFigma} />
-          </View>
-
-          {/* Back button (Figma: parent11 - blur circle) */}
+          {/* Back button */}
           <TouchableOpacity
             style={styles.backButtonFigma}
             onPress={() => router.back()}
@@ -224,23 +217,34 @@ export default function OtherUserProfileScreen() {
             <BlurView intensity={24} tint="light" style={StyleSheet.absoluteFill} />
             <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
           </TouchableOpacity>
+        </View>
 
-          {/* Name + bio overlay (Figma: frameParent); for business = business name + tagline */}
-          <View style={[styles.profileOverlayFigma, { top: topSectionHeight - 120 }]}>
-            <View style={styles.nameRowFigma}>
-              <Text style={styles.userNameFigma}>{viewedUser?.name || 'User'}</Text>
-              <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+        {/* 2. Bottom section: curved top, overlaps image by 5%; name + bio in text section */}
+        <View
+          key="bottom-section"
+          style={[
+            styles.bottomSection,
+            {
+              marginTop: -overlapPx,
+              paddingTop: overlapPx + 16,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              overflow: 'hidden',
+            },
+          ]}
+        >
+          {/* Name + bio in text section */}
+          <View style={styles.profileTextSection}>
+            <View style={styles.profileNameRow}>
+              <Text style={styles.profileNameText}>{viewedUser?.name || 'User'}</Text>
+              <Ionicons name="checkmark-circle" size={20} color="#1C1C1E" />
             </View>
             {viewedUser?.bio ? (
-              <Text style={styles.bioFigma} numberOfLines={2}>
+              <Text style={styles.profileBioText} numberOfLines={3}>
                 {viewedUser.bio}
               </Text>
             ) : null}
           </View>
-        </View>
-
-        {/* 2. Bottom section: business layout (Insta + Previous Runs) vs regular (stats, interests, stacked plans, actions) */}
-        <View key="bottom-section" style={styles.bottomSection}>
           {isBusinessProfile ? (
             <>
               {/* Business: white card with rounded top – action buttons + Instagram + Previous Runs */}
@@ -477,7 +481,7 @@ export default function OtherUserProfileScreen() {
             </View>
           )}
 
-          {/* Recent Plans – stacked: post-style card on top, smaller back card visible below; tap opens all plans */}
+          {/* Recent Plans – vertically scrollable list of EventCards (no repost icon) */}
           <View key="recent-plans-section" style={styles.recentPlansSectionFigma}>
             <Text style={styles.recentPlansTitleFigma}>Recent Plans</Text>
             {loadingPlans ? (
@@ -487,51 +491,63 @@ export default function OtherUserProfileScreen() {
             ) : recentPlans.length === 0 ? (
               <Text style={styles.emptyText}>No plans yet</Text>
             ) : (
-              <View style={styles.recentPlansStackWrap}>
-                {/* Back card – smaller, only bottom strip visible */}
-                <View style={styles.recentPlansStackBack} />
-                {/* Front card – main recent plan as post-style card */}
-                <TouchableOpacity
-                  style={styles.recentPlanPostCard}
-                  activeOpacity={0.95}
-                  onPress={() => setRecentPlansModalVisible(true)}
-                >
-                  <View style={styles.recentPlanPostContent}>
-                    <Text style={styles.recentPlanPostTitle} numberOfLines={2}>
-                      {recentPlans[0].title || 'Untitled Plan'}
-                    </Text>
-                    <Text style={styles.recentPlanPostDescription} numberOfLines={3}>
-                      {recentPlans[0].description || 'No description'}
-                    </Text>
-                    {getPlanDisplayTags(recentPlans[0]).length > 0 && (
-                      <View style={styles.recentPlanPostTagsRow}>
-                        {getPlanDisplayTags(recentPlans[0]).map((tag) => (
-                          <View key={tag} style={styles.recentPlanPostTag}>
-                            <Ionicons name={(TAG_ICONS[tag] || 'ellipse') as any} size={12} color="#3C3C43" />
-                            <Text style={styles.recentPlanPostTagText} numberOfLines={1}>{tag}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.recentPlanPostImageWrap}>
-                    {recentPlans[0].media?.length > 0 ? (
-                      <Image
-                        source={{ uri: recentPlans[0].media[0].url }}
-                        style={styles.recentPlanPostImage}
-                        resizeMode="cover"
+              <View style={styles.recentPlansListWrap}>
+                {recentPlans.map((plan, planIndex) => {
+                  const planKey = plan.plan_id ?? (plan as any).planId ?? (plan as any).id ?? `plan-${planIndex}`;
+                  const planTime = plan.created_at
+                    ? (() => {
+                        try {
+                          const d = typeof plan.created_at === 'string' ? new Date(plan.created_at) : plan.created_at;
+                          return `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                        } catch {
+                          return 'Recently';
+                        }
+                      })()
+                    : 'Recently';
+                  return (
+                    <TouchableOpacity
+                      key={planKey}
+                      activeOpacity={1}
+                      onPress={() => {
+                        router.push({
+                          pathname: '/business-plan/[planId]',
+                          params: { planId: plan.plan_id },
+                        } as any);
+                      }}
+                      style={styles.recentPlanCardWrap}
+                    >
+                      <EventCard
+                        user={{
+                          id: userId ?? '',
+                          name: viewedUser?.name ?? 'User',
+                          avatar: viewedUser?.profile_image ?? 'https://via.placeholder.com/44',
+                          time: planTime,
+                        }}
+                        event={{
+                          title: plan.title || 'Untitled Plan',
+                          description: plan.description || 'No description',
+                          tags: getPlanDisplayTags(plan),
+                          image: plan.media?.[0]?.url ?? '',
+                        }}
+                        onUserPress={() => {}}
+                        onJoinPress={() => {
+                          router.push({
+                            pathname: '/business-plan/[planId]',
+                            params: { planId: plan.plan_id },
+                          } as any);
+                        }}
+                        onSharePress={() => {}}
+                        onRepostPress={() => {}}
+                        joinDisabled={isOwnProfile}
+                        hideRepostButton={true}
                       />
-                    ) : (
-                      <View style={[styles.recentPlanPostImage, styles.recentPlanPostImagePlaceholder]}>
-                        <Ionicons name="image-outline" size={28} color="#8E8E93" />
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             )}
 
-            {/* Modal: all recent plans, vertical scroll */}
+            {/* Modal: all recent plans, same EventCard list */}
             <Modal
               visible={recentPlansModalVisible}
               animationType="slide"
@@ -553,11 +569,20 @@ export default function OtherUserProfileScreen() {
                   >
                     {recentPlans.map((plan, planIndex) => {
                       const planKey = plan.plan_id ?? (plan as any).planId ?? (plan as any).id ?? `plan-${planIndex}`;
+                      const planTime = plan.created_at
+                        ? (() => {
+                            try {
+                              const d = typeof plan.created_at === 'string' ? new Date(plan.created_at) : plan.created_at;
+                              return `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                            } catch {
+                              return 'Recently';
+                            }
+                          })()
+                        : 'Recently';
                       return (
                         <TouchableOpacity
                           key={planKey}
-                          style={styles.recentPlanPostCardModal}
-                          activeOpacity={0.9}
+                          activeOpacity={1}
                           onPress={() => {
                             setRecentPlansModalVisible(false);
                             router.push({
@@ -565,38 +590,34 @@ export default function OtherUserProfileScreen() {
                               params: { planId: plan.plan_id },
                             } as any);
                           }}
+                          style={styles.recentPlanCardWrapModal}
                         >
-                          <View style={styles.recentPlanPostContent}>
-                            <Text style={styles.recentPlanPostTitle} numberOfLines={2}>
-                              {plan.title || 'Untitled Plan'}
-                            </Text>
-                            <Text style={styles.recentPlanPostDescription} numberOfLines={3}>
-                              {plan.description || 'No description'}
-                            </Text>
-                            {getPlanDisplayTags(plan).length > 0 && (
-                              <View style={styles.recentPlanPostTagsRow}>
-                                {getPlanDisplayTags(plan).map((tag) => (
-                                  <View key={tag} style={styles.recentPlanPostTag}>
-                                    <Ionicons name={(TAG_ICONS[tag] || 'ellipse') as any} size={12} color="#3C3C43" />
-                                    <Text style={styles.recentPlanPostTagText} numberOfLines={1}>{tag}</Text>
-                                  </View>
-                                ))}
-                              </View>
-                            )}
-                          </View>
-                          <View style={styles.recentPlanPostImageWrap}>
-                            {plan.media?.length > 0 ? (
-                              <Image
-                                source={{ uri: plan.media[0].url }}
-                                style={styles.recentPlanPostImage}
-                                resizeMode="cover"
-                              />
-                            ) : (
-                              <View style={[styles.recentPlanPostImage, styles.recentPlanPostImagePlaceholder]}>
-                                <Ionicons name="image-outline" size={28} color="#8E8E93" />
-                              </View>
-                            )}
-                          </View>
+                          <EventCard
+                            user={{
+                              id: userId ?? '',
+                              name: viewedUser?.name ?? 'User',
+                              avatar: viewedUser?.profile_image ?? 'https://via.placeholder.com/44',
+                              time: planTime,
+                            }}
+                            event={{
+                              title: plan.title || 'Untitled Plan',
+                              description: plan.description || 'No description',
+                              tags: getPlanDisplayTags(plan),
+                              image: plan.media?.[0]?.url ?? '',
+                            }}
+                            onUserPress={() => {}}
+                            onJoinPress={() => {
+                              setRecentPlansModalVisible(false);
+                              router.push({
+                                pathname: '/business-plan/[planId]',
+                                params: { planId: plan.plan_id },
+                              } as any);
+                            }}
+                            onSharePress={() => {}}
+                            onRepostPress={() => {}}
+                            joinDisabled={isOwnProfile}
+                            hideRepostButton={true}
+                          />
                         </TouchableOpacity>
                       );
                     })}
@@ -675,20 +696,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#4A3B69',
   },
-  blurWrapperFigma: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 177,
-    overflow: 'hidden',
-  },
-  blurviewFigma: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
   backButtonFigma: {
     position: 'absolute',
     top: 21,
@@ -702,30 +709,28 @@ const styles = StyleSheet.create({
     zIndex: 10,
     ...FIGMA_CARD_SHADOW,
   },
-  profileOverlayFigma: {
-    position: 'absolute',
-    left: 20,
-    width: 262,
-    zIndex: 5,
+  profileTextSection: {
+    alignSelf: 'stretch',
+    paddingHorizontal: 4,
+    marginBottom: 16,
   },
-  nameRowFigma: {
+  profileNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  userNameFigma: {
-    fontSize: 28,
-    letterSpacing: -1.1,
-    lineHeight: 38,
-    textAlign: 'left',
-    color: '#fff',
+  profileNameText: {
+    fontSize: 24,
+    letterSpacing: -0.5,
+    lineHeight: 32,
+    color: '#1C1C1E',
     fontWeight: '700',
   },
-  bioFigma: {
-    fontSize: 16,
-    color: '#fff',
-    letterSpacing: -0.3,
+  profileBioText: {
+    fontSize: 15,
+    color: '#3C3C43',
+    letterSpacing: -0.2,
     lineHeight: 22,
     fontWeight: '500',
   },
@@ -764,7 +769,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f3f3',
     paddingHorizontal: 15,
-    paddingTop: 15,
     gap: 8,
     alignItems: 'center',
   },
@@ -870,6 +874,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -1,
     alignSelf: 'stretch',
+  },
+  recentPlansListWrap: {
+    alignSelf: 'stretch',
+    paddingBottom: 8,
+  },
+  recentPlanCardWrap: {
+    marginBottom: 20,
+  },
+  recentPlanCardWrapModal: {
+    marginBottom: 20,
   },
   recentPlansStackWrap: {
     alignSelf: 'stretch',
