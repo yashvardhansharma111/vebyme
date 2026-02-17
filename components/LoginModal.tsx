@@ -60,7 +60,8 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
 
   const phoneDigits = (phone || '').replace(/\D/g, '');
   const canSendOtp = phoneDigits.length >= 10;
-  const canVerifyOtp = (otp || '').trim().length >= 4 && !!otpId;
+  const OTP_LENGTH = 6;
+  const canVerifyOtp = (otp || '').trim().length >= OTP_LENGTH && !!otpId;
 
   const handleSendOTP = async () => {
     if (!phone.trim()) {
@@ -176,7 +177,7 @@ export default function LoginModal({ visible, onClose, onLoginSuccess }: LoginMo
                   value={otp}
                   onChangeText={setOtp}
                   keyboardType="number-pad"
-                  maxLength={6}
+                  maxLength={OTP_LENGTH}
                   autoFocus
                 />
                 <TouchableOpacity
