@@ -61,17 +61,17 @@ export default function BusinessEventCard({
         </View>
       </TouchableOpacity>
 
-      {/* Attendees Count (Top Right) */}
+      {/* Attendees: only when joiners > 0. 1→1 circle, 2→2 circles, 3→3 circles, 4+→3 circles + overflow count */}
       {attendeesCount > 0 && (
         <View style={styles.attendeesPill}>
           <View style={styles.avatarStack}>
-            {[1, 2].map((i) => (
-              <View key={i} style={[styles.stackedAvatar, { marginLeft: i === 1 ? 0 : -8 }]}>
+            {Array.from({ length: Math.min(3, attendeesCount) }, (_, i) => (
+              <View key={i} style={[styles.stackedAvatar, { marginLeft: i === 0 ? 0 : -8, zIndex: 3 - i }]}>
                 <Avatar uri={`https://i.pravatar.cc/150?u=${i}`} size={24} />
               </View>
             ))}
           </View>
-          <Text style={styles.attendeesText}>+{attendeesCount}</Text>
+          {attendeesCount > 3 && <Text style={styles.attendeesText}>+{attendeesCount - 3}</Text>}
         </View>
       )}
 

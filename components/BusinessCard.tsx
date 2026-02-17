@@ -302,8 +302,8 @@ function BusinessCardBase({
         </View>
       </TouchableOpacity>
 
-      {/* Attendees – always 3 circles (avatars or default DP), then +counter (FIGMA) */}
-      {onGuestListPress && (
+      {/* Attendees: only when joiners > 0. 1→1 circle, 2→2 circles, 3→3 circles, 4+→3 circles + overflow count */}
+      {onGuestListPress && attendeesCount > 0 && (
         <TouchableOpacity
           style={[
             styles.interactedPillOnImage,
@@ -316,7 +316,7 @@ function BusinessCardBase({
           }}
           activeOpacity={0.8}
         >
-          {[0, 1, 2].map((idx) => {
+          {Array.from({ length: Math.min(3, attendeesCount) }, (_, idx) => {
             const u = displayUsers[idx];
             return (
               <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
@@ -324,7 +324,7 @@ function BusinessCardBase({
               </View>
             );
           })}
-          {attendeesCount > 0 && <Text style={styles.interactedPlus}>+{attendeesCount}</Text>}
+          {attendeesCount > 3 && <Text style={styles.interactedPlus}>+{attendeesCount - 3}</Text>}
         </TouchableOpacity>
       )}
       </TouchableOpacity>
