@@ -43,10 +43,12 @@ function domainFromUrl(str: string): string | null {
 function isUrl(str: string): boolean {
   return /^https?:\/\/\S+/i.test(str.trim()) || /^[\w.-]+\.\w{2,}(\/.*)?$/i.test(str.trim());
 }
-// Match web mobile: hero ~60vh, content sheet overlaps slightly
-const HERO_HEIGHT = Math.max(280, SCREEN_HEIGHT * 0.6);
-const HERO_OVERLAP = 24; // overlap of white sheet over hero (web ~2vh)
-const CONTENT_PADDING_H = 20; // web px-5
+// Hero takes top ~70%; text section starts from bottom 30%, overlaps image and slides up over it on scroll
+const HERO_HEIGHT = Math.max(280, SCREEN_HEIGHT * 0.7);
+const HERO_OVERLAP = 24;
+/** How much the text sheet overlaps the hero so it visibly "comes out" over the image when scrolling */
+const TEXT_SHEET_OVERLAP = 80;
+const CONTENT_PADDING_H = 20;
 import GuestListModal from '@/components/GuestListModal';
 
 // Ticket background assets for pass cards
@@ -329,7 +331,7 @@ export default function BusinessPlanDetailScreen() {
   const heroImageUri = planMedia[0]?.url || 'https://picsum.photos/id/1011/800/1200';
 
   const detailPills = plan.add_details?.filter((d) => d.detail_type !== 'google_drive_link') ?? [];
-  const overlayHeight = HERO_OVERLAP;
+  const overlayHeight = TEXT_SHEET_OVERLAP;
   const distanceSubtitle = plan.add_details?.find((d) => d.detail_type === 'distance')?.title
     || plan.add_details?.find((d) => d.detail_type === 'distance')?.description
     || null;
@@ -342,54 +344,56 @@ export default function BusinessPlanDetailScreen() {
     return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
   };
 
+  const heroTotalHeight = HERO_HEIGHT + insets.top + 12 + 56;
+
   return (
     <View style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: 72 + insets.bottom }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero – image from very top; no white header; sticky bar floats over */}
-        <View style={[styles.heroWrap, { height: HERO_HEIGHT + insets.top + 12 + 56 }]}>
-          {mediaCount > 1 ? (
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => {
-                const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-                setHeroImageIndex(i);
-              }}
-              style={styles.heroScroll}
-              contentContainerStyle={[styles.heroScrollContent, { height: HERO_HEIGHT + insets.top + 12 + 56 }]}
-            >
-              {planMedia.map((item, i) => (
-                <Image key={i} source={{ uri: item.url }} style={[styles.heroImageSlide, { height: HERO_HEIGHT + insets.top + 12 + 56 }]} resizeMode="cover" />
+      {/* Hero – fixed, does not scroll; photos stay in place */}
+      <View style={[styles.heroWrap, { height: heroTotalHeight }]}>
+        {mediaCount > 1 ? (
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => {
+              const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+              setHeroImageIndex(i);
+            }}
+            style={styles.heroScroll}
+            contentContainerStyle={[styles.heroScrollContent, { height: heroTotalHeight }]}
+          >
+            {planMedia.map((item, i) => (
+              <Image key={i} source={{ uri: item.url }} style={[styles.heroImageSlide, { height: heroTotalHeight }]} resizeMode="cover" />
+            ))}
+          </ScrollView>
+        ) : (
+          <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: heroTotalHeight }]} resizeMode="cover" />
+        )}
+
+        <View style={[styles.topSafe, { bottom: 24, top: undefined }]}>
+          {mediaCount > 1 && (
+            <View style={styles.carouselDots}>
+              {planMedia.map((_, i) => (
+                <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
               ))}
-            </ScrollView>
-          ) : (
-            <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: HERO_HEIGHT + insets.top + 12 + 56 }]} resizeMode="cover" />
+            </View>
           )}
-
-          <View style={[styles.topSafe, { bottom: 24, top: undefined }]}>
-            {mediaCount > 1 && (
-              <View style={styles.carouselDots}>
-                {planMedia.map((_, i) => (
-                  <View key={i} style={[styles.carouselDot, i === heroImageIndex && styles.carouselDotActive]} />
-                ))}
-              </View>
-            )}
-          </View>
-
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
-          />
         </View>
 
-        {/* White overlay + content – gradient then white; text section on top (match web mobile) */}
-        <View style={[styles.contentOverlay, { marginTop: -overlayHeight, paddingTop: overlayHeight + 8 }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
+        />
+      </View>
+
+      {/* Text section – separate scrollable entity; only this scrolls, hero stays fixed */}
+      <ScrollView
+        style={styles.textSectionScroll}
+        contentContainerStyle={[styles.textSectionScrollContent, { paddingBottom: 72 + insets.bottom }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.contentOverlay, styles.contentOverlayShadow, { marginTop: -overlayHeight, paddingTop: overlayHeight + 16, paddingHorizontal: CONTENT_PADDING_H + 8 }]}>
           <LinearGradient colors={['rgba(255,255,255,0.7)', '#FFFFFF']} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <View style={styles.contentOverlayInner}>
           <Text style={styles.title}>{plan.title}</Text>
@@ -526,24 +530,30 @@ export default function BusinessPlanDetailScreen() {
       <View style={[styles.stickyHeaderOverlay, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
         <View style={styles.headerRowSingle}>
           <TouchableOpacity style={styles.backButtonTouch} onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-            <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
+            <BlurView intensity={60} tint="light" style={styles.iconBlur}>
+              <View style={styles.backButtonCircle}>
+                <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+              </View>
+            </BlurView>
           </TouchableOpacity>
           <View style={styles.organizerPillWrapSingle} collapsable={false}>
-            <TouchableOpacity
-              style={styles.organizerPillSolid}
-              activeOpacity={0.8}
-              onPress={() => {
-                const userId = organizer?.user_id ?? plan?.user_id;
-                if (userId) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
-              }}
-              disabled={!(organizer?.user_id ?? plan?.user_id)}
-            >
-              <Avatar uri={organizerAvatar} size={36} />
-              <View style={styles.organizerPillText}>
-                <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
-                <Text style={styles.organizerTime} numberOfLines={1}>{formatPostedDate(plan.created_at, plan.date)}</Text>
-              </View>
-            </TouchableOpacity>
+            <BlurView intensity={60} tint="light" style={styles.organizerPillBlur}>
+              <TouchableOpacity
+                style={styles.organizerPillCenter}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const userId = organizer?.user_id ?? plan?.user_id;
+                  if (userId) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+                }}
+                disabled={!(organizer?.user_id ?? plan?.user_id)}
+              >
+                <Avatar uri={organizerAvatar} size={36} />
+                <View style={styles.organizerPillText}>
+                  <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
+                  <Text style={styles.organizerTime} numberOfLines={1}>{formatPostedDate(plan.created_at, plan.date)}</Text>
+                </View>
+              </TouchableOpacity>
+            </BlurView>
           </View>
           <View style={styles.headerRightRow}>
             {user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id) && (
@@ -605,17 +615,9 @@ export default function BusinessPlanDetailScreen() {
         <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
           <View
-            style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV }]}
+            style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV, margin: 20 }]}
             pointerEvents="box-none"
           >
-            <TouchableOpacity
-              style={styles.galleryCloseButton}
-              onPress={() => setShowImageGallery(false)}
-              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close-circle" size={36} color="#FFF" />
-            </TouchableOpacity>
             <ScrollView
               ref={galleryScrollRef}
               horizontal
@@ -642,6 +644,14 @@ export default function BusinessPlanDetailScreen() {
                 ))}
               </View>
             )}
+            <TouchableOpacity
+              style={styles.galleryCloseButton}
+              onPress={() => setShowImageGallery(false)}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle" size={36} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </Modal>
@@ -656,9 +666,18 @@ const styles = StyleSheet.create({
   },
   scroll: { flex: 1, backgroundColor: '#FFF' },
   scrollContent: { paddingBottom: 40, flexGrow: 1 },
+  textSectionScroll: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
+  textSectionScrollContent: {
+    flexGrow: 1,
+  },
   heroWrap: {
     width: SCREEN_WIDTH,
     overflow: 'hidden',
+    zIndex: 0,
   },
   heroImage: {
     position: 'absolute',
@@ -760,23 +779,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 8,
   },
-  organizerPillSolid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
+  organizerPillBlur: {
+    overflow: 'hidden',
     borderRadius: 22,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    alignSelf: 'center',
+    maxWidth: 200,
+  },
+  organizerPillCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 22,
+    gap: 8,
   },
   organizerPillText: {
-    marginLeft: 8,
-    flex: 1,
     minWidth: 0,
+    maxWidth: 140,
+    justifyContent: 'center',
   },
   organizerInfo: {
     minWidth: 0,
@@ -829,6 +849,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: CONTENT_PADDING_H,
     paddingBottom: 16,
   },
+  contentOverlayShadow: {
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+      },
+      android: { elevation: 12 },
+    }),
+  },
   contentOverlayInner: {
     backgroundColor: 'transparent',
     paddingHorizontal: 8,
@@ -844,21 +875,24 @@ const styles = StyleSheet.create({
   venueDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 10,
   },
   venueDateIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
-  venueDateTextWrap: { flex: 1, minWidth: 0 },
+  venueDateTextWrap: { flex: 1, minWidth: 0, alignItems: 'center' },
   venueDateTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1C1C1E',
+    textAlign: 'center',
   },
   venueDateSubtitle: {
     fontSize: 12,
     color: '#6B7280',
     marginTop: 2,
+    textAlign: 'center',
   },
   categoryPillsWrap: {
     flexDirection: 'row',
@@ -872,18 +906,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     minWidth: '47%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   categoryPillHeading: {
     fontSize: 12,
     fontWeight: '700',
     color: '#1C1C1E',
     marginBottom: 4,
+    textAlign: 'center',
   },
   categoryPillValue: {
     fontSize: 14,
     fontWeight: '600',
     color: '#6B7280',
     lineHeight: 18,
+    textAlign: 'center',
   },
   categoryPillLink: {
     color: '#007AFF',

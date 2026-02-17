@@ -622,7 +622,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.seeOthersButton}
               onPress={() => {
-                scrollViewRef.current?.scrollTo({ y: SCREEN_HEIGHT * 0.78, animated: true });
+                scrollViewRef.current?.scrollTo({ y: SCREEN_HEIGHT * 0.72, animated: true });
               }}
               activeOpacity={0.8}
             >
@@ -893,17 +893,18 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   businessHorizontalWrap: {
-    height: SCREEN_HEIGHT * 0.75,
+    height: 24 + SCREEN_HEIGHT * 0.59,
     marginBottom: 12,
   },
   businessHorizontalContent: {
     paddingHorizontal: 20,
     paddingRight: 24,
+    paddingTop: 24,
     gap: 16,
   },
   businessHorizontalCard: {
     width: SCREEN_WIDTH - 40,
-    height: SCREEN_HEIGHT * 0.75,
+    height: SCREEN_HEIGHT * 0.59,
     marginRight: 16,
   },
   businessHorizontalCardInner: {

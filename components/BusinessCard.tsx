@@ -71,6 +71,8 @@ interface BusinessCardProps {
   pillsAboveCard?: boolean;
   /** When true, card fills parent height (e.g. hero 75% viewport on homepage) */
   fillHeight?: boolean;
+  /** When true, reduce vertical padding/margin (e.g. business-posts list) */
+  compactVerticalPadding?: boolean;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -93,7 +95,8 @@ function BusinessCardBase({
   registerButtonGreyed = false,
   pillsAboveCard = false,
   fillHeight = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean }) {
+  compactVerticalPadding = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean }) {
   const router = useRouter();
   const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
@@ -174,7 +177,7 @@ function BusinessCardBase({
   };
 
   return (
-    <View style={[styles.cardOuterWrapper, fillHeight && styles.cardOuterWrapperFill]}>
+    <View style={[styles.cardOuterWrapper, fillHeight && styles.cardOuterWrapperFill, compactVerticalPadding && styles.cardOuterWrapperCompactVertical]}>
       <TouchableOpacity
         style={[styles.cardWrapper, fillHeight && styles.cardWrapperFill, containerStyle]}
         onPress={onPress}
@@ -328,15 +331,7 @@ function BusinessCardBase({
       >
         <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
-          <View style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: 20, paddingBottom: 20 }]} pointerEvents="box-none">
-            <TouchableOpacity
-              style={styles.galleryCloseButton}
-              onPress={() => setShowImageGallery(false)}
-              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="close-circle" size={36} color="#FFF" />
-            </TouchableOpacity>
+          <View style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: 20, paddingBottom: 20, margin: 20 }]} pointerEvents="box-none">
             <ScrollView
               ref={galleryScrollRef}
               horizontal
@@ -363,6 +358,14 @@ function BusinessCardBase({
                 ))}
               </View>
             )}
+            <TouchableOpacity
+              style={styles.galleryCloseButton}
+              onPress={() => setShowImageGallery(false)}
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="close-circle" size={36} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </Modal>
@@ -390,6 +393,7 @@ export default function BusinessCard({
   onArrowPress,
   pillsAboveCard = false,
   fillHeight = false,
+  compactVerticalPadding = false,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -497,6 +501,7 @@ export default function BusinessCard({
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
           fillHeight={fillHeight}
+          compactVerticalPadding={compactVerticalPadding}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -529,7 +534,7 @@ export default function BusinessCard({
       <Swipeable
         ref={swipeableRef}
         renderLeftActions={renderLeftActions}
-        containerStyle={styles.swipeContainer}
+        containerStyle={[styles.swipeContainer, compactVerticalPadding && styles.swipeContainerCompact]}
         onSwipeableWillOpen={handleSwipeableWillOpen}
         onSwipeableOpen={handleSwipeableOpen}
       >
@@ -552,6 +557,7 @@ export default function BusinessCard({
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
           fillHeight={fillHeight}
+          compactVerticalPadding={compactVerticalPadding}
         />
       </Swipeable>
       <GuestListModal
@@ -583,6 +589,9 @@ const styles = StyleSheet.create({
   swipeContainer: {
     marginBottom: 25,
   },
+  swipeContainerCompact: {
+    marginBottom: 12,
+  },
   cardWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
@@ -601,6 +610,9 @@ const styles = StyleSheet.create({
   cardOuterWrapperFill: {
     flex: 1,
     paddingVertical: 0,
+  },
+  cardOuterWrapperCompactVertical: {
+    paddingVertical: 8,
   },
   cardInner: {
     flex: 1,
@@ -733,7 +745,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   interactedPillOnImageWithArrow: {
-    right: 56,
+    right: 0,
   },
   interactedAvatarWrap: {
     width: 20,
