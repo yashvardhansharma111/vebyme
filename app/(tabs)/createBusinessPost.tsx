@@ -425,7 +425,7 @@ export default function CreateBusinessPostScreen() {
     const newPass: Pass = {
       pass_id: `pass_${Date.now()}`,
       name: '',
-      price: 0,
+      price: -1,
       description: '',
       capacity: 1,
     };
@@ -1186,32 +1186,34 @@ export default function CreateBusinessPostScreen() {
                 const isExistingTicket = editMode && pass.isExisting;
                 return (
                   <View key={pass.pass_id} style={styles.passCard}>
-                    <View style={styles.passHeader}>
-                      <Text style={styles.passTitle}>Pass {index + 1}</Text>
-                      {!editMode && (
-                        <TouchableOpacity onPress={() => removePass(index)}>
-                          <Ionicons name="close" size={20} color="#666" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
                     <View style={styles.passNamePriceRow}>
                       <TextInput
                         style={[styles.passInput, styles.passNameInRow]}
                         placeholder="Ticket Name"
                         value={pass.name}
                         onChangeText={(text) => !isExistingTicket && updatePass(index, 'name', text)}
-                        placeholderTextColor="#999"
+                        placeholderTextColor="#8E8E93"
                         editable={!isExistingTicket}
                       />
                       <TextInput
                         style={[styles.passInput, styles.passPriceInRow]}
                         placeholder="Price"
                         value={pass.price >= 0 ? pass.price.toString() : ''}
-                        onChangeText={(text) => !isExistingTicket && updatePass(index, 'price', parseFloat(text) >= 0 ? parseFloat(text) : 0)}
-                        keyboardType="numeric"
-                        placeholderTextColor="#999"
+                        onChangeText={(text) => {
+                          if (isExistingTicket) return;
+                          const digitsOnly = text.replace(/[^0-9]/g, '');
+                          const num = digitsOnly === '' ? -1 : parseInt(digitsOnly, 10);
+                          updatePass(index, 'price', num < 0 ? -1 : num);
+                        }}
+                        keyboardType="number-pad"
+                        placeholderTextColor="#8E8E93"
                         editable={!isExistingTicket}
                       />
+                      {!editMode && (
+                        <TouchableOpacity onPress={() => removePass(index)} style={styles.passRemoveButton}>
+                          <Ionicons name="close" size={20} color="#666" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <TextInput
                       style={[styles.passInput, styles.passDescription]}
@@ -1220,7 +1222,7 @@ export default function CreateBusinessPostScreen() {
                       onChangeText={(text) => !isExistingTicket && updatePass(index, 'description', text)}
                       multiline
                       numberOfLines={3}
-                      placeholderTextColor="#999"
+                      placeholderTextColor="#8E8E93"
                       editable={!isExistingTicket}
                     />
                   </View>
@@ -2058,29 +2060,24 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   passCard: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#F2F2F7',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
-  passHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  passTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
   passInput: {
     fontSize: 14,
-    color: '#000',
+    color: '#1C1C1E',
     padding: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFF',
     borderRadius: 8,
     marginBottom: 12,
+    borderWidth: 0,
+  },
+  passRemoveButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   passDescription: {
     minHeight: 80,
@@ -2150,7 +2147,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   passPriceInRow: {
-    width: 100,
+    width: 90,
     marginBottom: 0,
   },
   ticketActionsRow: {
