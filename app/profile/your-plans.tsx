@@ -117,6 +117,7 @@ function PlanCardWithAnalytics({
   onEdit,
   onCancel,
   onLongPress,
+  showAnalytics = true,
 }: {
   plan: Plan;
   displayTags: string[];
@@ -128,8 +129,9 @@ function PlanCardWithAnalytics({
   onEdit: () => void;
   onCancel: () => void;
   onLongPress?: () => void;
+  showAnalytics?: boolean;
 }) {
-  const { analytics, loading } = usePlanAnalytics(plan.plan_id);
+  const { analytics, loading } = usePlanAnalytics(showAnalytics ? plan.plan_id : undefined);
   const hasImage = plan.media && plan.media.length > 0;
   const showupPct = analytics?.showup_rate_percent ?? 0;
   const returningPct = analytics?.returning_percent ?? 0;
@@ -180,7 +182,7 @@ function PlanCardWithAnalytics({
             </Text>
           </TouchableOpacity>
 
-          {!isCancelled && (
+          {showAnalytics && !isCancelled && (
             <View style={styles.analyticsBox}>
               <View style={styles.totalAttendeesRow}>
                 <Text style={styles.totalAttendeesLabel}>
@@ -420,6 +422,7 @@ export default function YourPlansScreen() {
                 displayTags={displayTags}
                 isCancelled={isCancelled}
                 isCancelling={isCancelling}
+                showAnalytics={currentUser?.is_business === true}
                 onCardPress={() => {
                   router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.plan_id } } as any);
                 }}

@@ -10,7 +10,6 @@ import { useAppSelector } from '@/store/hooks';
 import { useSnackbar } from '@/context/SnackbarContext';
 import LoginModal from '@/components/LoginModal';
 import ShareToChatModal from '@/components/ShareToChatModal';
-import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/components/JoinModal';
 
 interface FeedPost {
   post_id: string;
@@ -83,11 +82,6 @@ export default function BusinessPostsScreen() {
     media: Array<{ url: string; type?: string }>;
     tags?: string[];
     category_main?: string;
-  } | null>(null);
-  const [joinModalContext, setJoinModalContext] = useState<{
-    planId: string;
-    plan: JoinModalPlan;
-    author: JoinModalAuthor;
   } | null>(null);
   const [plansUserHasTicket, setPlansUserHasTicket] = useState<Record<string, boolean>>({});
   const router = useRouter();
@@ -375,6 +369,7 @@ export default function BusinessPostsScreen() {
                         time: rawPost?.time || '',
                         passes: rawPost?.passes || [],
                         add_details: rawPost?.add_details || [],
+                        user: { user_id: rawPost?.user_id || item.user?.id, name: item.user?.name, profile_image: item.user?.avatar },
                       }}
                       user={item.user}
                       attendeesCount={rawPost?.joins_count ?? 0}
@@ -410,24 +405,22 @@ export default function BusinessPostsScreen() {
                             );
                             return;
                           }
-                          setJoinModalContext({
-                            planId: effectivePlanId,
-                            plan: {
-                              plan_id: effectivePlanId,
-                              title: item.event.title,
-                              description: item.event.description,
-                              media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                              category_sub: item.event.tags || rawPost?.tags || [],
-                              add_details: rawPost?.add_details || [],
-                            },
-                            author: {
-                              name: item.user?.name || 'Host',
-                              avatar: item.user?.avatar ?? null,
-                              time: rawPost?.date ? new Date(rawPost.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : undefined,
-                            },
-                          });
+                          const response = await apiService.registerForEvent(effectivePlanId, user.user_id, undefined);
+                          if (response.success && response.data?.ticket) {
+                            const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                            router.push({
+                              pathname: '/ticket/[ticketId]',
+                              params: {
+                                ticketId: response.data.ticket.ticket_id,
+                                planId: effectivePlanId,
+                                ticketData,
+                              },
+                            } as any);
+                          } else {
+                            Alert.alert('Registration Failed', 'Ticket was not created. Please try again.');
+                          }
                         } catch (error: any) {
-                          Alert.alert('Error', error.message || 'Could not open join');
+                          Alert.alert('Error', error.message || 'Could not register');
                         }
                       }}
                       onRequireAuth={() => {
@@ -466,38 +459,6 @@ export default function BusinessPostsScreen() {
           loadFeed();
         }}
       />
-      {joinModalContext && (
-        <JoinModal
-          visible={!!joinModalContext}
-          onClose={() => setJoinModalContext(null)}
-          planId={joinModalContext.planId}
-          plan={joinModalContext.plan}
-          author={joinModalContext.author}
-          onSuccess={async (messageOrEmoji) => {
-            if (!user?.user_id) return;
-            try {
-              const response = await apiService.registerForEvent(joinModalContext.planId, user.user_id, undefined, messageOrEmoji);
-              if (response.success && response.data?.ticket) {
-                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                setJoinModalContext(null);
-                router.push({
-                  pathname: '/ticket/[ticketId]',
-                  params: {
-                    ticketId: response.data.ticket.ticket_id,
-                    planId: joinModalContext.planId,
-                    ticketData,
-                  },
-                } as any);
-              } else {
-                throw new Error('Registration failed');
-              }
-            } catch (err: any) {
-              Alert.alert('Registration Failed', err?.message || 'Failed to register for event');
-              throw err;
-            }
-          }}
-        />
-      )}
       {sharedBusinessPlan && (
         <ShareToChatModal
           visible={showBusinessShareModal}

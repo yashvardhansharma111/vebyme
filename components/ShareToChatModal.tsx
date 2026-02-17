@@ -85,11 +85,13 @@ export default function ShareToChatModal({
   const [loading, setLoading] = useState(false);
   const [sharing, setSharing] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (visible && userId) {
       loadChatLists();
       setSearch('');
+      setSelectedChatIds(new Set());
     }
   }, [visible, userId]);
 
@@ -124,22 +126,34 @@ export default function ShareToChatModal({
     return [you, ...chats.map((item) => ({ type: 'chat' as const, item }))];
   }, [allChats, search, currentUserAvatar]);
 
-  const handleShareToChat = async (group_id: string) => {
-    if (!userId || group_id === 'you') return;
+  const toggleChatSelection = (group_id: string) => {
+    if (group_id === 'you') return;
+    setSelectedChatIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(group_id)) next.delete(group_id);
+      else next.add(group_id);
+      return next;
+    });
+  };
+
+  const handleShareToSelectedChats = async () => {
+    if (!userId || selectedChatIds.size === 0) return;
     try {
-      setSharing(group_id);
-      await apiService.sendMessage(group_id, userId, 'plan', {
-        plan_id: postId,
-        title: postTitle,
-        description: postDescription,
-        media: postMedia || [],
-        tags: postTags || postCategorySub || [],
-        category_sub: postCategorySub || postTags || [],
-        category_main: postCategoryMain,
-        is_business: postIsBusiness === true,
-      });
-      Alert.alert('Success', 'Post shared to chat!', [
-        { text: 'OK', onPress: () => { onShareSuccess?.(); onClose(); } },
+      setSharing('batch');
+      for (const group_id of selectedChatIds) {
+        await apiService.sendMessage(group_id, userId, 'plan', {
+          plan_id: postId,
+          title: postTitle,
+          description: postDescription,
+          media: postMedia || [],
+          tags: postTags || postCategorySub || [],
+          category_sub: postCategorySub || postTags || [],
+          category_main: postCategoryMain,
+          is_business: postIsBusiness === true,
+        });
+      }
+      Alert.alert('Success', `Post shared to ${selectedChatIds.size} chat(s)!`, [
+        { text: 'OK', onPress: () => { onShareSuccess?.(); setSelectedChatIds(new Set()); onClose(); } },
       ]);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to share post');
@@ -205,16 +219,17 @@ export default function ShareToChatModal({
     const { name, image, isGroup } = getDisplayForItem(entry);
     const id = entry.type === 'you' ? 'you' : entry.item.group_id;
     const isSharing = id !== 'you' && sharing === id;
+    const isSelected = id !== 'you' && selectedChatIds.has(id);
 
     return (
       <TouchableOpacity
         key={id}
-        style={styles.tile}
-        onPress={() => entry.type === 'chat' && handleShareToChat(entry.item.group_id)}
+        style={[styles.tile, isSelected && styles.tileSelected]}
+        onPress={() => entry.type === 'chat' && toggleChatSelection(entry.item.group_id)}
         disabled={entry.type === 'you' || isSharing}
         activeOpacity={0.7}
       >
-        <View style={styles.tileAvatarWrap}>
+        <View style={[styles.tileAvatarWrap, isSelected && styles.tileAvatarWrapSelected]}>
           {isGroup ? (
             image ? (
               <Avatar uri={image} size={CIRCLE_SIZE - 6} />
@@ -225,6 +240,11 @@ export default function ShareToChatModal({
             )
           ) : (
             <Avatar uri={image ?? undefined} size={CIRCLE_SIZE - 6} />
+          )}
+          {isSelected && (
+            <View style={styles.tileCheck}>
+              <Ionicons name="checkmark" size={16} color="#FFF" />
+            </View>
           )}
         </View>
         <Text style={styles.tileName} numberOfLines={1}>{name}</Text>
@@ -311,14 +331,30 @@ export default function ShareToChatModal({
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.copyLinkButton, !planUrl && styles.copyLinkButtonDisabled]}
-            onPress={handleCopyLink}
-            disabled={!planUrl}
-          >
-            <Ionicons name="link" size={22} color="#FFF" />
-            <Text style={styles.copyLinkText}>Copy Link</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomActionsRow}>
+            <TouchableOpacity
+              style={[styles.bottomActionButton, styles.shareToChatsButton, (selectedChatIds.size === 0 || sharing === 'batch') && styles.bottomActionButtonDisabled]}
+              onPress={handleShareToSelectedChats}
+              disabled={selectedChatIds.size === 0 || sharing === 'batch'}
+            >
+              {sharing === 'batch' ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <>
+                  <Ionicons name="chatbubbles" size={22} color="#FFF" />
+                  <Text style={styles.bottomActionButtonText}>Share to chats</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bottomActionButton, styles.copyLinkButton, !planUrl && styles.bottomActionButtonDisabled]}
+              onPress={handleCopyLink}
+              disabled={!planUrl}
+            >
+              <Ionicons name="link" size={22} color="#FFF" />
+              <Text style={styles.bottomActionButtonText}>Copy link</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </Modal>
@@ -435,21 +471,50 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#8E8E93',
   },
-  copyLinkButton: {
+  tileSelected: {
+    opacity: 1,
+  },
+  tileAvatarWrapSelected: {
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  tileCheck: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomActionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  bottomActionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3A3A3C',
     borderRadius: 14,
     paddingVertical: 14,
     gap: 10,
   },
-  copyLinkButtonDisabled: {
+  bottomActionButtonDisabled: {
     opacity: 0.5,
   },
-  copyLinkText: {
+  bottomActionButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',
+  },
+  shareToChatsButton: {
+    backgroundColor: '#007AFF',
+  },
+  copyLinkButton: {
+    backgroundColor: '#3A3A3C',
   },
 });

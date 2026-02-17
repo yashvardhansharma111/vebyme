@@ -22,12 +22,13 @@ function getAllEventTags(event: any): string[] {
 }
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, onInteractedPillPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false, hideRepostButton = false }: any) {
   const allTags = getAllEventTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
   const interactionCount = event?.interaction_count ?? 0;
   const showPill = true;
+  const hasInteractions = interactionCount > 0 || interactedUsers.length > 0;
 
   return (
     <View style={styles.cardContainer}>
@@ -47,7 +48,12 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
         </TouchableOpacity>
         {showPill && (
           <View style={styles.interactedPillPositioned}>
-            <View style={styles.interactedPill}>
+            <TouchableOpacity
+              style={styles.interactedPill}
+              onPress={hasInteractions ? onInteractedPillPress : undefined}
+              activeOpacity={hasInteractions ? 0.7 : 1}
+              disabled={!hasInteractions}
+            >
               {[0, 1, 2].map((idx) => {
                 const u = interactedUsers[idx];
                 return (
@@ -59,7 +65,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
               {interactionCount > 0 && (
                 <Text style={styles.interactedPlus}>+{interactionCount}</Text>
               )}
-            </View>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -155,9 +161,11 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
               <TouchableOpacity style={[styles.joinButton, joinDisabled && styles.joinButtonDisabled]} onPress={joinDisabled ? undefined : onJoinPress} disabled={joinDisabled}>
                 <Text style={[styles.joinButtonText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
-                <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-              </TouchableOpacity>
+              {!hideRepostButton && (
+                <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
+                  <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
                 <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
               </TouchableOpacity>
@@ -178,6 +186,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
+  const [showJoinedListModal, setShowJoinedListModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const hasEventImage = event?.image && String(event.image).trim();
   const swipeableRef = useRef<Swipeable>(null);
@@ -284,6 +293,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           event={event} 
           onUserPress={onUserPress} 
           onRequireAuth={onRequireAuth}
+          onInteractedPillPress={() => setShowJoinedListModal(true)}
           onJoinPress={() => {
             if (isOwnPost) {
               Alert.alert('Not allowed', "You can't join or react to your own post.");
@@ -366,6 +376,52 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           }}
         />
       )}
+      {/* Who joined modal – show list of interacted/registered users */}
+      <Modal
+        visible={showJoinedListModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowJoinedListModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.joinedListOverlay}
+          activeOpacity={1}
+          onPress={() => setShowJoinedListModal(false)}
+        >
+          <View style={styles.joinedListSheet} pointerEvents="box-none">
+            <View style={styles.joinedListHandle} />
+            <Text style={styles.joinedListTitle}>Who joined</Text>
+            <ScrollView style={styles.joinedListScroll} contentContainerStyle={styles.joinedListContent}>
+              {(event?.interacted_users || []).map((u: any) => (
+                <TouchableOpacity
+                  key={u?.id}
+                  style={styles.joinedListRow}
+                  onPress={() => {
+                    setShowJoinedListModal(false);
+                    onUserPress?.(u?.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Avatar uri={u?.avatar ?? undefined} size={44} />
+                  <Text style={styles.joinedListName}>{u?.name ?? 'User'}</Text>
+                  <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+                </TouchableOpacity>
+              ))}
+              {(event?.interaction_count ?? 0) > (event?.interacted_users?.length ?? 0) && (
+                <Text style={styles.joinedListMore}>
+                  +{(event?.interaction_count ?? 0) - (event?.interacted_users?.length ?? 0)} more
+                </Text>
+              )}
+              {(!event?.interacted_users?.length && (event?.interaction_count ?? 0) === 0) && (
+                <Text style={styles.joinedListEmpty}>No one has joined yet.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity style={styles.joinedListCloseBtn} onPress={() => setShowJoinedListModal(false)}>
+              <Text style={styles.joinedListCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
       {/* Full-screen image gallery (same UX as business-plan [planId]) */}
       <Modal
         visible={showImageGallery}
@@ -712,6 +768,77 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  joinedListOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  joinedListSheet: {
+    backgroundColor: '#FFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    maxHeight: '70%',
+  },
+  joinedListHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#C7C7CC',
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  joinedListTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 16,
+  },
+  joinedListScroll: {
+    maxHeight: 320,
+  },
+  joinedListContent: {
+    paddingBottom: 16,
+  },
+  joinedListRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+    gap: 12,
+  },
+  joinedListName: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  joinedListMore: {
+    fontSize: 14,
+    color: '#8E8E93',
+    paddingVertical: 12,
+  },
+  joinedListEmpty: {
+    fontSize: 14,
+    color: '#8E8E93',
+    paddingVertical: 24,
+    textAlign: 'center',
+  },
+  joinedListCloseBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  joinedListCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   galleryOverlay: {
     flex: 1,

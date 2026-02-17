@@ -14,7 +14,6 @@ import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { clearPostCreated } from '@/store/slices/postCreatedSlice';
 import { useSnackbar } from '@/context/SnackbarContext';
 import ShareToChatModal from '@/components/ShareToChatModal';
-import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/components/JoinModal';
 import { Colors } from '@/constants/theme';
 import Avatar from '@/components/Avatar';
 
@@ -118,11 +117,6 @@ export default function HomeScreen() {
     media: Array<{ url: string; type?: string }>;
     tags?: string[];
     category_main?: string;
-  } | null>(null);
-  const [joinModalContext, setJoinModalContext] = useState<{
-    planId: string;
-    plan: JoinModalPlan;
-    author: JoinModalAuthor;
   } | null>(null);
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -508,6 +502,7 @@ export default function HomeScreen() {
                             time: rawPost?.time || '',
                             passes: rawPost?.passes || [],
                             add_details: rawPost?.add_details || [],
+                            user: { user_id: rawPost?.user_id || item.user?.id, name: item.user?.name, profile_image: item.user?.avatar },
                           }}
                           user={item.user}
                           attendeesCount={rawPost?.joins_count ?? 0}
@@ -547,24 +542,22 @@ export default function HomeScreen() {
                                 );
                                 return;
                               }
-                              setJoinModalContext({
-                                planId: effectivePlanId,
-                                plan: {
-                                  plan_id: effectivePlanId,
-                                  title: item.event.title,
-                                  description: item.event.description,
-                                  media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                                  category_sub: item.event.tags || rawPost?.tags || [],
-                                  add_details: rawPost?.add_details || [],
-                                },
-                                author: {
-                                  name: item.user?.name || 'Host',
-                                  avatar: item.user?.avatar ?? null,
-                                  time: rawPost?.date ? new Date(rawPost.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : undefined,
-                                },
-                              });
+                              const response = await apiService.registerForEvent(effectivePlanId, user.user_id, undefined);
+                              if (response.success && response.data?.ticket) {
+                                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
+                                router.push({
+                                  pathname: '/ticket/[ticketId]',
+                                  params: {
+                                    ticketId: response.data.ticket.ticket_id,
+                                    planId: effectivePlanId,
+                                    ticketData,
+                                  },
+                                } as any);
+                              } else {
+                                Alert.alert('Registration Failed', 'Ticket was not created. Please try again.');
+                              }
                             } catch (error: any) {
-                              Alert.alert('Error', error.message || 'Could not open join');
+                              Alert.alert('Error', error.message || 'Could not register');
                             }
                           }}
                           onRequireAuth={() => {
@@ -716,38 +709,6 @@ export default function HomeScreen() {
           pointerEvents="none"
         />
       </View>
-      {joinModalContext && (
-        <JoinModal
-          visible={!!joinModalContext}
-          onClose={() => setJoinModalContext(null)}
-          planId={joinModalContext.planId}
-          plan={joinModalContext.plan}
-          author={joinModalContext.author}
-          onSuccess={async (messageOrEmoji) => {
-            if (!user?.user_id) return;
-            try {
-              const response = await apiService.registerForEvent(joinModalContext.planId, user.user_id, undefined, messageOrEmoji);
-              if (response.success && response.data?.ticket) {
-                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                setJoinModalContext(null);
-                router.push({
-                  pathname: '/ticket/[ticketId]',
-                  params: {
-                    ticketId: response.data.ticket.ticket_id,
-                    planId: joinModalContext.planId,
-                    ticketData,
-                  },
-                } as any);
-              } else {
-                throw new Error('Registration failed');
-              }
-            } catch (err: any) {
-              Alert.alert('Registration Failed', err?.message || 'Failed to register for event');
-              throw err;
-            }
-          }}
-        />
-      )}
       {sharedBusinessPlan && (
         <ShareToChatModal
           visible={showBusinessShareModal}

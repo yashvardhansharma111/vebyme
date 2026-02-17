@@ -17,6 +17,7 @@ import { apiService } from '@/services/api';
 import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/components/JoinModal';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
+import { EventCard } from '@/components/SwipeableEventCard';
 
 interface SavedPlan {
   post_id: string;
@@ -243,17 +244,42 @@ export default function SavedPlansScreen() {
             <Text style={styles.emptySubtext}>Save plans you're interested in!</Text>
           </View>
         ) : (
-          plans.map((plan) => (
-            <SavedPlanCard
-              key={plan.post_id}
-              plan={plan}
-              onUserPress={(userId: string) => {
-                router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
-              }}
-              onJoinPress={() => handleJoinPress(plan)}
-              joinDisabled={!!(user?.user_id && plan.user_id && String(plan.user_id) === String(user.user_id))}
-            />
-          ))
+          plans.map((plan) => {
+            const formatTime = (ts: string | Date) => {
+              try {
+                const d = typeof ts === 'string' ? new Date(ts) : ts;
+                return `${d.toLocaleDateString('en-US', { weekday: 'long' })}, ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+              } catch {
+                return 'Recently';
+              }
+            };
+            return (
+              <View key={plan.post_id} style={styles.savedCardWrapper}>
+                <EventCard
+                  user={{
+                    id: plan.user_id,
+                    name: plan.user?.name || 'Unknown User',
+                    avatar: plan.user?.profile_image ?? 'https://via.placeholder.com/44',
+                    time: plan.timestamp ? formatTime(plan.timestamp) : 'Recently',
+                  }}
+                  event={{
+                    title: plan.title || 'Untitled Plan',
+                    description: plan.description || 'No description',
+                    tags: plan.tags || [],
+                    image: plan.media?.[0]?.url ?? '',
+                  }}
+                  onUserPress={(userId: string) => {
+                    router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+                  }}
+                  onJoinPress={() => handleJoinPress(plan)}
+                  onSharePress={() => {}}
+                  onRepostPress={() => {}}
+                  joinDisabled={!!(user?.user_id && plan.user_id && String(plan.user_id) === String(user.user_id))}
+                  hideRepostButton={true}
+                />
+              </View>
+            );
+          })
         )}
       </ScrollView>
 
@@ -358,6 +384,10 @@ const styles = StyleSheet.create({
   },
 
   // --- Card Styles ---
+  savedCardWrapper: {
+    marginBottom: 24,
+    marginTop: 8,
+  },
   cardWrapper: {
     marginBottom: 40, // Space between cards to account for pill overflow
     marginTop: 20,    // Space for own pill
