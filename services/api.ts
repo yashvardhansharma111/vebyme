@@ -752,17 +752,21 @@ class ApiService {
     });
   }
 
-  async cancelPlan(accessToken: string, plan_id: string, planType: 'regular' | 'business') {
-    const endpoint = planType === 'business' 
+  /** Cancel or delete plan. For business: refundPaidTickets true = cancel event (refund), false = delete only (no refund). */
+  async cancelPlan(accessToken: string, plan_id: string, planType: 'regular' | 'business', refundPaidTickets: boolean = true) {
+    const endpoint = planType === 'business'
       ? `/business-post/update/${plan_id}`
       : `/post/update/${plan_id}`;
-    
+    const body: { post_status: string; refund_paid_tickets?: boolean } = { post_status: 'deleted' };
+    if (planType === 'business') {
+      body.refund_paid_tickets = refundPaidTickets;
+    }
     return this.request<any>(endpoint, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ post_status: 'deleted' }),
+      body: JSON.stringify(body),
     });
   }
 

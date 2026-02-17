@@ -277,37 +277,48 @@ export default function YourPlansScreen() {
     }
   };
 
-  const handleCancelPlan = async (plan: Plan) => {
+  /** isCancelEvent: true = Cancel event (refunds paid tickets); false = Delete only (no refund, e.g. after event done). */
+  const handleCancelPlan = async (plan: Plan, isCancelEvent: boolean = true) => {
     if (!user?.access_token) {
       Alert.alert('Error', 'Please log in to cancel plans');
       return;
     }
 
+    const isBusiness = plan.type === 'business';
+    const title = isCancelEvent ? 'Cancel event' : 'Delete plan';
+    const message = isCancelEvent
+      ? (isBusiness
+          ? 'Are you sure you want to cancel this event? It will no longer be visible. Paid tickets will be refunded.'
+          : 'Are you sure you want to cancel this plan? It will no longer be visible to other users.')
+      : (isBusiness
+          ? 'Remove this plan from your list? Paid tickets will not be refunded. Use "Cancel" on the card to cancel the event and refund.'
+          : 'Are you sure you want to delete this plan? It will no longer be visible.');
+
     Alert.alert(
-      'Cancel Plan',
-      'Are you sure you want to cancel this plan? It will no longer be visible to other users.',
+      title,
+      message,
       [
         { text: 'No', style: 'cancel' },
         {
-          text: 'Yes, Cancel',
+          text: isCancelEvent ? 'Yes, Cancel' : 'Yes, Delete',
           style: 'destructive',
           onPress: async () => {
             try {
               setCancellingPlanId(plan.plan_id);
               const planType = plan.type || 'regular';
-              await apiService.cancelPlan(user.access_token, plan.plan_id, planType as 'regular' | 'business');
-              
-              // Update local state
-              setPlans(plans.map(p => 
-                p.plan_id === plan.plan_id 
+              const refundPaidTickets = isCancelEvent;
+              await apiService.cancelPlan(user.access_token, plan.plan_id, planType as 'regular' | 'business', refundPaidTickets);
+
+              setPlans(plans.map(p =>
+                p.plan_id === plan.plan_id
                   ? { ...p, post_status: 'deleted' }
                   : p
               ));
-              
-              Alert.alert('Success', 'Plan cancelled successfully');
+
+              Alert.alert('Success', isCancelEvent ? 'Plan cancelled successfully' : 'Plan removed');
             } catch (error: any) {
-              console.error('Error cancelling plan:', error);
-              Alert.alert('Error', error.message || 'Failed to cancel plan');
+              console.error('Error:', error);
+              Alert.alert('Error', error.message || (isCancelEvent ? 'Failed to cancel plan' : 'Failed to delete plan'));
             } finally {
               setCancellingPlanId(null);
             }
@@ -398,7 +409,7 @@ export default function YourPlansScreen() {
                 }}
                 onDuplicate={() => handleDuplicatePlan(plan)}
                 onEdit={() => handleEditPlan(plan)}
-                onCancel={() => handleCancelPlan(plan)}
+                onCancel={() => handleCancelPlan(plan, true)}
                 onLongPress={() => setContextMenuPlan(plan)}
               />
             );
@@ -439,7 +450,7 @@ export default function YourPlansScreen() {
                       style={[styles.contextMenuBtn, styles.contextMenuBtnSmall, styles.contextMenuBtnDanger]}
                       onPress={() => {
                         setContextMenuPlan(null);
-                        handleCancelPlan(contextMenuPlan);
+                        handleCancelPlan(contextMenuPlan, false);
                       }}
                     >
                       <Text style={[styles.contextMenuBtnText, styles.contextMenuBtnTextDanger]}>Delete</Text>
