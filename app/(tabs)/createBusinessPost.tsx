@@ -731,14 +731,26 @@ export default function CreateBusinessPostScreen() {
         }
       } else {
         // Create new business plan
+        if (!user?.access_token) {
+          Alert.alert('Error', 'Session expired. Please log in again.');
+          setIsSubmitting(false);
+          return;
+        }
+        console.log('[CreateBusinessPost] Calling create API, hasFiles:', hasFiles);
         response = await apiService.createBusinessPlan(
-          user.access_token, 
+          user.access_token,
           hasFiles ? {} : planData,
           hasFiles ? formData : undefined
         );
-        if (response.success) {
-          const createdPlanId = (response as any)?.data?.post_id ?? (response as any)?.post_id ?? null;
-          if (shareToAnnouncementGroup && createdPlanId) {
+        const createdPlanId = (response as any)?.data?.post_id ?? (response as any)?.post_id ?? null;
+        const ok = (response as any)?.success === true || (createdPlanId != null);
+        if (!ok) {
+          const msg = (response as any)?.message || 'Server did not return a post ID. Please try again.';
+          Alert.alert('Error', msg);
+          setIsSubmitting(false);
+          return;
+        }
+        if (shareToAnnouncementGroup && createdPlanId) {
             try {
               const annRes = await apiService.getOrCreateAnnouncementGroup();
               const groupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
@@ -771,7 +783,6 @@ export default function CreateBusinessPostScreen() {
           setCreatedPlanIdForSuccess(createdPlanId);
           setShowPreview(false); // Close preview so main view (with success modal) is shown
           setShowPostSuccessModal(true);
-        }
       }
     } catch (error: any) {
       // Provide more detailed error messages

@@ -633,11 +633,13 @@ class ApiService {
 
     if (formData) {
       // Don't set Content-Type – let runtime set boundary for FormData
+      console.log('[API] POST business-post/create (FormData)', url);
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: formData,
       });
+      console.log('[API] business-post/create response status', response.status);
       if (!response.ok) {
         const errorText = await response.text();
         let errorMessage = 'Failed to create business plan';
@@ -649,16 +651,20 @@ class ApiService {
         }
         throw new Error(errorMessage);
       }
-      return await response.json();
+      const json = await response.json();
+      console.log('[API] business-post/create success', !!json?.success, 'post_id:', json?.data?.post_id ?? json?.post_id);
+      return json;
     }
 
     // No files: send JSON to same endpoint so backend uses full business-post logic
     headers['Content-Type'] = 'application/json';
+    console.log('[API] POST business-post/create (JSON)', url);
     const response = await fetch(url, {
       method: 'POST',
       headers,
       body: JSON.stringify(planData),
     });
+    console.log('[API] business-post/create response status', response.status);
     if (!response.ok) {
       const errorText = await response.text();
       let errorMessage = 'Failed to create business plan';
@@ -670,7 +676,9 @@ class ApiService {
       }
       throw new Error(errorMessage);
     }
-    return await response.json();
+    const json = await response.json();
+    console.log('[API] business-post/create success', !!json?.success, 'post_id:', json?.data?.post_id ?? json?.post_id);
+    return json;
   }
 
   async getBusinessPlan(planId: string) {
