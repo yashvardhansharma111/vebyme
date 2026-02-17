@@ -517,7 +517,7 @@ export default function HomeScreen() {
                           }}
                           hideRegisterButton={false}
                           registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId]}
-                          onRegisterPress={async () => {
+                          onRegisterPress={() => {
                             if (!isAuthenticated || !user?.user_id) {
                               router.push('/login');
                               return;
@@ -533,32 +533,8 @@ export default function HomeScreen() {
                                 return;
                               }
                             }
-                            try {
-                              const alreadyRegistered = await apiService.hasTicketForPlan(effectivePlanId, user.user_id);
-                              if (alreadyRegistered) {
-                                Alert.alert(
-                                  'Already Registered',
-                                  "You are already registered for this event. You can check your pass from your profile."
-                                );
-                                return;
-                              }
-                              const response = await apiService.registerForEvent(effectivePlanId, user.user_id, undefined);
-                              if (response.success && response.data?.ticket) {
-                                const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
-                                router.push({
-                                  pathname: '/ticket/[ticketId]',
-                                  params: {
-                                    ticketId: response.data.ticket.ticket_id,
-                                    planId: effectivePlanId,
-                                    ticketData,
-                                  },
-                                } as any);
-                              } else {
-                                Alert.alert('Registration Failed', 'Ticket was not created. Please try again.');
-                              }
-                            } catch (error: any) {
-                              Alert.alert('Error', error.message || 'Could not register');
-                            }
+                            // Open plan detail first so user can select a pass, then register
+                            router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}
                           onRequireAuth={() => {
                             if (!isAuthenticated) router.push('/login');

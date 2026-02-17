@@ -8,12 +8,13 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppSelector } from '@/store/hooks';
-import { apiService } from '@/services/api';
+import { apiService, getWebBaseUrl } from '@/services/api';
 import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/components/JoinModal';
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
@@ -272,10 +273,17 @@ export default function SavedPlansScreen() {
                     router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
                   }}
                   onJoinPress={() => handleJoinPress(plan)}
-                  onSharePress={() => {}}
-                  onRepostPress={() => {}}
+                  onSharePress={async () => {
+                    try {
+                      const baseUrl = getWebBaseUrl().replace(/\/$/, '');
+                      const planUrl = `${baseUrl}/post/${plan.post_id}`;
+                      const shareMessage = `Check out this plan: ${plan.title || 'Untitled Plan'}\n\n${planUrl}`;
+                      await Share.share({ message: shareMessage, url: planUrl, title: plan.title || 'Plan' });
+                    } catch (e: any) {
+                      if (e?.message !== 'User cancelled') Alert.alert('Error', e?.message || 'Failed to share');
+                    }
+                  }}
                   joinDisabled={!!(user?.user_id && plan.user_id && String(plan.user_id) === String(user.user_id))}
-                  hideRepostButton={true}
                 />
               </View>
             );

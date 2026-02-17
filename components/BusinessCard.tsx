@@ -15,7 +15,6 @@ import { useAppSelector } from '@/store/hooks';
 import { apiService, getWebBaseUrl } from '@/services/api';
 import Avatar from './Avatar';
 import GuestListModal from './GuestListModal';
-import RepostModal from './RepostModal';
 
 interface BusinessCardProps {
   plan: {
@@ -86,7 +85,6 @@ function BusinessCardBase({
   onPress,
   onRegisterPress,
   onRequireAuth,
-  onRepostPress,
   onSharePress,
   onGuestListPress,
   hideActions = false,
@@ -97,7 +95,7 @@ function BusinessCardBase({
   pillsAboveCard = false,
   fillHeight = false,
   compactVerticalPadding = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean }) {
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean }) {
   const router = useRouter();
   const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
@@ -256,9 +254,6 @@ function BusinessCardBase({
                   </TouchableOpacity>
                 )}
                 <View style={styles.footerIconRow}>
-                  <TouchableOpacity style={styles.iconButton} onPress={onRepostPress}>
-                    <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-                  </TouchableOpacity>
                   <TouchableOpacity style={styles.iconButton} onPress={handleShare}>
                     <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
                   </TouchableOpacity>
@@ -405,7 +400,6 @@ export default function BusinessCard({
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
-  const [showRepostModal, setShowRepostModal] = useState(false);
   const [showGuestListModal, setShowGuestListModal] = useState(false);
   const swipeableRef = useRef<Swipeable>(null);
 
@@ -476,16 +470,6 @@ export default function BusinessCard({
     }
   };
 
-  const handleRepost = () => {
-    if (!isAuthenticated) {
-      onRequireAuth?.();
-      return;
-    }
-    setShowRepostModal(true);
-  };
-
-  const organizerName = user?.name || plan.user?.name || 'Organizer';
-
   // If not swipeable, render base card directly
   if (!isSwipeable) {
     return (
@@ -499,7 +483,6 @@ export default function BusinessCard({
           onPress={onPress}
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
-          onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
@@ -518,18 +501,6 @@ export default function BusinessCard({
           onRegisterPress={() => {
             setShowGuestListModal(false);
             onRegisterPress?.();
-          }}
-        />
-        <RepostModal
-          visible={showRepostModal}
-          onClose={() => setShowRepostModal(false)}
-          originalPlanId={plan.plan_id}
-          originalPostTitle={plan.title}
-          originalPostDescription={plan.description}
-          originalAuthorName={organizerName}
-          onSuccess={() => {
-            setShowRepostModal(false);
-            // Optionally refresh or update UI
           }}
         />
       </>
@@ -555,7 +526,6 @@ export default function BusinessCard({
           onPress={onPress}
           onRegisterPress={onRegisterPress}
           onRequireAuth={onRequireAuth}
-          onRepostPress={handleRepost}
           onSharePress={onSharePress}
           onGuestListPress={handleGuestListPress}
           hideActions={hideActions}
@@ -575,18 +545,6 @@ export default function BusinessCard({
         onRegisterPress={() => {
           setShowGuestListModal(false);
           onRegisterPress?.();
-        }}
-      />
-      <RepostModal
-        visible={showRepostModal}
-        onClose={() => setShowRepostModal(false)}
-        originalPlanId={plan.plan_id}
-        originalPostTitle={plan.title}
-        originalPostDescription={plan.description}
-        originalAuthorName={organizerName}
-        onSuccess={() => {
-          setShowRepostModal(false);
-          // Optionally refresh or update UI
         }}
       />
     </>

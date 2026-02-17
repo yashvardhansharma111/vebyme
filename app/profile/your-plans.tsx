@@ -424,7 +424,15 @@ export default function YourPlansScreen() {
                 isCancelling={isCancelling}
                 showAnalytics={currentUser?.is_business === true}
                 onCardPress={() => {
-                  router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.plan_id } } as any);
+                  if (plan.type === 'business') {
+                    router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.plan_id } } as any);
+                  } else {
+                    // Regular plan: open in edit (no separate regular plan view)
+                    const planData = { ...plan, mode: 'edit' };
+                    AsyncStorage.setItem('planForCreation', JSON.stringify(planData)).then(() => {
+                      router.push('/(tabs)/createPost');
+                    });
+                  }
                 }}
                 onAnalyticsPress={() => {
                   router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any);

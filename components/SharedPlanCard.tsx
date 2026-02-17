@@ -27,7 +27,6 @@ interface SharedPlanCardProps {
   onJoinPress?: () => void;
   /** When user taps the card (not just the button) – open plan preview/detail */
   onCardPress?: () => void;
-  onRepostPress?: () => void;
   onSharePress?: () => void;
   containerStyle?: ViewStyle;
   /** Compact mode for inside chat bubbles (slightly smaller) */
@@ -79,7 +78,6 @@ export default function SharedPlanCard({
   plan,
   onJoinPress,
   onCardPress,
-  onRepostPress,
   onSharePress,
   containerStyle,
   compact = false,
@@ -178,9 +176,6 @@ export default function SharedPlanCard({
         {/* Footer - exact same as feed: icons + Join/Register pill */}
         <View style={[styles.footer, compact && styles.footerCompact]}>
           <View style={[styles.footerIcons, compact && styles.footerIconsCompact]}>
-            <TouchableOpacity style={[styles.footerIconBtn, compact && styles.footerIconBtnCompact]} onPress={onRepostPress ?? (() => {})}>
-              <Ionicons name="repeat-outline" size={compact ? 18 : 22} color="#000" />
-            </TouchableOpacity>
             <TouchableOpacity style={[styles.footerIconBtn, compact && styles.footerIconBtnCompact]} onPress={onSharePress ?? (() => {})}>
               <Ionicons name="paper-plane-outline" size={compact ? 18 : 22} color="#000" />
             </TouchableOpacity>

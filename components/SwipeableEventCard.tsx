@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from './JoinModal';
-import RepostModal from './RepostModal';
 import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
@@ -22,8 +21,8 @@ function getAllEventTags(event: any): string[] {
 }
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, onInteractedPillPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false, hideRepostButton = false }: any) {
-  const allTags = getAllEventTags(event);
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSharePress, onImagePress, onInteractedPillPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false, hideFooterActions = false, hideTags = false }: any) {
+  const allTags = hideTags ? [] : getAllEventTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
   const interactionCount = event?.interaction_count ?? 0;
@@ -134,6 +133,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
               <Text style={styles.title}>{event.title}</Text>
               <Text style={styles.description} numberOfLines={4}>{event.description}</Text>
               <View style={styles.middleRow}>
+                {!hideTags && (
                 <View style={styles.tagsContainer}>
                   {allTags.map((tag: string, index: number) => (
                     <View key={index} style={styles.tag}>
@@ -142,6 +142,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
                     </View>
                   ))}
                 </View>
+                )}
                 {hasEventImage ? (
                   <TouchableOpacity onPress={onImagePress} activeOpacity={0.95}>
                     <Image source={{ uri: event.image }} style={styles.eventImage} />
@@ -156,16 +157,11 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
           )}
           </View>
 
-          {!isRepost && !event?.repost_data && (
+          {!hideFooterActions && !isRepost && !event?.repost_data && (
             <View style={styles.footerRow}>
               <TouchableOpacity style={[styles.joinButton, joinDisabled && styles.joinButtonDisabled]} onPress={joinDisabled ? undefined : onJoinPress} disabled={joinDisabled}>
                 <Text style={[styles.joinButtonText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
               </TouchableOpacity>
-              {!hideRepostButton && (
-                <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
-                  <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
-                </TouchableOpacity>
-              )}
               <TouchableOpacity style={styles.footerIconBtn} onPress={onSharePress}>
                 <Ionicons name="paper-plane-outline" size={22} color="#1C1C1E" />
               </TouchableOpacity>
@@ -183,7 +179,6 @@ export { EventCard };
 export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription }: any) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [showRepostModal, setShowRepostModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [showJoinedListModal, setShowJoinedListModal] = useState(false);
@@ -255,22 +250,6 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
     }
   };
 
-  const handleRepost = () => {
-    if (!isAuthenticated || !authUser?.user_id) {
-      onRequireAuth?.();
-      return;
-    }
-
-    // Check if this is already a repost (cannot repost a repost)
-    const isRepostPost = event.is_repost || isRepost || !!event?.repost_data;
-    if (isRepostPost) {
-      Alert.alert('Info', 'You cannot repost a repost');
-      return;
-    }
-
-    setShowRepostModal(true);
-  };
-
   const handleShare = () => {
     if (!isAuthenticated) {
       onRequireAuth?.();
@@ -306,7 +285,6 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
             }
           }}
           joinDisabled={isOwnPost}
-          onRepostPress={handleRepost}
           onSharePress={handleShare}
           isRepost={isRepost}
           repostData={event.repost_data}
@@ -314,6 +292,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           originalPostTitle={event.original_post_title}
           originalPostDescription={event.original_post_description}
           onImagePress={hasEventImage ? () => setShowImageGallery(true) : undefined}
+          hideTags={true}
         />
       </Swipeable>
       {showJoinModal && (postId || event?.id) && (
@@ -349,17 +328,6 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           }}
         />
       )}
-      <RepostModal
-        visible={showRepostModal}
-        onClose={() => setShowRepostModal(false)}
-        originalPlanId={event?.repost_data?.original_plan_id || event?.repost_data?.plan_id || postId || event?.id || ''}
-        originalPostTitle={originalPostTitle || event?.title}
-        originalPostDescription={originalPostDescription || event?.description}
-        originalAuthorName={originalAuthor}
-        onSuccess={() => {
-          // Refresh feed or update UI
-        }}
-      />
       {isAuthenticated && authUser?.user_id && (
         <ShareToChatModal
           visible={showShareModal}

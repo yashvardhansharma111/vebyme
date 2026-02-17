@@ -826,13 +826,15 @@ export default function CreateBusinessPostScreen() {
         <SafeAreaView style={styles.previewFullScreen} edges={['top', 'bottom']}>
           <View style={styles.previewScroll}>
             {isBusinessUser ? (
-              <BusinessPlanDetailPreview
-                plan={previewData}
-                organizerName={currentUser?.name || 'Organizer'}
-                organizerAvatar={currentUser?.profile_image ?? null}
-                showOrganizer={true}
-                withStickyBar={true}
-              />
+              <View style={styles.businessPreviewWrap}>
+                <BusinessPlanDetailPreview
+                  plan={previewData}
+                  organizerName={currentUser?.name || 'Organizer'}
+                  organizerAvatar={currentUser?.profile_image ?? null}
+                  showOrganizer={true}
+                  withStickyBar={true}
+                />
+              </View>
             ) : (
               <View style={styles.eventPreviewWrap}>
                 <EventCard
@@ -851,8 +853,8 @@ export default function CreateBusinessPostScreen() {
                   }}
                   onUserPress={() => {}}
                   onJoinPress={() => {}}
-                  onRepostPress={() => {}}
                   onSharePress={() => {}}
+                  hideFooterActions={true}
                 />
               </View>
             )}
@@ -2594,11 +2596,31 @@ const styles = StyleSheet.create({
   },
   previewScroll: { flex: 1 },
   previewScrollContent: { paddingBottom: 24, paddingTop: 16, paddingHorizontal: 16 },
+  businessPreviewWrap: {
+    flex: 1,
+    marginHorizontal: 4,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   eventPreviewWrap: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 24,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   previewStickyBar: {
     flexDirection: 'row',

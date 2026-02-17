@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Modal,
   ImageBackground,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -172,7 +173,7 @@ export default function MyProfileScreen() {
 
           {/* Group 3: Contact */}
           <View style={styles.menuGroup}>
-            <TouchableOpacity style={styles.menuItem}>
+            <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL('mailto:plans@vybeme.in')}>
               <Ionicons name="headset-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
               <Text style={styles.menuText}>Contact Us</Text>
             </TouchableOpacity>

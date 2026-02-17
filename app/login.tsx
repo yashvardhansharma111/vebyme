@@ -206,8 +206,9 @@ export default function LoginScreen() {
                       style={styles.otpCircle}
                       value={otp[i] || ''}
                       keyboardType="number-pad"
-                      maxLength={1}
                       selectTextOnFocus
+                      textContentType={i === 0 ? 'oneTimeCode' : 'none'}
+                      {...(i === 0 && Platform.OS === 'android' && { autoComplete: 'sms-otp' as const })}
                       onChangeText={(text) => {
                         const digits = text.replace(/\D/g, '');
                         if (digits.length > 1) {
