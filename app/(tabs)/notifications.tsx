@@ -119,6 +119,15 @@ export default function NotificationsScreen() {
         console.log('[Notifications] loadNotifications: groups=', list.length, 'total interactions=', totalInteractions, 'individual (spec) types=', individualCount);
         setViewMode('summary');
         setSelectedEventId(null);
+        // Mark all as read when user opens/sees the list so badge decrements
+        const allIds = list.flatMap((g: any) => (g?.interactions ?? []).map((i: any) => i?.notification_id).filter(Boolean));
+        if (allIds.length > 0) {
+          Promise.all(allIds.map((id: string) => apiService.markNotificationAsRead(id).catch(() => null)))
+            .catch(() => null)
+            .finally(() => dispatch(setUnreadCount(0)));
+        } else {
+          dispatch(setUnreadCount(0));
+        }
       }
     } catch (error: any) {
       console.error('Error loading notifications:', error);

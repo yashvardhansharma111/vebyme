@@ -409,7 +409,7 @@ export default function HomeScreen() {
           <View style={styles.header}>
             <View style={styles.locationContainer}>
               <View style={styles.locationIconBg}>
-                <Ionicons name="location-sharp" size={18} color={Colors.light.primary} />
+                <Ionicons name="location-sharp" size={18} color="#1C1C1E" />
               </View>
               <View style={{ marginLeft: 10 }}>
                 <Text style={styles.locationTitle}>Bengaluru</Text>
@@ -422,7 +422,7 @@ export default function HomeScreen() {
                   style={styles.qrScannerButton}
                   onPress={() => router.push('/qr-scanner')}
                 >
-                  <Ionicons name="qr-code-outline" size={24} color={Colors.light.primary} />
+                  <Ionicons name="qr-code-outline" size={24} color="#1C1C1E" />
                 </TouchableOpacity>
               )}
               <TouchableOpacity

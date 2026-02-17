@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +34,7 @@ interface OverallData {
     checked_in_count: number;
     showup_rate_percent: number;
     revenue: number;
+    media?: Array<{ url: string; type?: string }>;
   }>;
 }
 
@@ -109,18 +111,22 @@ export default function OverallAnalyticsScreen() {
   const totalGender = segments.reduce((sum, s) => sum + (s.pct || 0), 0) || 1;
 
   const eventTypeRows = data.per_event?.length
-    ? data.per_event.slice(0, 6).map((ev, i) => ({
-        label: ev.title || `Event ${i + 1}`,
-        reg: ev.registered_count ?? 0,
-        showupPct: Math.round(ev.showup_rate_percent ?? 0),
-        icon: (['walk', 'barbell-outline', 'people-outline'] as const)[i % 3],
-        planId: ev.plan_id,
-      }))
-    : [
-        { label: 'Run Only Events', reg: 0, showupPct: 81, icon: 'walk' as const, planId: '' },
-        { label: 'Fitness/Training Events', reg: 0, showupPct: 92, icon: 'barbell-outline' as const, planId: '' },
-        { label: 'Social/Community Events', reg: 0, showupPct: 93, icon: 'people-outline' as const, planId: '' },
-      ];
+    ? data.per_event.slice(0, 6).map((ev, i) => {
+        const imageUrl = ev.media?.[0]?.url;
+        const dateStr = ev.created_at ? (() => {
+          const d = new Date(ev.created_at);
+          return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        })() : '';
+        return {
+          label: ev.title || `Event ${i + 1}`,
+          reg: ev.registered_count ?? 0,
+          showupPct: Math.round(ev.showup_rate_percent ?? 0),
+          planId: ev.plan_id,
+          imageUrl: imageUrl || null,
+          dateStr,
+        };
+      })
+    : [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -153,26 +159,9 @@ export default function OverallAnalyticsScreen() {
           </View>
         </View>
 
-        {/* Gender distribution (horizontal bar) – label and % inside bar; no Female if 0 */}
+        {/* Gender distribution (horizontal bar) – label and % inside bar */}
         <View style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitle}>Gender distribution</Text>
-            {data.per_event?.length > 0 && (
-              <TouchableOpacity
-                style={styles.perEventArrowWrap}
-                onPress={() =>
-                  router.push({
-                    pathname: '/analytics/event/[planId]',
-                    params: { planId: data.per_event![0].plan_id },
-                  } as any)
-                }
-                activeOpacity={0.7}
-              >
-                <Text style={styles.perEventArrowText}>Per event</Text>
-                <Ionicons name="chevron-forward" size={18} color="#1C1C1E" />
-              </TouchableOpacity>
-            )}
-          </View>
+          <Text style={styles.sectionTitle}>Gender distribution</Text>
           {segments.length > 0 ? (
             <View style={styles.barContainer}>
               {segments.map((seg, i) => (
@@ -195,9 +184,9 @@ export default function OverallAnalyticsScreen() {
           )}
         </View>
 
-        {/* Event type performance list – X reg Y% showup */}
+        {/* Event Level Analytics – event image (rounded), title, date, stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Event type performance</Text>
+          <Text style={styles.sectionTitle}>Event Level Analytics</Text>
           <View style={styles.eventTypeCard}>
             {eventTypeRows.map((row, i) => (
               <TouchableOpacity
@@ -215,28 +204,34 @@ export default function OverallAnalyticsScreen() {
                 activeOpacity={row.planId ? 0.7 : 1}
                 disabled={!row.planId}
               >
-                <View style={styles.eventTypeIconWrap}>
-                  <Ionicons name={row.icon} size={20} color="#1C1C1E" />
+                <View style={styles.eventTypeImageWrap}>
+                  {row.imageUrl ? (
+                    <Image source={{ uri: row.imageUrl }} style={styles.eventTypeImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.eventTypeImagePlaceholder}>
+                      <Ionicons name="image-outline" size={20} color="#9CA3AF" />
+                    </View>
+                  )}
                 </View>
 
-                {/* Middle Content */}
                 <View style={styles.eventTypeContent}>
                   <Text style={styles.eventTypeLabel} numberOfLines={1}>
                     {row.label}
                   </Text>
+                  {row.dateStr ? (
+                    <Text style={styles.eventTypeDate} numberOfLines={1}>{row.dateStr}</Text>
+                  ) : null}
 
                   <View style={styles.eventTypeStats}>
                     <Text style={styles.eventTypeStatText}>
                       Registered: <Text style={styles.eventTypeStatValue}>{row.reg}</Text>
                     </Text>
-
                     <Text style={styles.eventTypeStatText}>
                       Show-up: <Text style={styles.eventTypeStatValue}>{row.showupPct}%</Text>
                     </Text>
                   </View>
                 </View>
 
-                {/* Arrow */}
                 {row.planId && (
                   <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
                 )}
@@ -318,28 +313,11 @@ const styles = StyleSheet.create({
   },
 
   section: { marginBottom: 20 },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1C1C1E',
-  },
-  perEventArrowWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  perEventArrowText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    marginBottom: 12,
   },
   noGenderData: {
     fontSize: 14,
@@ -390,14 +368,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#F1F5F9',
   },
-  eventTypeIconWrap: {
-    width: 40,
-    height: 40,
+  eventTypeImageWrap: {
+    width: 48,
+    height: 48,
     borderRadius: 12,
+    overflow: 'hidden',
+    marginRight: 12,
     backgroundColor: '#F1F5F9',
+  },
+  eventTypeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  eventTypeImagePlaceholder: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   eventTypeContent: {
     flex: 1,
@@ -407,6 +394,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#1C1C1E',
+  },
+  eventTypeDate: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
   },
   eventTypeStats: {
     flexDirection: 'row',

@@ -26,8 +26,9 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
   const interactionCount = event?.interaction_count ?? 0;
-  const showPill = true;
   const hasInteractions = interactionCount > 0 || interactedUsers.length > 0;
+  const totalJoiners = interactionCount > 0 ? interactionCount : interactedUsers.length;
+  const numCircles = Math.min(3, totalJoiners);
 
   return (
     <View style={styles.cardContainer}>
@@ -45,15 +46,14 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
             <Text style={styles.userTime}>{user.time}</Text>
           </View>
         </TouchableOpacity>
-        {showPill && (
+        {hasInteractions && numCircles > 0 && (
           <View style={styles.interactedPillPositioned}>
             <TouchableOpacity
               style={styles.interactedPill}
-              onPress={hasInteractions ? onInteractedPillPress : undefined}
-              activeOpacity={hasInteractions ? 0.7 : 1}
-              disabled={!hasInteractions}
+              onPress={onInteractedPillPress}
+              activeOpacity={0.7}
             >
-              {[0, 1, 2].map((idx) => {
+              {Array.from({ length: numCircles }, (_, idx) => {
                 const u = interactedUsers[idx];
                 return (
                   <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -8, zIndex: 3 - idx }]}>
@@ -61,8 +61,8 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
                   </View>
                 );
               })}
-              {interactionCount > 0 && (
-                <Text style={styles.interactedPlus}>+{interactionCount}</Text>
+              {totalJoiners > 3 && (
+                <Text style={styles.interactedPlus}>+{totalJoiners - 3}</Text>
               )}
             </TouchableOpacity>
           </View>

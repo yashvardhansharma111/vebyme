@@ -298,30 +298,43 @@ function BusinessCardBase({
       </TouchableOpacity>
 
       {/* Attendees: only when joiners > 0. 1→1 circle, 2→2 circles, 3→3 circles, 4+→3 circles + overflow count */}
-      {onGuestListPress && attendeesCount > 0 && (
-        <TouchableOpacity
-          style={[
-            styles.interactedPillOnImage,
-            showArrowButton && styles.interactedPillOnImageWithArrow,
-            pillsAboveCard && styles.interactedPillAbove,
-          ]}
-          onPress={(e) => {
-            e?.stopPropagation?.();
-            onGuestListPress?.();
-          }}
-          activeOpacity={0.8}
-        >
-          {Array.from({ length: Math.min(3, attendeesCount) }, (_, idx) => {
-            const u = displayUsers[idx];
-            return (
-              <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
-                <Avatar uri={u?.avatar ?? undefined} size={20} />
-              </View>
-            );
-          })}
-          {attendeesCount > 3 && <Text style={styles.interactedPlus}>+{attendeesCount - 3}</Text>}
-        </TouchableOpacity>
-      )}
+      {attendeesCount > 0 && (() => {
+        const numCircles = Math.min(3, attendeesCount);
+        const pillStyle = [
+          styles.interactedPillOnImage,
+          showArrowButton && styles.interactedPillOnImageWithArrow,
+          pillsAboveCard && styles.interactedPillAbove,
+        ];
+        const content = (
+          <>
+            {Array.from({ length: numCircles }, (_, idx) => {
+              const u = displayUsers[idx];
+              return (
+                <View key={u?.id ?? idx} style={[styles.interactedAvatarWrap, { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx }]}>
+                  <Avatar uri={u?.avatar ?? undefined} size={20} />
+                </View>
+              );
+            })}
+            {attendeesCount > 3 && <Text style={styles.interactedPlus}>+{attendeesCount - 3}</Text>}
+          </>
+        );
+        if (onGuestListPress) {
+          return (
+            <TouchableOpacity
+              style={pillStyle}
+              onPress={(e) => {
+                e?.stopPropagation?.();
+                onGuestListPress?.();
+              }}
+              activeOpacity={0.8}
+            >
+              {content}
+            </TouchableOpacity>
+          );
+        }
+        return <View style={pillStyle}>{content}</View>;
+      })()}
+
       </TouchableOpacity>
 
       {/* Full-screen image gallery (same UX as business-plan [planId]) */}
