@@ -62,12 +62,13 @@ const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
 const ADDITIONAL_SETTINGS = [
   { id: 'distance', label: 'Distance', icon: 'location', placeholder: 'e.g. 5k' },
   { id: 'starting_point', label: 'Starting Point', icon: 'navigate', placeholder: 'e.g. Alienkind Indiranagar' },
+  { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
   { id: 'dress_code', label: 'Dress Code', icon: 'shirt', placeholder: 'e.g. Cafe Joggers' },
   { id: 'music_type', label: 'Music Type', icon: 'musical-notes', placeholder: 'e.g. Electronic' },
-  { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
+  { id: 'links', label: 'Links', icon: 'link', placeholder: 'https://...' },
   { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
-  { id: 'additional_info', label: 'Additional Info', icon: 'information-circle', placeholder: 'Heading and description' },
 ];
+
 
 interface Pass {
   pass_id: string;
@@ -139,7 +140,7 @@ export default function CreateBusinessPostScreen() {
     setTitle('');
     setDescription('');
     setMedia([]);
-    setLocation('Bengaluru');
+    setLocation('');
     setSelectedDate(null);
     setShowDatePicker(false);
     setTimeEnabled(false);
@@ -895,10 +896,9 @@ export default function CreateBusinessPostScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* Title – with label */}
           <View style={styles.sectionCard}>
-            <Text style={styles.fieldLabel}>Title</Text>
             <TextInput
               style={styles.titleInput}
-              placeholder="e.g. Sunday 5K Run"
+              placeholder="Title"
               value={title}
               onChangeText={setTitle}
               placeholderTextColor="#999"
@@ -907,10 +907,10 @@ export default function CreateBusinessPostScreen() {
 
           {/* Event Description – label + expands as text increases */}
           <View style={styles.sectionCard}>
-            <Text style={styles.fieldLabel}>Event Description</Text>
+            
             <TextInput
               style={[styles.descriptionInput, { minHeight: Math.max(100, descriptionHeight) }]}
-              placeholder="Join the run club for another 5k at Bohemians Indiranagar. Runs, Coffees, and some groovy music on the house."
+              placeholder="Plan Description"
               value={description}
               onChangeText={setDescription}
               multiline
@@ -921,7 +921,7 @@ export default function CreateBusinessPostScreen() {
 
           {/* Media - with section label; Add Media as smaller button */}
           <View style={[styles.sectionCard, styles.mediaSection]}>
-            <Text style={styles.fieldLabel}>Media</Text>
+            
             {media.length > 0 ? (
               <View style={styles.mediaList}>
                 {media.map((item, index) => (
@@ -952,10 +952,10 @@ export default function CreateBusinessPostScreen() {
 
           {/* Location */}
           <View style={styles.sectionCard}>
-            <Text style={styles.fieldLabel}>Location</Text>
+            
             <TextInput
               style={styles.locationInputPill}
-              placeholder="e.g. Cubbon Park, Bengaluru"
+              placeholder="Location"
               value={location}
               onChangeText={setLocation}
               placeholderTextColor="#999"
@@ -974,7 +974,7 @@ export default function CreateBusinessPostScreen() {
                 const day = d.getDate();
                 const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
                 return `${day}${suffix} ${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-              })() : '7th January, 2026'}
+              })() : 'Date of Event'}
             </Text>
             <Ionicons name="calendar-outline" size={20} color="#666" />
           </TouchableOpacity>
@@ -992,8 +992,8 @@ export default function CreateBusinessPostScreen() {
           />
 
           {/* Time of Event */}
-          <View style={styles.sectionCard}>
-          <View style={styles.toggleRow}>
+          <View style={[styles.sectionCard, styles.sectionCardCompact]}>
+          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
             <Text style={styles.toggleLabel}>Time of Event</Text>
             <Switch
               value={timeEnabled}
@@ -1005,7 +1005,7 @@ export default function CreateBusinessPostScreen() {
 
           {timeEnabled && (
             <>
-              <View style={styles.timeRow}>
+              <View style={[styles.timeRow, styles.timeRowCompact]}>
                 <TextInput
                   style={[styles.input, styles.timeInput]}
                   placeholder="8:00"
@@ -1035,7 +1035,7 @@ export default function CreateBusinessPostScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.timeRow}>
+              <View style={[styles.timeRow, styles.timeRowCompact]}>
                 <TextInput
                   style={[styles.input, styles.timeInput]}
                   placeholder="End time (optional)"
@@ -1146,8 +1146,8 @@ export default function CreateBusinessPostScreen() {
           </View>
 
           {/* Tickets */}
-          <View style={styles.sectionCard}>
-          <View style={styles.toggleRow}>
+          <View style={[styles.sectionCard, styles.sectionCardCompact, ticketsEnabled && styles.ticketsSectionWhenOn]}>
+          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
             <Text style={styles.toggleLabel}>Tickets</Text>
             <Switch
               value={ticketsEnabled}
@@ -1162,25 +1162,24 @@ export default function CreateBusinessPostScreen() {
 
           {ticketsEnabled && (
             <View style={styles.passesSection}>
-              {/* Ticket selection UI: Add Media, Add Type */}
-              <View style={styles.ticketActionsRow}>
-                <TouchableOpacity
-                  style={styles.ticketActionButton}
-                  onPress={() => passes[0] && !(editMode && passes[0].isExisting) ? handleAddPassImage(0) : undefined}
-                  disabled={editMode && passes[0]?.isExisting}
-                >
-                  <Ionicons name="image-outline" size={18} color="#1C1C1E" />
-                  <Text style={styles.ticketActionButtonText}>Add Media</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.ticketActionButton} onPress={addPass}>
-                  <Ionicons name="add-circle-outline" size={18} color="#1C1C1E" />
-                  <Text style={styles.ticketActionButtonText}>Add Type</Text>
-                </TouchableOpacity>
-              </View>
-              {passes[0] && editMode && passes[0].isExisting && passes[0].media && passes[0].media.length > 0 && (
-                <View style={styles.passImageRow}>
-                  <Text style={styles.passImageLabel}>Ticket image</Text>
-                  <Image source={{ uri: passes[0].media[0].uri }} style={styles.passMediaThumb} />
+              {/* Add media – just below ticket title; gray bg */}
+              <TouchableOpacity
+                style={styles.ticketAddMediaButton}
+                onPress={() => passes[0] && !(editMode && passes[0].isExisting) ? handleAddPassImage(0) : undefined}
+                disabled={editMode && passes[0]?.isExisting}
+              >
+                <Ionicons name="image-outline" size={18} color="#1C1C1E" />
+                <Text style={styles.ticketAddMediaButtonText}>Add media</Text>
+              </TouchableOpacity>
+              {/* Small preview of uploaded ticket image below Add media */}
+              {(passes[0]?.media?.length ?? 0) > 0 && (
+                <View style={styles.ticketImagePreviewWrap}>
+                  <Image source={{ uri: passes[0].media![0].uri }} style={styles.ticketImagePreviewThumb} />
+                  {!(editMode && passes[0]?.isExisting) && (
+                    <TouchableOpacity style={styles.ticketImagePreviewRemove} onPress={() => removePassImage(0)}>
+                      <Ionicons name="close" size={14} color="#FFF" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
               {passes.map((pass, index) => {
@@ -1227,20 +1226,27 @@ export default function CreateBusinessPostScreen() {
                   </View>
                 );
               })}
-              <TouchableOpacity
-                style={styles.previewTicketButtonBottom}
-                onPress={() => { setPreviewPassIndex(0); setShowTicketPreview(true); }}
-              >
-                <Ionicons name="eye-outline" size={18} color="#1C1C1E" />
-                <Text style={styles.previewTicketButtonText}>Preview Ticket</Text>
-              </TouchableOpacity>
+              {/* Bottom row: Add type (gray, left) | Preview ticket (black, right) */}
+              <View style={styles.ticketsBottomRow}>
+                <TouchableOpacity style={styles.ticketAddTypeButton} onPress={addPass}>
+                  <Ionicons name="add-circle-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.ticketAddTypeButtonText}>Add type</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.previewTicketButtonBottom}
+                  onPress={() => { setPreviewPassIndex(0); setShowTicketPreview(true); }}
+                >
+                  <Ionicons name="eye-outline" size={18} color="#FFF" />
+                  <Text style={styles.previewTicketButtonBottomText}>Preview ticket</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
           </View>
 
           {/* Share to community */}
-          <View style={styles.sectionCard}>
-          <View style={styles.toggleRow}>
+          <View style={[styles.sectionCard, styles.sectionCardCompact]}>
+          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
             <Text style={styles.toggleLabel}>Share to community</Text>
             <Switch
               value={shareToAnnouncementGroup}
@@ -1607,13 +1613,20 @@ export default function CreateBusinessPostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#FFF',
   },
   sectionCard: {
     backgroundColor: '#EBEBED',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+  },
+  /** Shorter sections with white bg: Time of Event, Tickets, Share to community */
+  sectionCardCompact: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
   },
   locationInputPill: {
     fontSize: 15,
@@ -1638,7 +1651,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#FFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E5EA',
   },
@@ -1673,7 +1686,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#FFF',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E5E5EA',
   },
@@ -1829,6 +1842,9 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
+  timeRowCompact: {
+    marginBottom: 10,
+  },
   timeInput: {
     flex: 1,
     marginBottom: 0,
@@ -1862,6 +1878,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     marginBottom: 16,
+  },
+  toggleRowCompact: {
+    paddingVertical: 6,
+    marginBottom: 8,
   },
   toggleLabel: {
     fontSize: 16,
@@ -1972,8 +1992,70 @@ const styles = StyleSheet.create({
   subcategoryChipTextSelected: {
     color: '#FFF',
   },
+  ticketsSectionWhenOn: {
+    backgroundColor: '#FFF',
+  },
   passesSection: {
-    marginBottom: 16,
+    marginTop: 8,
+    marginBottom: 0,
+  },
+  ticketAddMediaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+  },
+  ticketAddMediaButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  ticketImagePreviewWrap: {
+    position: 'relative',
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  ticketImagePreviewThumb: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+  },
+  ticketImagePreviewRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 10,
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  ticketsBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 12,
+  },
+  ticketAddTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 10,
+  },
+  ticketAddTypeButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
   passCard: {
     backgroundColor: 'transparent',
@@ -2305,11 +2387,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    backgroundColor: '#E5E5EA',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#1C1C1E',
     borderRadius: 12,
-    marginTop: 12,
+  },
+  previewTicketButtonBottomText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFF',
   },
   addPassButton: {
     padding: 12,
@@ -2336,25 +2422,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     gap: 6,
   },
   settingChipSelected: {
     backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
   },
   settingChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#666',
+    color: '#1C1C1E',
   },
   settingChipTextSelected: {
     color: '#FFF',
   },
   additionalDetailCard: {
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   additionalDetailLabel: {
     fontSize: 14,

@@ -415,8 +415,8 @@ export default function HomeScreen() {
                 <Ionicons name="location-sharp" size={18} color={Colors.light.primary} />
               </View>
               <View style={{ marginLeft: 10 }}>
-                <Text style={styles.locationTitle}>Indiranagar</Text>
-                <Text style={styles.locationSubtitle}>Bengaluru</Text>
+                <Text style={styles.locationTitle}>Bengaluru</Text>
+                {/* <Text style={styles.locationSubtitle}>Bengaluru</Text> */}
               </View>
             </View>
             <View style={styles.headerRight}>
@@ -510,7 +510,9 @@ export default function HomeScreen() {
                           interactedUsers={item.event?.interacted_users}
                           isSwipeable={false}
                           containerStyle={styles.businessHorizontalCardInner}
-                          showArrowButton={false}
+                          fillHeight={true}
+                          showArrowButton={true}
+                          onArrowPress={() => router.push('/business-posts')}
                           onPress={() => {
                             router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}
@@ -620,7 +622,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={styles.seeOthersButton}
               onPress={() => {
-                scrollViewRef.current?.scrollTo({ y: SCREEN_HEIGHT * 0.6, animated: true });
+                scrollViewRef.current?.scrollTo({ y: SCREEN_HEIGHT * 0.78, animated: true });
               }}
               activeOpacity={0.8}
             >
@@ -891,20 +893,22 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   businessHorizontalWrap: {
-    marginBottom: 20,
+    height: SCREEN_HEIGHT * 0.75,
+    marginBottom: 12,
   },
   businessHorizontalContent: {
     paddingHorizontal: 20,
-    paddingRight: 20,
+    paddingRight: 24,
     gap: 16,
   },
   businessHorizontalCard: {
-    width: SCREEN_WIDTH * 0.85,
-    maxWidth: 360,
+    width: SCREEN_WIDTH - 40,
+    height: SCREEN_HEIGHT * 0.75,
     marginRight: 16,
   },
   businessHorizontalCardInner: {
     width: '100%',
+    height: '100%',
     marginHorizontal: 0,
   },
   heroCardWrap: {
