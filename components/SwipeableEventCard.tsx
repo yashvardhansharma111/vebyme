@@ -292,7 +292,6 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           originalPostTitle={event.original_post_title}
           originalPostDescription={event.original_post_description}
           onImagePress={hasEventImage ? () => setShowImageGallery(true) : undefined}
-          hideTags={true}
         />
       </Swipeable>
       {showJoinModal && (postId || event?.id) && (

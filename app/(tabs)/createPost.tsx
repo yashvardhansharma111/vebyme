@@ -24,19 +24,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Tag options based on the screenshot
+// Tag options – categories same as business post; Day/Time with icons
 const DAY_TAGS = ['Today', 'Tomorrow', 'Weekend'];
 const TIME_TAGS = ['Morning', 'Evening', 'Night'];
-const CATEGORY_TAGS = ['Music', 'Cafe', 'Clubs'];
-const CATEGORY_ICONS: { [key: string]: keyof typeof Ionicons.glyphMap } = {
-  Music: 'musical-notes',
-  Cafe: 'cafe',
-  Clubs: 'wine',
+const CATEGORY_TAGS = ['Running', 'Sports', 'Fitness/Training', 'Social/Community'];
+const DAY_ICONS: Record<string, string> = {
+  Today: 'today-outline',
+  Tomorrow: 'calendar-outline',
+  Weekend: 'calendar-outline',
 };
-const SUB_CATEGORY_TAGS: { [key: string]: string[] } = {
-  Music: ['Rave', 'Concert', 'DJ', 'Karaoke', 'Rooftop'],
-  Cafe: ['Coffee', 'Brunch', 'Dessert', 'Work', 'Study'],
-  Clubs: ['Nightclub', 'Bar', 'Pub', 'Lounge', 'Dance'],
+const TIME_ICONS: Record<string, string> = {
+  Morning: 'sunny-outline',
+  Evening: 'partly-sunny-outline',
+  Night: 'moon-outline',
+};
+const CATEGORY_ICONS: Record<string, string> = {
+  Running: 'walk-outline',
+  Sports: 'basketball-outline',
+  'Fitness/Training': 'barbell-outline',
+  'Social/Community': 'people-outline',
 };
 
 const DESCRIPTION_MAX_WORDS = 250;
@@ -117,6 +123,7 @@ export default function CreatePostScreen() {
           if (planData.category_sub && planData.category_sub.length > 0) {
             setSelectedSubCategory(planData.category_sub[0]);
           }
+          // Subcategory UI removed; state kept for edit load compat
           
           // Handle temporal tags
           if (planData.temporal_tags && planData.temporal_tags.length > 0) {
@@ -219,8 +226,7 @@ export default function CreatePostScreen() {
     const tags: string[] = [];
     if (selectedDay) tags.push(selectedDay);
     if (selectedTime) tags.push(selectedTime);
-    if (selectedSubCategory) tags.push(selectedSubCategory);
-    else if (selectedCategory) tags.push(selectedCategory);
+    if (selectedCategory) tags.push(selectedCategory);
 
     return {
       user: {
@@ -283,20 +289,10 @@ export default function CreatePostScreen() {
         });
       }
 
-      // Add category
+      // Add category (no subcategory for regular post)
       if (selectedCategory) {
         formData.append('category_main', selectedCategory.toLowerCase());
-        
-        // category_sub as array
-        const categorySubs: string[] = [];
-        if (selectedSubCategory) {
-          categorySubs.push(selectedSubCategory.toLowerCase());
-        } else {
-          categorySubs.push(selectedCategory.toLowerCase());
-        }
-        categorySubs.forEach((sub) => {
-          formData.append('category_sub', sub);
-        });
+        formData.append('category_sub', selectedCategory.toLowerCase());
       }
 
       // Add media files
@@ -516,6 +512,18 @@ export default function CreatePostScreen() {
             )}
           </View>
 
+          {/* Number of people */}
+          <View style={styles.section}>
+            <TextInput
+              style={[styles.input, styles.inputGray]}
+              placeholder="Number of people"
+              placeholderTextColor="#8E8E93"
+              value={numPeople}
+              onChangeText={setNumPeople}
+              keyboardType="number-pad"
+            />
+          </View>
+
           {/* Women only – toggle */}
           <View style={[styles.section, styles.toggleRow]}>
             <Text style={styles.label}>Women only post</Text>
@@ -527,20 +535,7 @@ export default function CreatePostScreen() {
             />
           </View>
 
-          {/* Number of people */}
-          <View style={styles.section}>
-            {/* <Text style={styles.label}>Number of people</Text> */}
-            <TextInput
-              style={[styles.input, styles.inputGray]}
-              placeholder="Number of people"
-              placeholderTextColor="#8E8E93"
-              value={numPeople}
-              onChangeText={setNumPeople}
-              keyboardType="number-pad"
-            />
-          </View>
-
-          {/* Tags – day, time, category in gray box; pills white, selected black */}
+          {/* Tags – Day, Time, Category with icons; no subcategory */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tags</Text>
             <View style={styles.tagsGrayBox}>
@@ -556,6 +551,12 @@ export default function CreatePostScreen() {
                       ]}
                       onPress={() => setSelectedDay(selectedDay === tag ? '' : tag)}
                     >
+                      <Ionicons
+                        name={(DAY_ICONS[tag] || 'calendar-outline') as any}
+                        size={16}
+                        color={selectedDay === tag ? '#FFF' : '#1C1C1E'}
+                        style={{ marginRight: 6 }}
+                      />
                       <Text
                         style={[
                           styles.tagPillTextWhite,
@@ -581,6 +582,12 @@ export default function CreatePostScreen() {
                       ]}
                       onPress={() => setSelectedTime(selectedTime === tag ? '' : tag)}
                     >
+                      <Ionicons
+                        name={(TIME_ICONS[tag] || 'time-outline') as any}
+                        size={16}
+                        color={selectedTime === tag ? '#FFF' : '#1C1C1E'}
+                        style={{ marginRight: 6 }}
+                      />
                       <Text
                         style={[
                           styles.tagPillTextWhite,
@@ -610,7 +617,7 @@ export default function CreatePostScreen() {
                       }}
                     >
                       <Ionicons
-                        name={CATEGORY_ICONS[tag] || 'ellipse'}
+                        name={(CATEGORY_ICONS[tag] || 'pricetag-outline') as any}
                         size={16}
                         color={selectedCategory === tag ? '#FFF' : '#1C1C1E'}
                         style={{ marginRight: 6 }}
@@ -627,33 +634,6 @@ export default function CreatePostScreen() {
                   ))}
                 </View>
               </View>
-
-              {selectedCategory && SUB_CATEGORY_TAGS[selectedCategory] && (
-                <View style={styles.tagSection}>
-                  <Text style={styles.tagLabel}>SUB-CATEGORY</Text>
-                  <View style={styles.tagRow}>
-                    {SUB_CATEGORY_TAGS[selectedCategory].map((tag) => (
-                      <TouchableOpacity
-                        key={tag}
-                        style={[
-                          styles.tagPillWhite,
-                          selectedSubCategory === tag && styles.tagPillSelected,
-                        ]}
-                        onPress={() => setSelectedSubCategory(selectedSubCategory === tag ? '' : tag)}
-                      >
-                        <Text
-                          style={[
-                            styles.tagPillTextWhite,
-                            selectedSubCategory === tag && styles.tagPillTextSelected,
-                          ]}
-                        >
-                          {tag}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
             </View>
           </View>
         </ScrollView>
