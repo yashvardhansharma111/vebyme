@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     alignItems: 'center',
-    paddingTop: 56,
+    paddingTop: 180,
   },
   cardSection: {
     flexShrink: 0,
