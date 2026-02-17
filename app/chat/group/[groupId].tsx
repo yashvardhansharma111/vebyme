@@ -18,7 +18,7 @@ import {
   Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
@@ -150,7 +150,6 @@ export default function GroupChatScreen() {
   const TYPING_DEBOUNCE_MS = 2000;
   const TYPING_TTL_MS = 10000; // match backend: typing expires after 10s
   const flatListRef = useRef<FlatList>(null);
-  const initialScrollDoneRef = useRef(false);
   const [driveLink, setDriveLink] = useState<string>('');
   const [showDriveModal, setShowDriveModal] = useState(false);
   const [driveDraft, setDriveDraft] = useState('');
@@ -158,21 +157,20 @@ export default function GroupChatScreen() {
 
   useEffect(() => {
     if (groupId) {
-      initialScrollDoneRef.current = false;
       loadGroupDetails();
       loadMessages();
-      const interval = setInterval(loadMessages, 3000);
+      const interval = setInterval(loadMessages, 2000);
       return () => clearInterval(interval);
     }
   }, [groupId]);
 
-  // Scroll to bottom when chat is first opened (after messages load)
-  useEffect(() => {
-    if (!loading && messages.length > 0 && !initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-    }
-  }, [loading, messages.length]);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (groupId) {
+        loadMessages();
+      }
+    }, [groupId])
+  );
 
   const openDriveLink = async () => {
     const url = (driveLink || '').trim();
@@ -565,14 +563,15 @@ export default function GroupChatScreen() {
   };
 
   const displayMessages = useMemo(() => mergeConsecutiveImageMessages(messages), [messages]);
+  const invertedData = useMemo(() => [...displayMessages].reverse(), [displayMessages]);
 
   const renderMessage = ({ item, index }: { item: DisplayItem; index: number }) => {
     const isMe = item.user_id === user?.user_id;
-    const previousMessage = index > 0 ? displayMessages[index - 1] : null;
-    const showTimeHeader = !previousMessage || 
+    const previousMessage = index + 1 < invertedData.length ? invertedData[index + 1] : null;
+    const showTimeHeader = !previousMessage ||
       (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showAvatar = !isMe && (!previousMessage || previousMessage.user_id !== item.user_id);
-    const showName = !isMe && showAvatar;
+    const showName = !isMe;
 
     return (
       <View style={{ paddingHorizontal: 16 }}>
@@ -663,7 +662,11 @@ export default function GroupChatScreen() {
                 </View>
               ) : (
                 <View style={[styles.messageContentWrap, isMe && styles.messageContentWrapRight]}>
-                  {showName && <Text style={styles.senderName} numberOfLines={1}>{item.user?.name || 'User'}</Text>}
+                  {showName && (
+                    <Text style={styles.senderName} numberOfLines={1}>
+                      {item.user?.name || 'User'}
+                    </Text>
+                  )}
                   <View style={[styles.messageBubble, isMe ? styles.bubbleRight : styles.bubbleLeft]}>
                     {item.type === 'text' && (
                       <Text style={[styles.messageText, isMe ? styles.textRight : styles.textLeft]}>
@@ -710,13 +713,13 @@ export default function GroupChatScreen() {
       >
         <FlatList
           ref={flatListRef}
-          data={displayMessages}
+          data={invertedData}
           renderItem={renderMessage}
-          ListHeaderComponent={renderPlanCard}
+          ListFooterComponent={renderPlanCard}
           keyExtractor={(item) => ('merged' in item && item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          inverted
         />
 
         {/* Typing indicator */}

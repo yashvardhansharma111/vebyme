@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Colors, borderRadius, Fonts } from '@/constants/theme';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setChatUnreadCount } from '@/store/slices/chatSlice';
@@ -63,6 +63,14 @@ export default function ChatScreen() {
       loadChats();
     }
   }, [isAuthenticated, user]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (isAuthenticated && user?.user_id) {
+        loadChats();
+      }
+    }, [isAuthenticated, user?.user_id])
+  );
 
   const loadChats = async () => {
     if (!user?.user_id) return;

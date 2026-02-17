@@ -17,7 +17,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
@@ -130,26 +130,29 @@ export default function IndividualChatScreen() {
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const [messageImageErrors, setMessageImageErrors] = useState<Set<string>>(new Set());
   const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
+  const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+  const TYPING_DEBOUNCE_MS = 2000;
+  const TYPING_TTL_MS = 10000;
   const flatListRef = useRef<FlatList>(null);
-  const initialScrollDoneRef = useRef(false);
 
   useEffect(() => {
     if (groupId) {
-      initialScrollDoneRef.current = false;
       loadGroupDetails();
       loadMessages();
-      const interval = setInterval(loadMessages, 3000);
+      const interval = setInterval(loadMessages, 2000);
       return () => clearInterval(interval);
     }
   }, [groupId]);
 
-  // Scroll to bottom when chat is first opened (after messages load)
-  useEffect(() => {
-    if (!loading && messages.length > 0 && !initialScrollDoneRef.current) {
-      initialScrollDoneRef.current = true;
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
-    }
-  }, [loading, messages.length]);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (groupId) {
+        loadMessages();
+      }
+    }, [groupId])
+  );
 
   const loadGroupDetails = async () => {
     if (!groupId) return;
@@ -182,6 +185,20 @@ export default function IndividualChatScreen() {
           }
           return m;
         }));
+        const typingUsers = Array.isArray(raw) ? [] : (raw?.typing_users ?? []);
+        const othersTyping = (typingUsers as { user_id: string; name: string }[]).filter(
+          (u: any) => String(u.user_id) !== String(user?.user_id)
+        );
+        if (othersTyping.length > 0) {
+          const label = othersTyping.length === 1
+            ? `${othersTyping[0].name} is typing...`
+            : `${othersTyping.map((u: any) => u.name).join(' and ')} are typing...`;
+          setTypingLabel(label);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setTypingLabel(null), TYPING_TTL_MS);
+        } else {
+          setTypingLabel(null);
+        }
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -198,16 +215,27 @@ export default function IndividualChatScreen() {
       const content = inputText.trim();
       await apiService.sendMessage(groupId, user.user_id, 'text', content);
       setInputText('');
+      setTypingLabel(null);
       await loadMessages();
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
     } catch (error: any) {
       const msg = error?.message || error?.data?.message || 'Failed to send message.';
       Alert.alert('Error', msg.includes('not a member') ? 'You need to join this plan to send messages here.' : msg);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleTypingInput = (text: string) => {
+    setInputText(text);
+    if (groupId && user?.user_id && text.trim()) {
+      const now = Date.now();
+      if (now - lastTypingSentRef.current >= TYPING_DEBOUNCE_MS) {
+        lastTypingSentRef.current = now;
+        apiService.sendTyping(groupId, user.user_id).catch(() => {});
+      }
+    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => setTypingLabel(null), 2000);
   };
 
   const handlePickImage = async () => {
@@ -254,7 +282,6 @@ export default function IndividualChatScreen() {
       });
       setShowShareModal(false);
       await loadMessages();
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e: any) {
       Alert.alert('Error', 'Failed to share plan.');
     } finally {
@@ -342,6 +369,8 @@ export default function IndividualChatScreen() {
   };
 
   const displayMessages = useMemo(() => mergeConsecutiveImageMessages(messages), [messages]);
+  // Inverted list: show newest at bottom without scrolling
+  const invertedData = useMemo(() => [...displayMessages].reverse(), [displayMessages]);
 
   const getEmojiForType = (type: string) => {
     const r = REACTION_EMOJIS.find((e) => e.type === type);
@@ -350,7 +379,8 @@ export default function IndividualChatScreen() {
 
   const renderMessage = ({ item, index }: { item: DisplayItem; index: number }) => {
     const isMe = item.user_id === user?.user_id;
-    const previousMessage = index > 0 ? displayMessages[index - 1] : null;
+    // inverted list: index 0 is newest, so "previous" in time is index+1
+    const previousMessage = index + 1 < invertedData.length ? invertedData[index + 1] : null;
     const showTimeHeader = !previousMessage || (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showReactionPicker = reactionMessageId === item.message_id;
 
@@ -500,13 +530,19 @@ export default function IndividualChatScreen() {
       >
         <FlatList
           ref={flatListRef}
-          data={displayMessages}
+          data={invertedData}
           renderItem={renderMessage}
           keyExtractor={(item) => ('merged' in item && item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 10 }]}
           showsVerticalScrollIndicator={false}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          inverted
         />
+
+        {typingLabel ? (
+          <View style={styles.typingBar}>
+            <Text style={styles.typingText}>{typingLabel}</Text>
+          </View>
+        ) : null}
 
         {/* Input Area: input, image upload, microphone, send */}
         <View style={[styles.inputWrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
@@ -516,7 +552,7 @@ export default function IndividualChatScreen() {
               placeholder="Send a message"
               placeholderTextColor="#999"
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleTypingInput}
               multiline={false}
             />
             <TouchableOpacity style={styles.iconButton} onPress={handlePickImage} disabled={sending}>
@@ -945,5 +981,17 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#9CA3AF',
+  },
+  typingBar: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  typingText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 });
