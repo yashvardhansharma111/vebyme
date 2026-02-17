@@ -331,7 +331,6 @@ export default function BusinessPlanDetailScreen() {
   const heroImageUri = planMedia[0]?.url || 'https://picsum.photos/id/1011/800/1200';
 
   const detailPills = plan.add_details?.filter((d) => d.detail_type !== 'google_drive_link') ?? [];
-  const overlayHeight = TEXT_SHEET_OVERLAP;
   const distanceSubtitle = plan.add_details?.find((d) => d.detail_type === 'distance')?.title
     || plan.add_details?.find((d) => d.detail_type === 'distance')?.description
     || null;
@@ -344,7 +343,7 @@ export default function BusinessPlanDetailScreen() {
     return t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
   };
 
-  const heroTotalHeight = HERO_HEIGHT + insets.top + 12 + 56;
+  const heroTotalHeight = SCREEN_HEIGHT * 0.7;
 
   return (
     <View style={styles.container}>
@@ -393,7 +392,7 @@ export default function BusinessPlanDetailScreen() {
         contentContainerStyle={[styles.textSectionScrollContent, { paddingBottom: 72 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.contentOverlay, styles.contentOverlayShadow, { marginTop: -overlayHeight, paddingTop: overlayHeight + 16, paddingHorizontal: CONTENT_PADDING_H + 8 }]}>
+        <View style={[styles.contentOverlay, styles.contentOverlayShadow, { marginTop: -TEXT_SHEET_OVERLAP, paddingTop: TEXT_SHEET_OVERLAP + 16, paddingHorizontal: CONTENT_PADDING_H + 8, borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: '#FFF' }]}>
           <LinearGradient colors={['rgba(255,255,255,0.7)', '#FFFFFF']} style={StyleSheet.absoluteFill} pointerEvents="none" />
           <View style={styles.contentOverlayInner}>
           <Text style={styles.title}>{plan.title}</Text>
@@ -667,9 +666,13 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: '#FFF' },
   scrollContent: { paddingBottom: 40, flexGrow: 1 },
   textSectionScroll: {
-    flex: 1,
-    backgroundColor: 'transparent',
-    zIndex: 10,
+    position: 'absolute',
+    top: SCREEN_HEIGHT * 0.7,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 50,
+    elevation: 50,
   },
   textSectionScrollContent: {
     flexGrow: 1,
@@ -678,6 +681,7 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     overflow: 'hidden',
     zIndex: 0,
+    elevation: 0,
   },
   heroImage: {
     position: 'absolute',
@@ -841,24 +845,17 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   contentOverlay: {
-    position: 'relative',
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    overflow: 'hidden',
-    paddingHorizontal: CONTENT_PADDING_H,
-    paddingBottom: 16,
+    minHeight: SCREEN_HEIGHT * 0.3,
   },
   contentOverlayShadow: {
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.12,
-        shadowRadius: 12,
-      },
-      android: { elevation: 12 },
-    }),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 20,
   },
   contentOverlayInner: {
     backgroundColor: 'transparent',
@@ -952,14 +949,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
-  },
-  heroTapArea: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: HERO_HEIGHT,
-    zIndex: 1,
   },
   galleryOverlay: {
     flex: 1,
