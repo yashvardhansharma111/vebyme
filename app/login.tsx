@@ -119,22 +119,24 @@ export default function LoginScreen() {
     setResendLoading(false);
   };
 
-  // —— Splash: vybeme. + Login or Signup button ——
+  // —— Splash: vybeme. centered, Login button at bottom ——
   if (step === 'splash') {
     return (
       <View style={styles.screen}>
         <StatusBar style="light" />
         <View style={styles.splashContent}>
-          <View style={styles.vybemeWrapper}>
+          <View style={styles.splashLogoBlock}>
             <Text style={styles.vybemeLogo}>vybeme.</Text>
           </View>
-          <TouchableOpacity
-            style={styles.splashButton}
-            onPress={() => setStep('phone')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.splashButtonText}>Login or Signup</Text>
-          </TouchableOpacity>
+          <View style={styles.splashBottomBlock}>
+            <TouchableOpacity
+              style={styles.splashButton}
+              onPress={() => setStep('phone')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.splashButtonText}>Login or Signup</Text>
+            </TouchableOpacity>
+          </View>
         </View>
         <View style={styles.homeIndicator} />
       </View>
@@ -151,7 +153,7 @@ export default function LoginScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
-          {/* Header: back + vybeme. */}
+          {/* Header: back left, vybeme. centered */}
           <View style={styles.headerRow}>
             <TouchableOpacity
               style={styles.backBtn}
@@ -159,7 +161,10 @@ export default function LoginScreen() {
             >
               <Ionicons name="chevron-back" size={28} color={DARK_TEXT} />
             </TouchableOpacity>
-            <Text style={styles.headerVybe}>vybeme.</Text>
+            <View style={styles.headerCenter}>
+              <Text style={styles.headerVybe}>vybeme.</Text>
+            </View>
+            <View style={styles.backBtnPlaceholder} />
           </View>
 
           {step === 'phone' ? (
@@ -266,12 +271,16 @@ const styles = StyleSheet.create({
   },
   splashContent: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 40,
   },
-  vybemeWrapper: {
-    marginBottom: 48,
+  splashLogoBlock: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashBottomBlock: {
+    paddingBottom: 40,
+    alignItems: 'center',
   },
   vybemeLogo: {
     fontSize: 56,
@@ -310,11 +319,20 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 24,
   },
   backBtn: {
     padding: 8,
-    marginRight: 8,
+    minWidth: 44,
+  },
+  backBtnPlaceholder: {
+    minWidth: 44,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerVybe: {
     fontSize: 20,

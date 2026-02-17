@@ -367,35 +367,15 @@ export default function HomeScreen() {
     loadFeed(true);
   }, [loadFeed]);
 
-  // When returning from create post with success, refresh feed so new post appears
+  // When returning from create post with success, refresh feed so new post appears (no 2nd popup – first one with preview is in create flow)
   useFocusEffect(
     useCallback(() => {
       if (postCreated) {
         loadFeed(true);
+        dispatch(clearPostCreated());
       }
-    }, [postCreated, loadFeed])
+    }, [postCreated, loadFeed, dispatch])
   );
-
-  const handlePostCreatedEdit = useCallback(() => {
-    if (postCreated?.planId) {
-      dispatch(clearPostCreated());
-      router.push({ pathname: '/business-plan/[planId]', params: { planId: postCreated.planId } } as any);
-    }
-  }, [postCreated, dispatch, router]);
-
-  const handlePostCreatedShare = useCallback(() => {
-    if (!postCreated) return;
-    setSharedBusinessPlan({
-      planId: postCreated.planId,
-      title: postCreated.title,
-      description: postCreated.description ?? '',
-      media: postCreated.media ?? [],
-      tags: postCreated.tags,
-      category_main: postCreated.category_main,
-    });
-    setShowBusinessShareModal(true);
-    dispatch(clearPostCreated());
-  }, [postCreated, dispatch]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -763,32 +743,6 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Post creation popup – B2U Create Post Flow */}
-      <Modal
-        visible={!!postCreated}
-        transparent
-        animationType="fade"
-        onRequestClose={() => dispatch(clearPostCreated())}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          style={styles.postCreatedOverlay}
-          onPress={() => dispatch(clearPostCreated())}
-        >
-          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.postCreatedCard}>
-            <Text style={styles.postCreatedTitle}>{postCreated?.title ?? ''} is Live</Text>
-            <View style={styles.postCreatedActions}>
-              <TouchableOpacity style={styles.postCreatedEditButton} onPress={handlePostCreatedEdit}>
-                <Text style={styles.postCreatedEditButtonText}>View Event</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.postCreatedShareButton} onPress={handlePostCreatedShare}>
-                <Ionicons name="paper-plane-outline" size={20} color="#FFF" />
-                <Text style={styles.postCreatedShareButtonText}>Share</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -979,61 +933,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   createCtaButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  postCreatedOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  postCreatedCard: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderRadius: 20,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  postCreatedTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  postCreatedActions: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  postCreatedEditButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#1C1C1E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  postCreatedEditButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  postCreatedShareButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#1C1C1E',
-  },
-  postCreatedShareButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFF',

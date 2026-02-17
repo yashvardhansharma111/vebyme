@@ -384,14 +384,19 @@ export default function NotificationsScreen() {
       return bLatest - aLatest;
     });
 
-  // All interactions as flat list for Instagram-style notifications below the cards
-  // Include plan context so each row can show "Yash commented" (and optionally "on Plan title")
+  // All interactions as flat list for individual notifications below the cards
+  // Only show spec types; exclude event_ended_registered from list (already in stacked cards)
+  const BUSINESS_INDIVIDUAL_TYPES = ['post_live', 'event_ended', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled'];
+  const REGULAR_INDIVIDUAL_TYPES = ['registration_successful', 'event_ended', 'free_event_cancelled', 'paid_event_cancelled', 'plan_shared_chat'];
+  const allowedListTypes = isBusinessUser ? BUSINESS_INDIVIDUAL_TYPES : REGULAR_INDIVIDUAL_TYPES;
   const allInteractionsForList = notifications.flatMap((group) =>
-    group.interactions.map((interaction) => ({
-      ...interaction,
-      _planTitle: group.post?.title || null,
-      _planId: group.post?.plan_id || group.post_id || null,
-    }))
+    group.interactions
+      .filter((i) => allowedListTypes.includes(i.type))
+      .map((interaction) => ({
+        ...interaction,
+        _planTitle: group.post?.title || null,
+        _planId: group.post?.plan_id || group.post_id || null,
+      }))
   );
 
   // Get all unique avatars from all plan cards for summary
