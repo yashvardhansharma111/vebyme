@@ -41,11 +41,6 @@ export default function OverallAnalyticsScreen() {
   const [data, setData] = useState<OverallData | null>(null);
   const [loading, setLoading] = useState(true);
   const [months] = useState(1);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({
-    runnerPreference: false,
-    audienceFeedback: false,
-    testEvents: true,
-  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,10 +59,6 @@ export default function OverallAnalyticsScreen() {
   useEffect(() => {
     load();
   }, [load]);
-
-  const toggleSection = (key: string) => {
-    setCollapsed((c) => ({ ...c, [key]: !c[key] }));
-  };
 
   if (loading) {
     return (
@@ -108,29 +99,27 @@ export default function OverallAnalyticsScreen() {
   const repeatRunners = Math.round(data.returning_percent);
   const firstTimers = Math.round(data.first_timers_percent);
   const g = data.gender_distribution_percent;
-  const totalGender = (g.male || 0) + (g.female || 0) + (g.other || 0);
-  const segments = totalGender > 0
-    ? [
-        { label: 'Male', pct: g.male || 0, color: '#22C55E' },
-        { label: 'Female', pct: g.female || 0, color: '#14B8A6' },
-        { label: 'Others', pct: g.other || 0, color: '#3B82F6' },
-      ]
-    : [
-        { label: '5k', pct: 47, color: '#22C55E' },
-        { label: '10k', pct: 31, color: '#14B8A6' },
-        { label: 'Others', pct: 22, color: '#3B82F6' },
-      ];
+  const counts = data.gender_distribution || { male: 0, female: 0, other: 0 };
+  const allSegments = [
+    { label: 'Male', pct: g.male || 0, count: counts.male || 0, color: '#22C55E' },
+    { label: 'Female', pct: g.female || 0, count: counts.female || 0, color: '#14B8A6' },
+    { label: 'Others', pct: g.other || 0, count: counts.other || 0, color: '#3B82F6' },
+  ];
+  const segments = allSegments.filter((s) => s.pct > 0 || s.count > 0);
+  const totalGender = segments.reduce((sum, s) => sum + (s.pct || 0), 0) || 1;
 
   const eventTypeRows = data.per_event?.length
     ? data.per_event.slice(0, 6).map((ev, i) => ({
         label: ev.title || `Event ${i + 1}`,
-        pct: Math.round(ev.showup_rate_percent),
+        reg: ev.registered_count ?? 0,
+        showupPct: Math.round(ev.showup_rate_percent ?? 0),
         icon: (['walk', 'barbell-outline', 'people-outline'] as const)[i % 3],
+        planId: ev.plan_id,
       }))
     : [
-        { label: 'Run Only Events', pct: 81, icon: 'walk' as const },
-        { label: 'Fitness/Training Events', pct: 92, icon: 'barbell-outline' as const },
-        { label: 'Social/Community Events', pct: 93, icon: 'people-outline' as const },
+        { label: 'Run Only Events', reg: 0, showupPct: 81, icon: 'walk' as const, planId: '' },
+        { label: 'Fitness/Training Events', reg: 0, showupPct: 92, icon: 'barbell-outline' as const, planId: '' },
+        { label: 'Social/Community Events', reg: 0, showupPct: 93, icon: 'people-outline' as const, planId: '' },
       ];
 
   return (
@@ -164,132 +153,96 @@ export default function OverallAnalyticsScreen() {
           </View>
         </View>
 
-        {/* Event distribution (horizontal bar) */}
+        {/* Gender distribution (horizontal bar) – label and % inside bar; no Female if 0 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Event distribution</Text>
-          <View style={styles.barContainer}>
-            {segments.map((seg, i) => (
-              <View
-                key={seg.label}
-                style={[
-                  styles.barSegment,
-                  { flex: seg.pct || 0.01, backgroundColor: seg.color },
-                  i === 0 && styles.barSegmentFirst,
-                  i === segments.length - 1 && styles.barSegmentLast,
-                ]}
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>Gender distribution</Text>
+            {data.per_event?.length > 0 && (
+              <TouchableOpacity
+                style={styles.perEventArrowWrap}
+                onPress={() =>
+                  router.push({
+                    pathname: '/analytics/event/[planId]',
+                    params: { planId: data.per_event![0].plan_id },
+                  } as any)
+                }
+                activeOpacity={0.7}
               >
-                <Text style={styles.barSegmentPct}>{seg.pct}%</Text>
-              </View>
-            ))}
+                <Text style={styles.perEventArrowText}>Per event</Text>
+                <Ionicons name="chevron-forward" size={18} color="#1C1C1E" />
+              </TouchableOpacity>
+            )}
           </View>
-          <View style={styles.barLabels}>
-            {segments.map((seg) => (
-              <Text key={seg.label} style={styles.barLabelText}>{seg.label}</Text>
-            ))}
-          </View>
+          {segments.length > 0 ? (
+            <View style={styles.barContainer}>
+              {segments.map((seg, i) => (
+                <View
+                  key={seg.label}
+                  style={[
+                    styles.barSegment,
+                    { flex: (seg.pct || 0.01) / totalGender, backgroundColor: seg.color },
+                    i === 0 && styles.barSegmentFirst,
+                    i === segments.length - 1 && styles.barSegmentLast,
+                  ]}
+                >
+                  <Text style={styles.barSegmentLabel} numberOfLines={1}>{seg.label}</Text>
+                  <Text style={styles.barSegmentPct}>{Math.round(seg.pct)}%</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noGenderData}>No gender data</Text>
+          )}
         </View>
 
-        {/* Event type performance list */}
+        {/* Event type performance list – X reg Y% showup */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Event type performance</Text>
           <View style={styles.eventTypeCard}>
             {eventTypeRows.map((row, i) => (
-              <View key={i} style={styles.eventTypeRow}>
+              <TouchableOpacity
+                key={i}
+                style={styles.eventTypeRow}
+                onPress={
+                  row.planId
+                    ? () =>
+                        router.push({
+                          pathname: '/analytics/event/[planId]',
+                          params: { planId: row.planId },
+                        } as any)
+                    : undefined
+                }
+                activeOpacity={row.planId ? 0.7 : 1}
+                disabled={!row.planId}
+              >
                 <View style={styles.eventTypeIconWrap}>
                   <Ionicons name={row.icon} size={20} color="#1C1C1E" />
                 </View>
-                <Text style={styles.eventTypeLabel} numberOfLines={1}>{row.label}</Text>
-                <Text style={styles.eventTypePct}>{row.pct}%</Text>
-              </View>
+
+                {/* Middle Content */}
+                <View style={styles.eventTypeContent}>
+                  <Text style={styles.eventTypeLabel} numberOfLines={1}>
+                    {row.label}
+                  </Text>
+
+                  <View style={styles.eventTypeStats}>
+                    <Text style={styles.eventTypeStatText}>
+                      Registered: <Text style={styles.eventTypeStatValue}>{row.reg}</Text>
+                    </Text>
+
+                    <Text style={styles.eventTypeStatText}>
+                      Show-up: <Text style={styles.eventTypeStatValue}>{row.showupPct}%</Text>
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Arrow */}
+                {row.planId && (
+                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                )}
+              </TouchableOpacity>
             ))}
           </View>
-        </View>
-
-        {/* Collapsible: Runner Preference */}
-        <View style={styles.collapsibleCard}>
-          <TouchableOpacity
-            style={styles.collapsibleHeader}
-            onPress={() => toggleSection('runnerPreference')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.collapsibleTitle}>Runner Preference</Text>
-            <Ionicons
-              name={collapsed.runnerPreference ? 'chevron-down' : 'chevron-up'}
-              size={22}
-              color="#8E8E93"
-            />
-          </TouchableOpacity>
-          {!collapsed.runnerPreference && (
-            <View style={styles.collapsibleBody}>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Collapsible: Audience Feedback */}
-        <View style={styles.collapsibleCard}>
-          <TouchableOpacity
-            style={styles.collapsibleHeader}
-            onPress={() => toggleSection('audienceFeedback')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.collapsibleTitle}>Audience Feedback</Text>
-            <Ionicons
-              name={collapsed.audienceFeedback ? 'chevron-down' : 'chevron-up'}
-              size={22}
-              color="#8E8E93"
-            />
-          </TouchableOpacity>
-          {!collapsed.audienceFeedback && (
-            <View style={styles.collapsibleBody}>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Collapsible: Test events / Per event */}
-        <View style={styles.collapsibleCard}>
-          <TouchableOpacity
-            style={styles.collapsibleHeader}
-            onPress={() => toggleSection('testEvents')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.collapsibleTitle}>Per event</Text>
-            <Ionicons
-              name={collapsed.testEvents ? 'chevron-down' : 'chevron-up'}
-              size={22}
-              color="#8E8E93"
-            />
-          </TouchableOpacity>
-          {!collapsed.testEvents && data.per_event && data.per_event.length > 0 && (
-            <View style={styles.collapsibleBody}>
-              {data.per_event.map((ev) => (
-                <TouchableOpacity
-                  key={ev.plan_id}
-                  style={styles.perEventRow}
-                  onPress={() =>
-                    router.push({ pathname: '/analytics/event/[planId]', params: { planId: ev.plan_id } } as any)
-                  }
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.perEventTitle} numberOfLines={1}>{ev.title}</Text>
-                  <Text style={styles.perEventMeta}>
-                    {ev.registered_count} reg · {Math.round(ev.showup_rate_percent)}% showup
-                  </Text>
-                  <Ionicons name="chevron-forward" size={18} color="#8E8E93" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-          {!collapsed.testEvents && (!data.per_event || data.per_event.length === 0) && (
-            <View style={styles.collapsibleBody}>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-              <Text style={styles.placeholderItem}>#reposts</Text>
-            </View>
-          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -365,11 +318,33 @@ const styles = StyleSheet.create({
   },
 
   section: { marginBottom: 20 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1C1C1E',
-    marginBottom: 12,
+  },
+  perEventArrowWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  perEventArrowText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+  },
+  noGenderData: {
+    fontSize: 14,
+    color: '#8E8E93',
+    paddingVertical: 12,
   },
   barContainer: {
     flexDirection: 'row',
@@ -384,21 +359,16 @@ const styles = StyleSheet.create({
   },
   barSegmentFirst: { borderTopLeftRadius: 10, borderBottomLeftRadius: 10 },
   barSegmentLast: { borderTopRightRadius: 10, borderBottomRightRadius: 10 },
+  barSegmentLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFF',
+    textTransform: 'uppercase',
+  },
   barSegmentPct: {
     fontSize: 12,
     fontWeight: '800',
     color: '#FFF',
-  },
-  barLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingHorizontal: 2,
-  },
-  barLabelText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
   },
 
   eventTypeCard: {
@@ -429,67 +399,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  eventTypeContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
   eventTypeLabel: {
-    flex: 1,
     fontSize: 15,
     fontWeight: '600',
     color: '#1C1C1E',
   },
-  eventTypePct: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#1C1C1E',
-    marginLeft: 8,
-  },
-
-  collapsibleCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    marginBottom: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  collapsibleHeader: {
+  eventTypeStats: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    gap: 12,
+    marginTop: 4,
   },
-  collapsibleTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  collapsibleBody: {
-    paddingHorizontal: 18,
-    paddingBottom: 16,
-  },
-  placeholderItem: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 8,
-  },
-  perEventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F1F5F9',
-  },
-  perEventTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  perEventMeta: {
+  eventTypeStatText: {
     fontSize: 13,
     color: '#64748B',
-    marginRight: 8,
+    fontWeight: '500',
+  },
+  eventTypeStatValue: {
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
 });
