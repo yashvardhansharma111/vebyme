@@ -529,23 +529,21 @@ export default function BusinessPlanDetailScreen() {
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
           <View style={styles.organizerPillWrapSingle} collapsable={false}>
-            <BlurView intensity={60} tint="light" style={styles.organizerPillBlur}>
-              <TouchableOpacity
-                style={styles.organizerPillCenter}
-                activeOpacity={0.8}
-                onPress={() => {
-                  const userId = organizer?.user_id ?? plan?.user_id;
-                  if (userId) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
-                }}
-                disabled={!(organizer?.user_id ?? plan?.user_id)}
-              >
-                <Avatar uri={organizerAvatar} size={36} />
-                <View style={styles.organizerInfo}>
-                  <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
-                  <Text style={styles.organizerTime} numberOfLines={1}>{formatPostedDate(plan.created_at, plan.date)}</Text>
-                </View>
-              </TouchableOpacity>
-            </BlurView>
+            <TouchableOpacity
+              style={styles.organizerPillSolid}
+              activeOpacity={0.8}
+              onPress={() => {
+                const userId = organizer?.user_id ?? plan?.user_id;
+                if (userId) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+              }}
+              disabled={!(organizer?.user_id ?? plan?.user_id)}
+            >
+              <Avatar uri={organizerAvatar} size={36} />
+              <View style={styles.organizerPillText}>
+                <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
+                <Text style={styles.organizerTime} numberOfLines={1}>{formatPostedDate(plan.created_at, plan.date)}</Text>
+              </View>
+            </TouchableOpacity>
           </View>
           <View style={styles.headerRightRow}>
             {user?.user_id && (plan.user_id === user.user_id || plan.business_id === user.user_id) && (
@@ -762,17 +760,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 8,
   },
-  organizerPillBlur: {
-    overflow: 'hidden',
-    borderRadius: 28,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  organizerPillCenter: {
+  organizerPillSolid: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 28,
-    gap: 10,
+    backgroundColor: '#FFF',
+    borderRadius: 22,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  organizerPillText: {
+    marginLeft: 8,
+    flex: 1,
+    minWidth: 0,
   },
   organizerInfo: {
     minWidth: 0,
@@ -783,8 +787,8 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   organizerTime: {
-    fontSize: 12,
-    color: '#1C1C1E',
+    fontSize: 11,
+    color: '#8E8E93',
     marginTop: 2,
   },
   carouselDots: {

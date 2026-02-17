@@ -69,6 +69,8 @@ interface BusinessCardProps {
   registerButtonGreyed?: boolean;
   /** When true, pills stick above the card (same hack as event card) for list layouts */
   pillsAboveCard?: boolean;
+  /** When true, card fills parent height (e.g. hero 75% viewport on homepage) */
+  fillHeight?: boolean;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -90,7 +92,8 @@ function BusinessCardBase({
   hideRegisterButton = false,
   registerButtonGreyed = false,
   pillsAboveCard = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean }) {
+  fillHeight = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onRepostPress?: () => void; onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean }) {
   const router = useRouter();
   const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
@@ -171,9 +174,9 @@ function BusinessCardBase({
   };
 
   return (
-    <View style={styles.cardOuterWrapper}>
+    <View style={[styles.cardOuterWrapper, fillHeight && styles.cardOuterWrapperFill]}>
       <TouchableOpacity
-        style={[styles.cardWrapper, containerStyle]}
+        style={[styles.cardWrapper, fillHeight && styles.cardWrapperFill, containerStyle]}
         onPress={onPress}
         activeOpacity={0.98}
       >
@@ -269,7 +272,7 @@ function BusinessCardBase({
         </TouchableOpacity>
       )}
 
-      {/* Organizer pill – tappable to open organizer profile */}
+      {/* Organizer pill – image first, then name & detail (same as SwipeableEventCard user pill) */}
       <TouchableOpacity
         style={[styles.organizerPill, pillsAboveCard && styles.organizerPillAbove]}
         activeOpacity={0.8}
@@ -281,11 +284,11 @@ function BusinessCardBase({
         }}
         disabled={!organizerUserId}
       >
-        <View style={styles.organizerInfo}>
+        <Avatar uri={organizerAvatar} size={36} />
+        <View style={styles.organizerPillText}>
           <Text style={styles.organizerName} numberOfLines={1}>{organizerName}</Text>
           <Text style={styles.organizerTime} numberOfLines={1}>{timeText}</Text>
         </View>
-        <Avatar uri={organizerAvatar} size={26} style={styles.organizerAvatarRight} />
       </TouchableOpacity>
 
       {/* Attendees – always 3 circles (avatars or default DP), then +counter (FIGMA) */}
@@ -386,6 +389,7 @@ export default function BusinessCard({
   showArrowButton,
   onArrowPress,
   pillsAboveCard = false,
+  fillHeight = false,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -492,6 +496,7 @@ export default function BusinessCard({
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
+          fillHeight={fillHeight}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -546,6 +551,7 @@ export default function BusinessCard({
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
+          fillHeight={fillHeight}
         />
       </Swipeable>
       <GuestListModal
@@ -584,9 +590,17 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'visible',
   },
+  cardWrapperFill: {
+    marginHorizontal: 0,
+    marginBottom: 0,
+  },
   cardOuterWrapper: {
     paddingHorizontal: 0,
     paddingVertical: 18,
+  },
+  cardOuterWrapperFill: {
+    flex: 1,
+    paddingVertical: 0,
   },
   cardInner: {
     flex: 1,
@@ -642,33 +656,33 @@ const styles = StyleSheet.create({
     width: FLOATING_BUTTON_SIZE,
     height: FLOATING_BUTTON_SIZE,
     borderRadius: FLOATING_BUTTON_SIZE / 2,
-    backgroundColor: '#FFF',
+    backgroundColor: 'rgba(255,255,255,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 11,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
     elevation: 6,
   },
   organizerPill: {
     position: 'absolute',
     top: -20,
-    left: 10,
+    left: 4,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: '#FFF',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 18,
+    borderRadius: 22,
     maxWidth: '48%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 4,
   },
   organizerPillAbove: {
@@ -679,6 +693,11 @@ const styles = StyleSheet.create({
   interactedPillAbove: {
     top: 26,
   },
+  organizerPillText: {
+    marginLeft: 8,
+    flex: 1,
+    minWidth: 0,
+  },
   organizerInfo: {
     flex: 1,
     minWidth: 0,
@@ -687,13 +706,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   organizerName: {
-    fontSize: 11,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1C1C1E',
   },
   organizerTime: {
-    fontSize: 10,
-    color: '#888',
+    fontSize: 11,
+    color: '#8E8E93',
   },
   interactedPillOnImage: {
     position: 'absolute',
