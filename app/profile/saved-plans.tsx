@@ -70,11 +70,13 @@ const fetchUserProfile = async (user_id: string) => {
 function SavedPlanCard({ 
   plan, 
   onUserPress,
-  onJoinPress 
+  onJoinPress,
+  joinDisabled = false,
 }: { 
   plan: SavedPlan & { user?: any }; 
   onUserPress?: (userId: string) => void;
   onJoinPress?: (postId: string) => void;
+  joinDisabled?: boolean;
 }) {
   
   const formatUserTime = (timestamp: string | Date): string => {
@@ -155,10 +157,11 @@ function SavedPlanCard({
             <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.joinButton}
-            onPress={() => onJoinPress?.(plan.post_id)}
+            style={[styles.joinButton, joinDisabled && styles.joinButtonDisabled]}
+            onPress={joinDisabled ? undefined : () => onJoinPress?.(plan)}
+            disabled={joinDisabled}
           >
-            <Text style={styles.joinButtonText}>Join</Text>
+            <Text style={[styles.joinButtonText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -205,6 +208,10 @@ export default function SavedPlansScreen() {
       setShowLoginModal(true);
       return;
     }
+    if (plan.user_id && user?.user_id && String(plan.user_id) === String(user.user_id)) {
+      Alert.alert('Not allowed', "You can't join or react to your own post.");
+      return;
+    }
     setSelectedPlan(plan);
   };
 
@@ -244,6 +251,7 @@ export default function SavedPlansScreen() {
                 router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
               }}
               onJoinPress={() => handleJoinPress(plan)}
+              joinDisabled={!!(user?.user_id && plan.user_id && String(plan.user_id) === String(user.user_id))}
             />
           ))
         )}
@@ -482,5 +490,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 16,
+  },
+  joinButtonDisabled: {
+    backgroundColor: '#C7C7CC',
+    opacity: 0.9,
+  },
+  joinButtonTextDisabled: {
+    color: '#8E8E93',
   },
 });

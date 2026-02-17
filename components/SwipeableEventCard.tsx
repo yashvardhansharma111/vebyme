@@ -22,7 +22,7 @@ function getAllEventTags(event: any): string[] {
 }
 
 // --- The Base Event Card ---
-function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription }: any) {
+function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRepostPress, onSharePress, onImagePress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false }: any) {
   const allTags = getAllEventTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
@@ -112,8 +112,8 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
                   </View>
                 )}
                 <View style={styles.embeddedFooter}>
-                  <TouchableOpacity style={styles.embeddedJoinBtn} onPress={onJoinPress}>
-                    <Text style={styles.embeddedJoinText}>Join</Text>
+                  <TouchableOpacity style={[styles.embeddedJoinBtn, joinDisabled && styles.joinButtonDisabled]} onPress={joinDisabled ? undefined : onJoinPress} disabled={joinDisabled}>
+                    <Text style={[styles.embeddedJoinText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.embeddedShareBtn} onPress={onSharePress}>
                     <Ionicons name="paper-plane-outline" size={20} color="#1C1C1E" />
@@ -152,8 +152,8 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onRep
 
           {!isRepost && !event?.repost_data && (
             <View style={styles.footerRow}>
-              <TouchableOpacity style={styles.joinButton} onPress={onJoinPress}>
-                <Text style={styles.joinButtonText}>Join</Text>
+              <TouchableOpacity style={[styles.joinButton, joinDisabled && styles.joinButtonDisabled]} onPress={joinDisabled ? undefined : onJoinPress} disabled={joinDisabled}>
+                <Text style={[styles.joinButtonText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.footerIconBtn} onPress={onRepostPress}>
                 <Ionicons name="repeat-outline" size={22} color="#1C1C1E" />
@@ -181,6 +181,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   const [saving, setSaving] = useState(false);
   const hasEventImage = event?.image && String(event.image).trim();
   const swipeableRef = useRef<Swipeable>(null);
+  const isOwnPost = !!(authUser?.user_id && (String(user?.id) === String(authUser.user_id) || String(user?.user_id) === String(authUser.user_id) || String(event?.user_id) === String(authUser.user_id)));
   
   // Logic: Reveal the Left Action (Save icon) when swiping
   const renderLeftActions = (progress: any, dragX: any) => {
@@ -284,12 +285,17 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           onUserPress={onUserPress} 
           onRequireAuth={onRequireAuth}
           onJoinPress={() => {
+            if (isOwnPost) {
+              Alert.alert('Not allowed', "You can't join or react to your own post.");
+              return;
+            }
             if (isAuthenticated) {
               setShowJoinModal(true);
             } else {
               onRequireAuth?.();
             }
           }}
+          joinDisabled={isOwnPost}
           onRepostPress={handleRepost}
           onSharePress={handleShare}
           isRepost={isRepost}
@@ -692,6 +698,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+  joinButtonDisabled: {
+    backgroundColor: '#C7C7CC',
+    opacity: 0.9,
+  },
+  joinButtonTextDisabled: {
+    color: '#8E8E93',
+  },
   footerIconBtn: {
     width: 44,
     height: 44,
