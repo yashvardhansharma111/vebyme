@@ -26,14 +26,15 @@ import NormalUserEventCard from '@/components/NormalUserEventCard';
 
 interface Interaction {
   notification_id: string;
-  type: 'comment' | 'reaction' | 'join' | 'repost';
+  type: string;
   source_user_id: string;
+  source_plan_id?: string | null;
   user?: {
     user_id: string;
     name: string;
     profile_image?: string;
   };
-  payload?: any;
+  payload?: { cta_type?: string; plan_id?: string; group_id?: string; ticket_id?: string; [key: string]: any };
   created_at: string;
 }
 
@@ -367,9 +368,16 @@ export default function NotificationsScreen() {
   const availableUserIds = uniqueUserIds.filter((id) => id && !announcementMemberIds.has(id));
   const allSelected = availableUserIds.length > 0 && selectedUsers.size === availableUserIds.length;
 
-  // Separate grouped plan cards from individual notifications
+  const CARD_INTERACTION_TYPES = ['comment', 'reaction', 'join', 'repost'];
+  // Separate grouped plan cards (only social interactions) from individual notifications
   const groupedPlanCards = notifications
-    .filter((n) => n.post !== null && n.post.plan_id && n.interactions.length > 0)
+    .filter(
+      (n) =>
+        n.post !== null &&
+        n.post.plan_id &&
+        n.interactions.length > 0 &&
+        n.interactions.every((i) => CARD_INTERACTION_TYPES.includes(i.type))
+    )
     .sort((a, b) => {
       const aLatest = Math.max(...a.interactions.map(i => new Date(i.created_at).getTime()));
       const bLatest = Math.max(...b.interactions.map(i => new Date(i.created_at).getTime()));
@@ -449,6 +457,33 @@ export default function NotificationsScreen() {
   };
 
   const timeGroupedNotifications = groupNotificationsByTime(allInteractionsForList);
+
+  const handleNotificationPress = (interaction: InteractionWithPlan) => {
+    if (interaction.notification_id && user?.user_id) {
+      apiService.markNotificationAsRead(interaction.notification_id).catch(() => null);
+      dispatch(fetchUnreadCount(user.user_id));
+    }
+    const planId = (interaction as any)._planId || (interaction as Interaction).source_plan_id || interaction.payload?.plan_id;
+    const ctaType = interaction.payload?.cta_type;
+    const groupId = interaction.payload?.group_id;
+    const ticketId = interaction.payload?.ticket_id;
+
+    if (ctaType === 'go_to_analytics' && planId) {
+      router.push({ pathname: '/analytics/event/[planId]', params: { planId } } as any);
+      return;
+    }
+    if (ctaType === 'go_to_chat' && groupId) {
+      router.push({ pathname: '/chat/group/[groupId]', params: { groupId } } as any);
+      return;
+    }
+    if (ctaType === 'go_to_ticket' && ticketId) {
+      router.push({ pathname: '/ticket/[ticketId]', params: { ticketId } } as any);
+      return;
+    }
+    if ((ctaType === 'go_to_event' || ctaType === 'go_to_plan' || !ctaType) && planId) {
+      router.push({ pathname: '/business-plan/[planId]', params: { planId } } as any);
+    }
+  };
 
   // Relative time for list items (e.g. "2h", "5m", "Yesterday")
   const formatRelativeTime = (dateStr: string) => {
@@ -569,7 +604,7 @@ export default function NotificationsScreen() {
                 key={group.post_id}
                 post_id={group.post_id}
                 post={group.post}
-                interactions={group.interactions}
+                interactions={group.interactions as any}
                 created_at={group.created_at}
                 userCache={userCache}
                 isExpanded={isExpanded}
@@ -627,21 +662,12 @@ export default function NotificationsScreen() {
     const renderItem = (interaction: InteractionWithPlan, isLast: boolean) => (
       <NotificationListItem
         key={interaction.notification_id}
-        interaction={interaction}
+        interaction={interaction as any}
         userCache={userCache}
         planTitle={(interaction as any)._planTitle ?? undefined}
         timeLabel={formatRelativeTime(interaction.created_at)}
         onUserPress={openUserProfile}
-        onPress={() => {
-          if (interaction.notification_id && user?.user_id) {
-            apiService.markNotificationAsRead(interaction.notification_id).catch(() => null);
-            dispatch(fetchUnreadCount(user.user_id));
-          }
-          const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-          if (planId) {
-            router.push({ pathname: '/business-plan/[planId]', params: { planId } } as any);
-          }
-        }}
+        onPress={() => handleNotificationPress(interaction)}
         showDivider={!isLast}
       />
     );
@@ -772,7 +798,7 @@ export default function NotificationsScreen() {
                             key={group.post_id}
                             post_id={group.post_id}
                             post={group.post}
-                            interactions={group.interactions}
+                            interactions={group.interactions as any}
                             created_at={group.created_at}
                             userCache={userCache}
                             isExpanded={isExpanded}
@@ -807,15 +833,12 @@ export default function NotificationsScreen() {
                         return (
                           <NotificationListItem
                             key={interaction.notification_id}
-                            interaction={interaction}
+                            interaction={interaction as any}
                             userCache={userCache}
+                            planTitle={(interaction as any)._planTitle ?? undefined}
+                            timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
-                            onPress={() => {
-                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                              if (planId) {
-                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
-                              }
-                            }}
+                            onPress={() => handleNotificationPress(interaction)}
                             showDivider={!isLast}
                           />
                         );
@@ -834,15 +857,12 @@ export default function NotificationsScreen() {
                         return (
                           <NotificationListItem
                             key={interaction.notification_id}
-                            interaction={interaction}
+                            interaction={interaction as any}
                             userCache={userCache}
+                            planTitle={(interaction as any)._planTitle ?? undefined}
+                            timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
-                            onPress={() => {
-                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                              if (planId) {
-                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
-                              }
-                            }}
+                            onPress={() => handleNotificationPress(interaction)}
                             showDivider={!isLast}
                           />
                         );
@@ -859,15 +879,12 @@ export default function NotificationsScreen() {
                         return (
                           <NotificationListItem
                             key={interaction.notification_id}
-                            interaction={interaction}
+                            interaction={interaction as any}
                             userCache={userCache}
+                            planTitle={(interaction as any)._planTitle ?? undefined}
+                            timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
-                            onPress={() => {
-                              const planId = (interaction as any)._planId || interaction.payload?.plan_id;
-                              if (planId) {
-                                router.push({ pathname: '/plan/[planId]', params: { planId } } as any);
-                              }
-                            }}
+                            onPress={() => handleNotificationPress(interaction)}
                             showDivider={!isLast}
                           />
                         );

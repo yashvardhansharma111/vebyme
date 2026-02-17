@@ -3,17 +3,42 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from './Avatar';
 
+const GENERAL_NOTIFICATION_TYPES = [
+  'post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended',
+  'free_event_cancelled', 'paid_event_cancelled',
+  'registration_successful', 'plan_shared_chat',
+] as const;
+
+function getCTALabel(ctaType: string): string {
+  switch (ctaType) {
+    case 'go_to_event': return 'Go to Event';
+    case 'go_to_analytics': return 'Go to Analytics';
+    case 'go_to_ticket': return 'Go to Ticket';
+    case 'go_to_chat': return 'Go to Chat';
+    case 'go_to_plan': return 'Go to Plan';
+    default: return 'View';
+  }
+}
+
 interface NotificationListItemProps {
   interaction: {
     notification_id: string;
-    type: 'comment' | 'reaction' | 'join' | 'repost' | 'message';
+    type: string;
     source_user_id: string;
+    source_plan_id?: string | null;
     user?: {
       user_id: string;
       name: string;
       profile_image?: string;
     };
-    payload?: any;
+    payload?: {
+      notification_text?: string;
+      cta_type?: string;
+      plan_id?: string;
+      group_id?: string;
+      ticket_id?: string;
+      [key: string]: any;
+    };
     created_at: string;
   };
   userCache: { [key: string]: { name: string; profile_image: string | null } };
@@ -37,11 +62,14 @@ export default function NotificationListItem({
 }: NotificationListItemProps) {
   const cachedUser = userCache[interaction.source_user_id];
   const user = cachedUser || interaction.user;
-  const userName = user?.name || 'Unknown';
-  const userAvatar = (user as any)?.profile_image || null;
+  const userName = user?.name || '';
+  const userAvatar = (user as any)?.profile_image ?? null;
+  const isGeneralType = GENERAL_NOTIFICATION_TYPES.includes(interaction.type as any);
+  const hasCTA = isGeneralType && !!interaction.payload?.cta_type;
+  const isSystem = interaction.source_user_id === 'system';
 
   const handleUserPress = () => {
-    if (onUserPress) {
+    if (onUserPress && !isSystem) {
       onUserPress(interaction.source_user_id);
       return;
     }
@@ -74,6 +102,9 @@ export default function NotificationListItem({
     const text = (interaction.payload?.notification_text || '').toLowerCase();
     if (text.includes('booking')) return 'document-text-outline';
     if (text.includes('shared') || text.includes('invited')) return 'paper-plane-outline';
+    if (text.includes('live')) return 'radio-outline';
+    if (text.includes('ended')) return 'checkmark-done-outline';
+    if (text.includes('cancelled')) return 'close-circle-outline';
     switch (interaction.type) {
       case 'comment':
         return 'chatbubble-outline';
@@ -90,31 +121,47 @@ export default function NotificationListItem({
     }
   };
 
+  const displayText = getInteractionText();
+  const showUserName = !isSystem && userName && !isGeneralType;
+
   return (
     <TouchableOpacity
       style={styles.container}
-      onPress={onUserPress ? handleUserPress : onPress}
+      onPress={hasCTA ? onPress : (onUserPress ? handleUserPress : onPress)}
       activeOpacity={0.7}
     >
       <View style={styles.row}>
-        <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+        <TouchableOpacity onPress={!isSystem ? handleUserPress : undefined} activeOpacity={0.7} disabled={isSystem}>
           <Avatar uri={userAvatar} size={44} />
         </TouchableOpacity>
 
-        {/* Text */}
         <View style={styles.textContainer}>
           <Text style={styles.text} numberOfLines={2}>
-            <Text style={styles.userName} onPress={handleUserPress}>
-              {userName}
-            </Text>
-            {' '}
-            <Text style={styles.actionText}>{getInteractionText()}</Text>
-            {planTitle ? ` on ${planTitle}` : ''}
+            {showUserName && (
+              <>
+                <Text style={styles.userName} onPress={handleUserPress}>
+                  {userName}
+                </Text>
+                {' '}
+              </>
+            )}
+            <Text style={showUserName ? styles.actionText : styles.textPlain}>{displayText}</Text>
+            {planTitle && !isGeneralType ? ` on ${planTitle}` : ''}
           </Text>
         </View>
 
-        {/* Right: Time or icon */}
-        {timeLabel !== undefined && timeLabel !== '' ? (
+        {hasCTA ? (
+          <TouchableOpacity
+            style={styles.ctaButton}
+            onPress={(e) => {
+              e?.stopPropagation?.();
+              onPress?.();
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.ctaButtonText}>{getCTALabel(interaction.payload!.cta_type!)}</Text>
+          </TouchableOpacity>
+        ) : timeLabel !== undefined && timeLabel !== '' ? (
           <Text style={styles.timeRight}>{timeLabel}</Text>
         ) : getInteractionIcon() ? (
           <Ionicons
@@ -126,7 +173,6 @@ export default function NotificationListItem({
         ) : null}
       </View>
 
-      {/* Bottom: Divider */}
       {showDivider && <View style={styles.divider} />}
     </TouchableOpacity>
   );
@@ -158,6 +204,21 @@ const styles = StyleSheet.create({
   actionText: {
     fontWeight: '400',
     color: '#8E8E93',
+  },
+  textPlain: {
+    fontWeight: '400',
+  },
+  ctaButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#1C1C1E',
+    marginLeft: 8,
+  },
+  ctaButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   timeRight: {
     fontSize: 13,
