@@ -12,7 +12,6 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useAppSelector } from '@/store/hooks';
 import { apiService } from '@/services/api';
@@ -106,11 +105,14 @@ function formatPlanDate(dateStr: string | undefined): string {
   return `${day}${suffix} ${month}, ${weekday}`;
 }
 
+const CARD_IMAGE_HEIGHT = 180;
+
 function PlanCardWithAnalytics({
   plan,
   isCancelled,
   isCancelling,
   onCardPress,
+  onAnalyticsPress,
   onDuplicate,
   onEdit,
   onCancel,
@@ -121,6 +123,7 @@ function PlanCardWithAnalytics({
   isCancelled: boolean;
   isCancelling: boolean;
   onCardPress: () => void;
+  onAnalyticsPress: () => void;
   onDuplicate: () => void;
   onEdit: () => void;
   onCancel: () => void;
@@ -135,13 +138,7 @@ function PlanCardWithAnalytics({
   return (
     <View style={styles.planCardWrapper}>
       <Text style={styles.planDateText}>{formatPlanDate(plan.date)}</Text>
-      <TouchableOpacity
-        style={styles.planCard}
-        activeOpacity={0.95}
-        onPress={onCardPress}
-        onLongPress={onLongPress}
-        delayLongPress={400}
-      >
+      <View style={styles.planCard}>
         {isCancelled && (
           <View style={styles.cancelledBadge}>
             <Text style={styles.cancelledText}>Cancelled</Text>
@@ -152,77 +149,96 @@ function PlanCardWithAnalytics({
             <Text style={styles.repostText}>You Reposted</Text>
           </View>
         )}
-        <View style={styles.planCardImageWrap}>
+
+        {/* Upper half: image only */}
+        <TouchableOpacity
+          style={styles.planCardImageWrap}
+          activeOpacity={0.95}
+          onPress={onCardPress}
+          onLongPress={onLongPress}
+          delayLongPress={400}
+        >
           {hasImage ? (
             <Image source={{ uri: plan.media![0].url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFillObject, styles.planCardImagePlaceholder]} />
           )}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
-            style={styles.planCardOverlay}
-          />
-          <View style={styles.planCardTextBlock}>
-            <Text style={styles.planCardTitle} numberOfLines={2}>{plan.title || 'Untitled Plan'}</Text>
-            <Text style={styles.planCardDesc} numberOfLines={3}>
-              {plan.description}
-              <Text style={styles.vybemeText}> vybeme!</Text>
-            </Text>
-          </View>
-        </View>
+        </TouchableOpacity>
 
-        {!isCancelled && (
-          <View style={styles.analyticsBox}>
-            <TouchableOpacity style={styles.totalAttendeesRow} onPress={onCardPress} activeOpacity={0.8}>
-              <Text style={styles.totalAttendeesLabel}>
-                Total Attendees: {loading ? '—' : String(analytics?.registered_count ?? 0)}
-              </Text>
-              <Ionicons name="chevron-forward" size={20} color="#1C1C1E" />
-            </TouchableOpacity>
-            <View style={styles.metricsRow}>
-              <View style={[styles.metricBox, styles.metricBoxDark]}>
-                <Text style={styles.metricBoxValueDark}>{loading ? '—' : `${showupPct} %`}</Text>
-                <Text style={styles.metricBoxLabelDark}>Showup Rate</Text>
+        {/* Lower half: white bg, title, 3-line description, then attendees/metrics, then actions */}
+        <View style={styles.planCardLower}>
+          <TouchableOpacity
+            activeOpacity={0.95}
+            onPress={onCardPress}
+            onLongPress={onLongPress}
+            delayLongPress={400}
+            style={styles.planCardTextBlockTouch}
+          >
+            <Text style={styles.planCardTitleDark} numberOfLines={2}>{plan.title || 'Untitled Plan'}</Text>
+            <Text style={styles.planCardDescDark} numberOfLines={3}>
+              {plan.description || 'No description'}
+            </Text>
+          </TouchableOpacity>
+
+          {!isCancelled && (
+            <View style={styles.analyticsBox}>
+              <View style={styles.totalAttendeesRow}>
+                <Text style={styles.totalAttendeesLabel}>
+                  Total Attendees: {loading ? '—' : String(analytics?.registered_count ?? 0)}
+                </Text>
+                <TouchableOpacity
+                  onPress={onAnalyticsPress}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={styles.analyticsChevronTouch}
+                >
+                  <Ionicons name="chevron-forward" size={20} color="#1C1C1E" />
+                </TouchableOpacity>
               </View>
-              <View style={styles.metricBox}>
-                <Text style={styles.metricBoxValue}>{loading ? '—' : `${returningPct} %`}</Text>
-                <Text style={styles.metricBoxLabel}>Returning</Text>
-              </View>
-              <View style={styles.metricBox}>
-                <Text style={styles.metricBoxValue}>{loading ? '—' : `${firstTimersPct} %`}</Text>
-                <Text style={styles.metricBoxLabel}>First Timers</Text>
+              <View style={styles.metricsRow}>
+                <View style={[styles.metricBox, styles.metricBoxDark]}>
+                  <Text style={styles.metricBoxValueDark}>{loading ? '—' : `${showupPct} %`}</Text>
+                  <Text style={styles.metricBoxLabelDark}>Showup Rate</Text>
+                </View>
+                <View style={styles.metricBox}>
+                  <Text style={styles.metricBoxValue}>{loading ? '—' : `${returningPct} %`}</Text>
+                  <Text style={styles.metricBoxLabel}>Returning</Text>
+                </View>
+                <View style={styles.metricBox}>
+                  <Text style={styles.metricBoxValue}>{loading ? '—' : `${firstTimersPct} %`}</Text>
+                  <Text style={styles.metricBoxLabel}>First Timers</Text>
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {!isCancelled && (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={[styles.actionButton, styles.duplicateButton]} onPress={onDuplicate}>
-              <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
-              <Text style={styles.actionButtonText}>Duplicate</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={onEdit}>
-              <Ionicons name="create-outline" size={16} color="#1C1C1E" />
-              <Text style={styles.actionButtonText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={onCancel}
-              disabled={isCancelling}
-            >
-              {isCancelling ? (
-                <ActivityIndicator size="small" color="#FF3B30" />
-              ) : (
-                <>
-                  <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
-                  <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </TouchableOpacity>
+          {!isCancelled && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={[styles.actionButton, styles.duplicateButton]} onPress={onDuplicate}>
+                <Ionicons name="copy-outline" size={16} color="#1C1C1E" />
+                <Text style={styles.actionButtonText}>Duplicate</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, styles.editButton]} onPress={onEdit}>
+                <Ionicons name="create-outline" size={16} color="#1C1C1E" />
+                <Text style={styles.actionButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={onCancel}
+                disabled={isCancelling}
+              >
+                {isCancelling ? (
+                  <ActivityIndicator size="small" color="#FF3B30" />
+                ) : (
+                  <>
+                    <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
+                    <Text style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -364,7 +380,7 @@ export default function YourPlansScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Plans</Text>
+        <Text style={styles.headerTitle}>{currentUser?.is_business ? 'My Events' : 'My Plans'}</Text>
         {currentUser?.is_business ? (
           <TouchableOpacity
             style={styles.headerAnalyticsButton}
@@ -405,6 +421,9 @@ export default function YourPlansScreen() {
                 isCancelled={isCancelled}
                 isCancelling={isCancelling}
                 onCardPress={() => {
+                  router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.plan_id } } as any);
+                }}
+                onAnalyticsPress={() => {
                   router.push({ pathname: '/analytics/event/[planId]', params: { planId: plan.plan_id } } as any);
                 }}
                 onDuplicate={() => handleDuplicatePlan(plan)}
@@ -556,6 +575,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   planCard: {
+    position: 'relative',
     backgroundColor: '#FFF',
     borderRadius: 24,
     overflow: 'hidden',
@@ -568,39 +588,39 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   planCardImageWrap: {
-    height: 200,
+    height: CARD_IMAGE_HEIGHT,
     position: 'relative',
+    backgroundColor: '#E5E5E5',
   },
   planCardImagePlaceholder: {
     backgroundColor: '#94A3B8',
   },
-  planCardOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    padding: 18,
+  planCardLower: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
   },
-  planCardTextBlock: {
-    paddingBottom: 8,
+  planCardTextBlockTouch: {
+    marginBottom: 12,
   },
-  planCardTitle: {
-    fontSize: 22,
+  planCardTitleDark: {
+    fontSize: 18,
     fontWeight: '800',
-    color: '#FFF',
+    color: '#1C1C1E',
     marginBottom: 6,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
-  planCardDesc: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.95)',
-    lineHeight: 22,
+  planCardDescDark: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    lineHeight: 20,
   },
   analyticsBox: {
     backgroundColor: '#F1F5F9',
     borderRadius: 16,
-    margin: 14,
-    marginTop: 12,
+    marginHorizontal: 0,
+    marginTop: 4,
+    marginBottom: 12,
     padding: 16,
   },
   totalAttendeesRow: {
@@ -608,6 +628,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  analyticsChevronTouch: {
+    padding: 4,
   },
   totalAttendeesLabel: {
     fontSize: 16,
@@ -666,10 +689,6 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '600',
   },
-  vybemeText: {
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.95)',
-  },
   cancelledBadge: {
     position: 'absolute',
     top: 12,
@@ -688,10 +707,10 @@ const styles = StyleSheet.create({
 
   actionButtons: {
     flexDirection: 'row',
-    marginTop: 4,
-    paddingHorizontal: 14,
+    marginTop: 0,
+    paddingHorizontal: 0,
     paddingVertical: 14,
-    paddingTop: 14,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     gap: 8,

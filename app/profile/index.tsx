@@ -158,28 +158,15 @@ export default function MyProfileScreen() {
                   <Ionicons name="stats-chart-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
                   <Text style={styles.menuText}>Analytics</Text>
                 </TouchableOpacity>
-                <View style={styles.divider} />
-                <TouchableOpacity 
-                  style={styles.menuItem} 
-                  onPress={() => router.push('/(tabs)/createBusinessPost')}
-                >
-                  <Ionicons name="business-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
-                  <Text style={styles.menuText}>Create Business Post</Text>
-                </TouchableOpacity>
               </>
             )}
           </View>
 
-          {/* Group 2: Preferences – Location Preferences hidden for now */}
+          {/* Group 2: Preferences */}
           <View style={styles.menuGroup}>
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/manage-socials')}>
               <Ionicons name="logo-instagram" size={22} color="#1C1C1E" style={styles.menuIcon} />
               <Text style={styles.menuText}>Manage Socials</Text>
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/manage-interests')}>
-              <Ionicons name="options-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Manage Interests</Text>
             </TouchableOpacity>
           </View>
 
