@@ -403,15 +403,18 @@ export default function NotificationsScreen() {
   const BUSINESS_INDIVIDUAL_TYPES = ['post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled'];
   const REGULAR_INDIVIDUAL_TYPES = ['registration_successful', 'event_ended', 'free_event_cancelled', 'paid_event_cancelled', 'plan_shared_chat'];
   const allowedListTypes = isBusinessUser ? BUSINESS_INDIVIDUAL_TYPES : REGULAR_INDIVIDUAL_TYPES;
-  const allInteractionsForList = notifications.flatMap((group) =>
-    group.interactions
+  const allInteractionsForList = notifications.flatMap((group) => {
+    const mediaFirst = group.post?.media?.[0];
+    const planImageUri = typeof mediaFirst === 'string' ? mediaFirst : mediaFirst?.url ?? null;
+    return group.interactions
       .filter((i) => allowedListTypes.includes(i.type))
       .map((interaction) => ({
         ...interaction,
         _planTitle: group.post?.title || null,
         _planId: group.post?.plan_id || group.post_id || null,
-      }))
-  );
+        _planImageUri: planImageUri,
+      }));
+  });
 
   // Get all unique avatars from all plan cards for summary
   const getAllAvatars = () => {
@@ -642,6 +645,7 @@ export default function NotificationsScreen() {
         {(viewMode === 'eventsList' || viewMode === 'eventDetail') &&
           groupedPlanCards.map((group) => {
             const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+            const unreadCount = (group.interactions as any[]).filter((i: any) => !i.is_read).length;
             return (
               <NormalUserEventCard
                 key={group.post_id}
@@ -655,6 +659,7 @@ export default function NotificationsScreen() {
                 onUserPress={openUserProfile}
                 formatRelativeTime={formatRelativeTime}
                 hideCountBadge={viewedCardIds.has(group.post_id)}
+                unreadCount={unreadCount}
                 currentUserId={user?.user_id}
                 onStartChat={async (otherUserId) => {
                   if (!user?.user_id || !group.post?.plan_id) return;
@@ -708,6 +713,7 @@ export default function NotificationsScreen() {
         interaction={interaction as any}
         userCache={userCache}
         planTitle={(interaction as any)._planTitle ?? undefined}
+        planImageUri={(interaction as any)._planImageUri ?? undefined}
         timeLabel={formatRelativeTime(interaction.created_at)}
         onUserPress={openUserProfile}
         onPress={() => handleNotificationPress(interaction)}
@@ -777,30 +783,30 @@ export default function NotificationsScreen() {
         <View style={styles.headerLeft}>
           <Text style={styles.headerText}>Notifications</Text>
         </View>
-        {(isBusinessUser || (!isBusinessUser && groupedPlanCards.length > 0)) && (
-          isBusinessUser ? (
-            viewMode !== 'summary' ? (
-              <TouchableOpacity
-                style={styles.closeStackButton}
-                onPress={handleCloseStack}
-                accessibilityLabel="Close stack"
-              >
-                <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={styles.editButton}>
-                <Ionicons name="create-outline" size={22} color="#FFD700" />
-              </TouchableOpacity>
-            )
-          ) : viewMode !== 'summary' ? (
-            <TouchableOpacity
-              style={styles.closeStackButton}
-              onPress={handleCloseStack}
-              accessibilityLabel="Close stack"
-            >
-              <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
-            </TouchableOpacity>
-          ) : null
+        {viewMode !== 'summary' ? (
+          <TouchableOpacity
+            style={styles.closeStackButton}
+            onPress={handleCloseStack}
+            accessibilityLabel="Close stack"
+          >
+            <Ionicons name="chevron-down" size={24} color="#1C1C1E" />
+          </TouchableOpacity>
+        ) : isBusinessUser ? (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/profile/your-plans' as any)}
+            accessibilityLabel="My plans"
+          >
+            <Ionicons name="create-outline" size={22} color="#FFD700" />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => router.push('/profile/tickets-passes' as any)}
+            accessibilityLabel="Tickets"
+          >
+            <Ionicons name="ticket-outline" size={22} color="#FFD700" />
+          </TouchableOpacity>
         )}
       </View>
 
@@ -879,6 +885,7 @@ export default function NotificationsScreen() {
                             interaction={interaction as any}
                             userCache={userCache}
                             planTitle={(interaction as any)._planTitle ?? undefined}
+                            planImageUri={(interaction as any)._planImageUri ?? undefined}
                             timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
                             onPress={() => handleNotificationPress(interaction)}
@@ -903,6 +910,7 @@ export default function NotificationsScreen() {
                             interaction={interaction as any}
                             userCache={userCache}
                             planTitle={(interaction as any)._planTitle ?? undefined}
+                            planImageUri={(interaction as any)._planImageUri ?? undefined}
                             timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
                             onPress={() => handleNotificationPress(interaction)}
@@ -925,6 +933,7 @@ export default function NotificationsScreen() {
                             interaction={interaction as any}
                             userCache={userCache}
                             planTitle={(interaction as any)._planTitle ?? undefined}
+                            planImageUri={(interaction as any)._planImageUri ?? undefined}
                             timeLabel={formatRelativeTime(interaction.created_at)}
                             onUserPress={openUserProfile}
                             onPress={() => handleNotificationPress(interaction)}

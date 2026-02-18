@@ -33,6 +33,8 @@ interface NormalUserEventCardProps {
   onUserPress: (userId: string) => void;
   formatRelativeTime: (dateStr: string) => string;
   hideCountBadge?: boolean;
+  /** When set, badge shows this count (e.g. unread only); otherwise uses interactions.length */
+  unreadCount?: number;
   /** Start individual chat with this user (opens chat screen) */
   onStartChat?: (otherUserId: string) => void;
   /** Create group with selected users; called with groupName and selected user ids */
@@ -72,6 +74,7 @@ export default function NormalUserEventCard({
   onUserPress,
   formatRelativeTime,
   hideCountBadge = false,
+  unreadCount,
   onStartChat,
   onCreateGroup,
   currentUserId,
@@ -97,7 +100,7 @@ export default function NormalUserEventCard({
   const avatars = uniqueByUser
     .slice(0, 3)
     .map((i) => i.user?.profile_image || userCache[i.source_user_id]?.profile_image || null);
-  const count = interactions.length;
+  const count = unreadCount !== undefined ? unreadCount : interactions.length;
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -305,7 +308,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     overflow: 'visible',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -314,7 +318,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardExpanded: {
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   unreadBadge: {
     position: 'absolute',

@@ -9,14 +9,14 @@ const GENERAL_NOTIFICATION_TYPES = [
   'registration_successful', 'plan_shared_chat',
 ] as const;
 
-function getCTALabel(ctaType: string): string {
+function getCTAIcon(ctaType: string): keyof typeof Ionicons.glyphMap {
   switch (ctaType) {
-    case 'go_to_event': return 'Go to Event';
-    case 'go_to_analytics': return 'Go to Analytics';
-    case 'go_to_ticket': return 'Go to Ticket';
-    case 'go_to_chat': return 'Go to Chat';
-    case 'go_to_plan': return 'Go to Plan';
-    default: return 'View';
+    case 'go_to_analytics': return 'stats-chart-outline';
+    case 'go_to_event':
+    case 'go_to_plan': return 'calendar-outline';
+    case 'go_to_ticket': return 'ticket-outline';
+    case 'go_to_chat': return 'chatbubble-outline';
+    default: return 'arrow-forward-circle-outline';
   }
 }
 
@@ -49,6 +49,8 @@ interface NotificationListItemProps {
   planTitle?: string | null;
   /** Optional relative time to show on the right (e.g. "2h", "Yesterday") */
   timeLabel?: string;
+  /** When set, use this as the avatar image (e.g. plan/event image) instead of user avatar */
+  planImageUri?: string | null;
 }
 
 export default function NotificationListItem({
@@ -59,12 +61,14 @@ export default function NotificationListItem({
   showDivider = true,
   planTitle,
   timeLabel,
+  planImageUri,
 }: NotificationListItemProps) {
   const cachedUser = userCache[interaction.source_user_id];
   const user = cachedUser || interaction.user;
   const userName = user?.name || '';
   const userAvatar = (user as any)?.profile_image ?? null;
   const isGeneralType = GENERAL_NOTIFICATION_TYPES.includes(interaction.type as any);
+  const avatarUri = (isGeneralType && planImageUri) ? planImageUri : userAvatar;
   const hasCTA = isGeneralType && !!interaction.payload?.cta_type;
   const isSystem = interaction.source_user_id === 'system';
 
@@ -132,7 +136,7 @@ export default function NotificationListItem({
     >
       <View style={styles.row}>
         <TouchableOpacity onPress={!isSystem ? handleUserPress : undefined} activeOpacity={0.7} disabled={isSystem}>
-          <Avatar uri={userAvatar} size={44} />
+          <Avatar uri={avatarUri} size={44} />
         </TouchableOpacity>
 
         <View style={styles.textContainer}>
@@ -152,14 +156,14 @@ export default function NotificationListItem({
 
         {hasCTA ? (
           <TouchableOpacity
-            style={styles.ctaButton}
+            style={styles.ctaIconButton}
             onPress={(e) => {
               e?.stopPropagation?.();
               onPress?.();
             }}
             activeOpacity={0.8}
           >
-            <Text style={styles.ctaButtonText}>{getCTALabel(interaction.payload!.cta_type!)}</Text>
+            <Ionicons name={getCTAIcon(interaction.payload!.cta_type!)} size={22} color="#1C1C1E" />
           </TouchableOpacity>
         ) : timeLabel !== undefined && timeLabel !== '' ? (
           <Text style={styles.timeRight}>{timeLabel}</Text>
@@ -208,17 +212,9 @@ const styles = StyleSheet.create({
   textPlain: {
     fontWeight: '400',
   },
-  ctaButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#1C1C1E',
+  ctaIconButton: {
     marginLeft: 8,
-  },
-  ctaButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    padding: 4,
   },
   timeRight: {
     fontSize: 13,
