@@ -81,11 +81,20 @@ export default function NotificationListItem({
   };
 
   const getInteractionText = () => {
-    // Check if payload has custom notification text
-    if (interaction.payload?.notification_text) {
-      return interaction.payload.notification_text;
+    const p = interaction.payload;
+    const eventTitle = p?.event_title || planTitle || 'Event';
+
+    if (interaction.type === 'event_ended_registered') {
+      const count = p?.registered_count ?? 0;
+      return `${count} people registered for ${eventTitle}`;
     }
-    
+    if (interaction.type === 'event_ended_attended') {
+      const attended = p?.scanned_count ?? 0;
+      return `${attended} people attended ${eventTitle}`;
+    }
+
+    if (p?.notification_text) return p.notification_text;
+
     switch (interaction.type) {
       case 'comment':
         return 'commented';

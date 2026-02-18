@@ -132,7 +132,9 @@ function PlanCardWithAnalytics({
   showAnalytics?: boolean;
 }) {
   const { analytics, loading } = usePlanAnalytics(showAnalytics ? plan.plan_id : undefined);
-  const hasImage = plan.media && plan.media.length > 0;
+  const mediaFirst = plan.media?.[0];
+  const imageUri = typeof mediaFirst === 'string' ? mediaFirst : (mediaFirst as any)?.url;
+  const hasImage = !!imageUri;
   const showupPct = analytics?.showup_rate_percent ?? 0;
   const returningPct = analytics?.returning_percent ?? 0;
   const firstTimersPct = analytics?.first_timers_percent ?? 0;

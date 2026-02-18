@@ -383,18 +383,21 @@ export default function NotificationsScreen() {
   const allSelected = availableUserIds.length > 0 && selectedUsers.size === availableUserIds.length;
 
   const CARD_INTERACTION_TYPES = ['comment', 'reaction', 'join', 'repost'];
-  // Separate grouped plan cards (only social interactions) from individual notifications
+  const BUSINESS_PLAN_NOTIFICATION_TYPES = ['event_ended', 'event_ended_registered', 'event_ended_attended', 'post_live', 'free_event_cancelled', 'paid_event_cancelled'];
+  // Grouped plan cards: social-only for regular users; for business users also include plans with event_ended* etc. so recent plans appear in the stack
   const groupedPlanCards = notifications
-    .filter(
-      (n) =>
-        n.post !== null &&
-        n.post.plan_id &&
-        n.interactions.length > 0 &&
-        n.interactions.every((i) => CARD_INTERACTION_TYPES.includes(i.type))
-    )
+    .filter((n) => {
+      if (!n.post || !n.post.plan_id || n.interactions.length === 0) return false;
+      if (isBusinessUser) {
+        const hasSocial = n.interactions.some((i) => CARD_INTERACTION_TYPES.includes(i.type));
+        const hasBusinessPlanNotif = n.interactions.some((i) => BUSINESS_PLAN_NOTIFICATION_TYPES.includes(i.type));
+        return hasSocial || hasBusinessPlanNotif;
+      }
+      return n.interactions.every((i) => CARD_INTERACTION_TYPES.includes(i.type));
+    })
     .sort((a, b) => {
-      const aLatest = Math.max(...a.interactions.map(i => new Date(i.created_at).getTime()));
-      const bLatest = Math.max(...b.interactions.map(i => new Date(i.created_at).getTime()));
+      const aLatest = Math.max(...a.interactions.map((i) => new Date(i.created_at).getTime()));
+      const bLatest = Math.max(...b.interactions.map((i) => new Date(i.created_at).getTime()));
       return bLatest - aLatest;
     });
 

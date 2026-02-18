@@ -185,6 +185,7 @@ export default function OverallAnalyticsScreen() {
           )}
         </View>
 
+        {/* Audience feedback: TODO – add section when post-event survey/ratings are available (e.g. show average rating, comments, or "Coming soon") */}
         {/* Event Level Analytics – event image (rounded), title, date, stats */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Event Level Analytics</Text>
