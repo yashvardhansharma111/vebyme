@@ -598,6 +598,9 @@ class ApiService {
     return data;
   }
 
+  // Upload/create timeout (ms) – prevents infinite loading when request never reaches server (e.g. iOS FormData hang)
+  private static readonly CREATE_POST_TIMEOUT_MS = 90000;
+
   // Post APIs
   async createPost(accessToken: string, postData: FormData | any) {
     const headers: Record<string, string> = {
@@ -609,19 +612,32 @@ class ApiService {
       headers['Content-Type'] = 'application/json';
     }
 
-    const response = await fetch(`${this.baseUrl}/post/create`, {
-      method: 'POST',
-      headers,
-      body: postData instanceof FormData ? postData : JSON.stringify(postData),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ApiService.CREATE_POST_TIMEOUT_MS);
 
-    const data = await response.json();
-    if (!response.ok) {
-      const error = new Error(data.message || 'Failed to create post');
-      (error as any).statusCode = response.status;
-      throw error;
+    try {
+      const response = await fetch(`${this.baseUrl}/post/create`, {
+        method: 'POST',
+        headers,
+        body: postData instanceof FormData ? postData : JSON.stringify(postData),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || 'Failed to create post');
+        (error as any).statusCode = response.status;
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        throw new Error('Request timed out. Check your connection and try again.');
+      }
+      throw err;
     }
-    return data;
   }
 
   // Business Plan APIs – always use /business-post/create (with FormData or JSON)
@@ -634,26 +650,38 @@ class ApiService {
     if (formData) {
       // Don't set Content-Type – let runtime set boundary for FormData
       console.log('[API] POST business-post/create (FormData)', url);
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-      console.log('[API] business-post/create response status', response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to create business plan';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), ApiService.CREATE_POST_TIMEOUT_MS);
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        console.log('[API] business-post/create response status', response.status);
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to create business plan';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
-        throw new Error(errorMessage);
+        const json = await response.json();
+        console.log('[API] business-post/create success', !!json?.success, 'post_id:', json?.data?.post_id ?? json?.post_id);
+        return json;
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err?.name === 'AbortError') {
+          throw new Error('Request timed out. Check your connection and try again.');
+        }
+        throw err;
       }
-      const json = await response.json();
-      console.log('[API] business-post/create success', !!json?.success, 'post_id:', json?.data?.post_id ?? json?.post_id);
-      return json;
     }
 
     // No files: send JSON to same endpoint so backend uses full business-post logic
@@ -697,19 +725,30 @@ class ApiService {
       headers['Content-Type'] = 'application/json';
     }
 
-    const response = await fetch(`${this.baseUrl}/post/update/${post_id}`, {
-      method: 'PUT',
-      headers,
-      body: postData instanceof FormData ? postData : JSON.stringify(postData),
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      const error = new Error(data.message || 'Failed to update post');
-      (error as any).statusCode = response.status;
-      throw error;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ApiService.CREATE_POST_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${this.baseUrl}/post/update/${post_id}`, {
+        method: 'PUT',
+        headers,
+        body: postData instanceof FormData ? postData : JSON.stringify(postData),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const data = await response.json();
+      if (!response.ok) {
+        const error = new Error(data.message || 'Failed to update post');
+        (error as any).statusCode = response.status;
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        throw new Error('Request timed out. Check your connection and try again.');
+      }
+      throw err;
     }
-    return data;
   }
 
   async updateBusinessPlan(accessToken: string, post_id: string, planData: any, formData?: FormData) {
@@ -718,28 +757,36 @@ class ApiService {
       const headers: Record<string, string> = {
         'Authorization': `Bearer ${accessToken}`,
       };
-      // Don't set Content-Type - let browser set it with boundary for FormData
-      
       const url = `${this.baseUrl}/business-post/update/${post_id}`;
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers,
-        body: formData,
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = 'Failed to update business plan';
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.message || errorMessage;
-        } catch {
-          errorMessage = errorText || errorMessage;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), ApiService.CREATE_POST_TIMEOUT_MS);
+      try {
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers,
+          body: formData,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorMessage = 'Failed to update business plan';
+          try {
+            const errorJson = JSON.parse(errorText);
+            errorMessage = errorJson.message || errorMessage;
+          } catch {
+            errorMessage = errorText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
-        throw new Error(errorMessage);
+        return await response.json();
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err?.name === 'AbortError') {
+          throw new Error('Request timed out. Check your connection and try again.');
+        }
+        throw err;
       }
-      
-      return await response.json();
     }
     
     // Otherwise use JSON
