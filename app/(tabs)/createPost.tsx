@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -104,42 +104,41 @@ export default function CreatePostScreen() {
     }
   }, [currentUser, router]);
 
-  // Load plan data from AsyncStorage if available (for duplicate/edit)
-  useEffect(() => {
-    const loadPlanData = async () => {
-      try {
-        const planDataStr = await AsyncStorage.getItem('planForCreation');
-        if (planDataStr) {
-          openedFromMyPlansRef.current = true;
+  // Load plan data from AsyncStorage when screen is focused (e.g. user tapped Edit in My Plans)
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      const loadPlanData = async () => {
+        try {
+          const planDataStr = await AsyncStorage.getItem('planForCreation');
+          if (cancelled || !planDataStr) return;
           const planData = JSON.parse(planDataStr);
           const isEdit = planData.mode === 'edit';
-          
-          setEditMode(isEdit);
-          if (isEdit) {
-            setPlanId(planData.plan_id);
-          }
 
-          // Pre-fill form fields
+          openedFromMyPlansRef.current = true;
+          setEditMode(!!isEdit);
+          if (isEdit && planData.plan_id) setPlanId(planData.plan_id);
+
           if (planData.title) setTitle(planData.title);
           if (planData.description) setDescription(planData.description);
-          if (planData.is_women_only) setIsWomenOnly(planData.is_women_only);
+          if (planData.is_women_only !== undefined) setIsWomenOnly(!!planData.is_women_only);
           if (planData.post_type) setPostType(planData.post_type);
-          if (planData.num_people) setNumPeople(planData.num_people.toString());
-          if (planData.category_main) setSelectedCategory(planData.category_main);
+          if (planData.num_people != null) setNumPeople(String(planData.num_people));
+          // Map stored category_main (e.g. "fitness/training") to display tag ("Fitness/Training")
+          if (planData.category_main) {
+            const main = (planData.category_main || '').toLowerCase().trim();
+            const displayCategory = CATEGORY_TAGS.find((t) => t.toLowerCase().trim() === main) || planData.category_main;
+            setSelectedCategory(displayCategory);
+          }
           if (planData.category_sub && planData.category_sub.length > 0) {
             setSelectedSubCategory(planData.category_sub[0]);
           }
-          // Subcategory UI removed; state kept for edit load compat
-          
-          // Handle temporal tags
           if (planData.temporal_tags && planData.temporal_tags.length > 0) {
             planData.temporal_tags.forEach((tag: string) => {
               if (DAY_TAGS.includes(tag)) setSelectedDay(tag);
               if (TIME_TAGS.includes(tag)) setSelectedTime(tag);
             });
           }
-
-          // Handle media
           if (planData.media && planData.media.length > 0) {
             const mediaItems = planData.media.map((item: any) => ({
               uri: item.url,
@@ -147,17 +146,15 @@ export default function CreatePostScreen() {
             }));
             setMedia(mediaItems);
           }
-
-          // Clear AsyncStorage after loading
           await AsyncStorage.removeItem('planForCreation');
+        } catch (error) {
+          if (!cancelled) console.error('Error loading plan data:', error);
         }
-      } catch (error) {
-        console.error('Error loading plan data:', error);
-      }
-    };
-
-    loadPlanData();
-  }, []);
+      };
+      loadPlanData();
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   const handleDescriptionChange = (text: string) => {
     const words = text.trim().split(/\s+/).filter(Boolean);
