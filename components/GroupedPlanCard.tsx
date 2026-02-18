@@ -315,8 +315,8 @@ export default function GroupedPlanCard({
     setShowAddToCommunityModal(false);
   };
 
-  // Stacking offset effect
-  const cardOffset = index * 4;
+  // No horizontal offset so cards stack vertically in the notification list
+  const cardOffset = 0;
 
   return (
     <View style={[styles.cardContainer, { marginLeft: cardOffset, marginRight: -cardOffset }]}>

@@ -1122,6 +1122,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F2F2F7',
   },
   groupedCardsContainer: {
+    flexDirection: 'column',
     padding: 20,
     paddingBottom: 20,
     backgroundColor: '#F2F2F7',
