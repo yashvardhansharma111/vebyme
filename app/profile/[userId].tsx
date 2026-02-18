@@ -277,7 +277,7 @@ export default function OtherUserProfileScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Instagram preview: logo + handle, 3x3 grid; tap opens in-app Instagram view (WebView) */}
+                {/* Instagram preview: logo + handle, inline WebView mini profile, then grid; tap opens full WebView modal */}
                 <View style={styles.businessInstaSection}>
                   <TouchableOpacity
                     style={styles.businessInstaHeader}
@@ -288,6 +288,28 @@ export default function OtherUserProfileScreen() {
                     <Text style={styles.businessInstaHandle}>{instagramId || viewedUser?.name || 'instagram'}</Text>
                     <Ionicons name="open-outline" size={18} color="#8E8E93" style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
+                  {/* Inline WebView mini profile preview (fixed height, no scroll) */}
+                  {instagramUrl && (
+                    <View style={styles.instagramWebViewPreviewWrap}>
+                      <WebView
+                        source={{ uri: instagramUrl }}
+                        style={styles.instagramWebViewPreview}
+                        scrollEnabled={false}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        sharedCookiesEnabled={false}
+                        incognito
+                        userAgent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                        startInLoadingState
+                        renderLoading={() => (
+                          <View style={styles.instagramWebViewPreviewLoading}>
+                            <ActivityIndicator size="large" color="#E4405F" />
+                          </View>
+                        )}
+                      />
+                    </View>
+                  )}
+                  {/* View Instagram posts – commented out for now
                   <TouchableOpacity
                     style={styles.businessInstaViewPostsBtn}
                     onPress={() => instagramUrl && setShowInstagramWebView(true)}
@@ -313,6 +335,7 @@ export default function OtherUserProfileScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
+                  */}
                 </View>
 
                 {/* Instagram account view – WebView (iframe-style) */}
@@ -1087,6 +1110,29 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  instagramWebViewPreviewWrap: {
+    height: 400,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 14,
+    backgroundColor: '#f2f2f7',
+  },
+  instagramWebViewPreview: {
+    flex: 1,
+    width: '100%',
+    height: 400,
+    backgroundColor: '#fff',
+  },
+  instagramWebViewPreviewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 400,
+    backgroundColor: '#f2f2f7',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   instagramWebViewContainer: {
     flex: 1,
