@@ -193,7 +193,6 @@ export default function OtherUserProfileScreen() {
     ...(socialMedia.google_drive ? [{ key: 'google_drive', icon: 'document-text', label: 'Google Drive', url: socialMedia.google_drive.startsWith('http') ? socialMedia.google_drive : `https://drive.google.com/${socialMedia.google_drive}`, color: '#4285F4' }] : []),
     ...((socialMedia.x || socialMedia.twitter) ? [{ key: 'x', icon: 'x', label: 'X', url: `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}`, color: '#000000' }] : []),
     ...(socialMedia.snapchat ? [{ key: 'snapchat', icon: 'logo-snapchat', label: 'Snapchat', url: socialMedia.snapchat.startsWith('http') ? socialMedia.snapchat : `https://www.snapchat.com/add/${String(socialMedia.snapchat).replace(/^@/, '')}`, color: '#FFFC00' }] : []),
-    ...(instagramUrl ? [{ key: 'instagram', icon: 'logo-instagram', label: instagramId || 'Instagram', url: instagramUrl, color: '#E4405F' }] : []),
   ];
 
   const copySocialLink = async (url: string, handle: string) => {
@@ -263,6 +262,7 @@ export default function OtherUserProfileScreen() {
               borderTopRightRadius: 24,
               overflow: 'hidden',
             },
+            isBusinessProfile && { backgroundColor: '#FFF' },
           ]}
         >
           {/* Name + bio in text section */}
@@ -407,7 +407,10 @@ export default function OtherUserProfileScreen() {
                   </Modal>
                 )}
 
-                {/* Previous Runs – horizontal scroll; each card: image on top, white strip below with title + bio; tap -> business plan */}
+              </View>
+
+              {/* Previous Runs – separate box with shadow, spaced from Instagram preview */}
+              <View style={styles.businessPreviousRunsCard}>
                 <View style={styles.businessPreviousRunsSection}>
                   <View style={styles.businessPreviousRunsHeader}>
                     <Text style={styles.businessPreviousRunsTitle}>Previous Runs</Text>
@@ -1162,12 +1165,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 14,
     backgroundColor: '#f2f2f7',
+    ...FIGMA_CARD_SHADOW,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   instagramWebViewPreview: {
     flex: 1,
     width: '100%',
     height: 400,
     backgroundColor: '#fff',
+    borderRadius: 16,
   },
   instagramWebViewPreviewLoading: {
     position: 'absolute',
@@ -1218,6 +1227,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  businessPreviousRunsCard: {
+    alignSelf: 'stretch',
+    backgroundColor: '#FFF',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
+    marginTop: 24,
+    ...FIGMA_CARD_SHADOW,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   businessPreviousRunsSection: {
     marginBottom: 8,
   },
@@ -1253,14 +1276,14 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginRight: 14,
-    ...FIGMA_CARD_SHADOW,
+    // ...FIGMA_CARD_SHADOW,
   },
   businessPreviousRunCardNew: {
     borderRadius: 20,
     overflow: 'hidden',
     marginRight: 14,
     backgroundColor: '#FFF',
-    ...FIGMA_CARD_SHADOW,
+    // ...FIGMA_CARD_SHADOW,
   },
   businessPreviousRunCardImageWrap: {
     width: '100%',
