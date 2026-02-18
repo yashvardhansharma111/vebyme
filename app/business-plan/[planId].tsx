@@ -50,12 +50,7 @@ const HERO_OVERLAP = 24;
 const CONTENT_PADDING_H = 20;
 import GuestListModal from '@/components/GuestListModal';
 
-// Ticket background assets for pass cards
-const TICKET_BGS = [
-  require('@/assets/images/ticket1 bg.png'),
-  require('@/assets/images/ticket2 bg.png'),
-  require('@/assets/images/ticket3 bg.png'),
-];
+// Pass cards use the event's main image as background (see plan.media below)
 
 interface BusinessPlan {
   plan_id: string;
@@ -506,12 +501,16 @@ export default function BusinessPlanDetailScreen() {
           )}
 
           {/* Select Passes – ticket bg images; unselected blurred 50% white */}
-          {plan.passes && plan.passes.length > 0 && (
+          {plan.passes && plan.passes.length > 0 && (() => {
+            const eventImageUri = plan.media && plan.media.length > 0 && plan.media[0]?.url
+              ? plan.media[0].url
+              : null;
+            const bgSource = eventImageUri ? { uri: eventImageUri } : require('@/assets/images/ticket1 bg.png');
+            return (
             <View style={styles.ticketsSection}>
               <Text style={styles.ticketsTitle}>Select Passes</Text>
-              {plan.passes.map((pass, index) => {
+              {plan.passes.map((pass) => {
                 const isSelected = selectedPass === pass.pass_id;
-                const bgSource = TICKET_BGS[index % TICKET_BGS.length];
                 return (
                   <TouchableOpacity
                     key={pass.pass_id}
@@ -538,7 +537,8 @@ export default function BusinessPlanDetailScreen() {
                 );
               })}
             </View>
-          )}
+            );
+          })()}
 
           </View>
         </View>

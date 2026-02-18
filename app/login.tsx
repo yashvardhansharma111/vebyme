@@ -179,7 +179,6 @@ export default function LoginScreen() {
                   keyboardType="phone-pad"
                   autoFocus
                 />
-                <Text style={styles.fieldNote}>Message & data rates may apply</Text>
               </View>
               <View style={styles.bottomBlock}>
                 <TouchableOpacity

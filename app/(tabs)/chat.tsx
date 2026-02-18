@@ -336,7 +336,7 @@ export default function ChatScreen() {
         <Text style={styles.headerTitle}>Chats</Text>
       </View>
 
-      {/* Tabs: business users see My events + Unread; others: Groups, Their Plans, Your Plans */}
+      {/* Tabs: business users see My events + Unread; others: Groups, Their Plans, My Plans */}
       <View style={styles.tabsContainer}>
         {isBusinessUser ? (
           <>
@@ -408,7 +408,7 @@ export default function ChatScreen() {
               onPress={() => setActiveTab('my_plans')}
             >
               <Text style={[styles.tabText, activeTab === 'my_plans' && styles.tabTextActive]}>
-                Your Plans
+                My Plans
               </Text>
               {getBadgeCount('my_plans') > 0 && (
                 <View style={[styles.badge, activeTab === 'my_plans' && styles.badgeActive]}>

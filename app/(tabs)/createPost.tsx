@@ -721,7 +721,14 @@ export default function CreatePostScreen() {
 
       <ShareToChatModal
         visible={showShareToChatModal}
-        onClose={() => setShowShareToChatModal(false)}
+        onClose={() => {
+          const wasFromSuccess = !!createdPlanIdForSuccess;
+          setShowShareToChatModal(false);
+          if (wasFromSuccess) {
+            setCreatedPlanIdForSuccess(null);
+            router.replace('/(tabs)' as any);
+          }
+        }}
         postId={createdPlanIdForSuccess ?? ''}
         postTitle={title}
         postDescription={description}

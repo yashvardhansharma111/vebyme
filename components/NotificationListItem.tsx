@@ -140,7 +140,7 @@ export default function NotificationListItem({
         </TouchableOpacity>
 
         <View style={styles.textContainer}>
-          <Text style={styles.text} numberOfLines={2}>
+          <Text style={styles.text}>
             {showUserName && (
               <>
                 <Text style={styles.userName} onPress={handleUserPress}>

@@ -19,6 +19,7 @@ import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from '@/component
 import LoginModal from '@/components/LoginModal';
 import Avatar from '@/components/Avatar';
 import { EventCard } from '@/components/SwipeableEventCard';
+import BusinessCard from '@/components/BusinessCard';
 
 interface SavedPlan {
   post_id: string;
@@ -30,6 +31,8 @@ interface SavedPlan {
   timestamp: string | Date;
   location?: any;
   saved_at?: string | Date;
+  /** 'business' | 'regular' – from API */
+  type?: string;
 }
 
 const TAG_ICONS: { [key: string]: string } = {
@@ -254,6 +257,42 @@ export default function SavedPlansScreen() {
                 return 'Recently';
               }
             };
+            const isBusiness = (plan as SavedPlan & { type?: string }).type === 'business';
+            if (isBusiness) {
+              return (
+                <View key={plan.post_id} style={styles.savedCardWrapper}>
+                  <BusinessCard
+                    plan={{
+                      plan_id: plan.post_id,
+                      title: plan.title || 'Untitled Plan',
+                      description: plan.description || 'No description',
+                      media: plan.media,
+                      category_sub: plan.tags || [],
+                      date: plan.timestamp,
+                      user: {
+                        user_id: plan.user_id,
+                        name: plan.user?.name || 'Unknown User',
+                        profile_image: plan.user?.profile_image ?? undefined,
+                      },
+                    }}
+                    user={{
+                      id: plan.user_id,
+                      name: plan.user?.name || 'Unknown User',
+                      avatar: plan.user?.profile_image ?? 'https://via.placeholder.com/44',
+                      time: plan.timestamp ? formatTime(plan.timestamp) : 'Recently',
+                    }}
+                    attendeesCount={0}
+                    hideActions
+                    hideRegisterButton
+                    isSwipeable={false}
+                    pillsAboveCard
+                    hideCardShadow
+                    descriptionNumberOfLines={2}
+                    onPress={() => router.push({ pathname: '/business-plan/[planId]', params: { planId: plan.post_id } } as any)}
+                  />
+                </View>
+              );
+            }
             return (
               <View key={plan.post_id} style={styles.savedCardWrapper}>
                 <EventCard

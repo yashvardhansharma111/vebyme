@@ -142,7 +142,7 @@ export default function MyProfileScreen() {
             <View style={styles.divider} />
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/your-plans')}>
               <Ionicons name="calendar-outline" size={22} color="#1C1C1E" style={styles.menuIcon} />
-              <Text style={styles.menuText}>Your Plans</Text>
+              <Text style={styles.menuText}>My Plans</Text>
             </TouchableOpacity>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/profile/saved-plans')}>
