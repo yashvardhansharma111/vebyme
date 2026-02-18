@@ -176,7 +176,7 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
 export { EventCard };
 
 // --- The Swipe Wrapper ---
-export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription }: any) {
+export default function SwipeableEventCard({ user, event, postId, onUserPress, onRequireAuth, isRepost, originalAuthor, originalPostTitle, originalPostDescription, hideFooterActions = false }: any) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -292,6 +292,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           originalPostTitle={event.original_post_title}
           originalPostDescription={event.original_post_description}
           onImagePress={hasEventImage ? () => setShowImageGallery(true) : undefined}
+          hideFooterActions={hideFooterActions}
         />
       </Swipeable>
       {showJoinModal && (postId || event?.id) && (

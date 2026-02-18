@@ -666,11 +666,14 @@ export default function CreatePostScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Post success modal: same layout as preview (card + Edit & Share) */}
+      {/* Post success modal: centered card + Edit & Share just below, close button visible */}
       <Modal visible={showPostSuccessModal} animationType="slide" statusBarTranslucent>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaView style={styles.successModalContainer} edges={['top', 'bottom']}>
-            <ScrollView contentContainerStyle={styles.previewContainer}>
+            <ScrollView
+              contentContainerStyle={[styles.previewContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={styles.previewText}>Your post is live! Share it or view it.</Text>
               <View style={styles.previewCardWrapper}>
                 {(() => {
@@ -680,35 +683,36 @@ export default function CreatePostScreen() {
                       user={previewData.user}
                       event={previewData.event}
                       onUserPress={() => {}}
+                      hideFooterActions
                     />
                   );
                 })()}
               </View>
-            </ScrollView>
-            <View style={[styles.successBottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-              <TouchableOpacity
-                style={[styles.button, styles.editButton]}
-                onPress={() => {
-                  if (createdPlanIdForSuccess) {
+              <View style={[styles.successBottomBar, { paddingTop: 12, paddingBottom: 0 }]}>
+                <TouchableOpacity
+                  style={[styles.button, styles.editButton]}
+                  onPress={() => {
+                    if (createdPlanIdForSuccess) {
+                      setShowPostSuccessModal(false);
+                      setCreatedPlanIdForSuccess(null);
+                      router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
+                    }
+                  }}
+                >
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.button, styles.postButton]}
+                  onPress={() => {
                     setShowPostSuccessModal(false);
-                    setCreatedPlanIdForSuccess(null);
-                    router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
-                  }
-                }}
-              >
-                <Text style={styles.editButtonText}>Edit</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.button, styles.postButton]}
-                onPress={() => {
-                  setShowPostSuccessModal(false);
-                  setShowShareToChatModal(true);
-                }}
-              >
-                <Text style={styles.postButtonText}>Share</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity style={styles.successModalClose} onPress={resetFormAndNavigate}>
+                    setShowShareToChatModal(true);
+                  }}
+                >
+                  <Text style={styles.postButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+            <TouchableOpacity style={[styles.successModalClose, { top: (insets?.top ?? 0) + 52 }]} onPress={resetFormAndNavigate}>
               <Ionicons name="close" size={24} color="#1C1C1E" />
             </TouchableOpacity>
           </SafeAreaView>
@@ -998,8 +1002,11 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   previewContainer: {
-    padding: 20,
-    paddingBottom: 100,
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 24,
   },
   previewText: {
     fontSize: 14,
@@ -1008,25 +1015,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   previewCardWrapper: {
-    marginBottom: 20,
+    marginBottom: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    elevation: 6,
   },
   successModalContainer: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#F2F2F7',
   },
   successBottomBar: {
     flexDirection: 'row',
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingTop: 16,
-    backgroundColor: '#F2F2F7',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E5EA',
+    backgroundColor: 'transparent',
   },
   successModalClose: {
     position: 'absolute',
-    top: 12,
     right: 16,
     width: 44,
     height: 44,
