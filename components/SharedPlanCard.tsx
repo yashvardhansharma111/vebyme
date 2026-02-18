@@ -173,16 +173,16 @@ export default function SharedPlanCard({
           )}
         </View>
 
-        {/* Footer - exact same as feed: icons + Join/Register pill */}
+        {/* Footer: Join/Register on left, Share icon on right (clear border for iOS) */}
         <View style={[styles.footer, compact && styles.footerCompact]}>
-          <View style={[styles.footerIcons, compact && styles.footerIconsCompact]}>
-            <TouchableOpacity style={[styles.footerIconBtn, compact && styles.footerIconBtnCompact]} onPress={onSharePress ?? (() => {})}>
-              <Ionicons name="paper-plane-outline" size={compact ? 18 : 22} color="#000" />
-            </TouchableOpacity>
-          </View>
           <TouchableOpacity style={[styles.actionButton, compact && styles.actionButtonCompact]} onPress={handleAction} activeOpacity={0.8}>
             <Text style={[styles.actionButtonText, compact && styles.actionButtonTextCompact]}>{actionLabel}</Text>
           </TouchableOpacity>
+          <View style={[styles.footerIcons, compact && styles.footerIconsCompact]}>
+            <TouchableOpacity style={[styles.footerIconBtn, compact && styles.footerIconBtnCompact]} onPress={onSharePress ?? (() => {})}>
+              <Ionicons name="share-outline" size={compact ? 18 : 22} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
         </View>
       </TouchableOpacity>
@@ -215,6 +215,8 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 20,
     paddingTop: 20,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -394,6 +396,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#F2F2F7',
     borderRadius: 24,
     minHeight: 54,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: '#D1D1D6',
   },
   footerCompact: {
     minHeight: 40,
@@ -429,11 +432,10 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionButton: {
-    flex: 1,
     minWidth: 72,
-    maxWidth: '50%',
-    marginLeft: 8,
     height: 34,
+    paddingHorizontal: 20,
+    marginRight: 12,
     backgroundColor: '#1C1C1E',
     justifyContent: 'center',
     alignItems: 'center',

@@ -142,13 +142,14 @@ export default function ChatScreen() {
 
         setGroups(finalGroups);
 
-        // Update global chat unread count for tab badge (sum across all lists)
-        const totalUnread = [
+        // Update global chat unread count for tab badge: number of chats with unread (not total message count)
+        const allItems = [
           ...(response.data.their_plans || []),
           ...(response.data.my_plans || []),
           ...finalGroups,
-        ].reduce((sum, item) => sum + (item?.unread_count ?? 0), 0);
-        dispatch(setChatUnreadCount(totalUnread));
+        ];
+        const unreadChatsCount = allItems.filter((item) => (item?.unread_count ?? 0) > 0).length;
+        dispatch(setChatUnreadCount(unreadChatsCount));
       }
     } catch (error: any) {
       console.error('[Chat] Error loading chats:', error);
@@ -239,10 +240,12 @@ export default function ChatScreen() {
   };
 
   const renderChatItem = ({ item }: { item: ChatItem }) => {
-    // Event/plan chats: show event name (plan_title); otherwise group_name or other user
-    const displayName = item.is_group
-      ? (item.plan_title || item.group_name)
-      : (item.other_user?.name || item.author_name);
+    // Event/plan chats: always prefer plan title when present (so 2-member event chats show event name, not other user name)
+    const displayName = item.plan_title
+      ? item.plan_title
+      : item.is_group
+        ? item.group_name
+        : (item.other_user?.name || item.author_name);
 
     // Groups from post/event: use that event's image as group DP
     const planMediaFirst = item.plan_media?.[0];
@@ -429,6 +432,7 @@ export default function ChatScreen() {
           data={getCurrentData()}
           renderItem={renderChatItem}
           keyExtractor={(item) => item.group_id}
+          style={styles.list}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -547,9 +551,13 @@ const styles = StyleSheet.create({
   },
 
   // List Styles
+  list: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 120,
+    flexGrow: 1,
   },
   chatItem: {
     flexDirection: 'row',
