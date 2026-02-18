@@ -1535,65 +1535,60 @@ export default function CreateBusinessPostScreen() {
         </View>
       </KeyboardAvoidingView>
 
-      {/* Post success modal: full BusinessCard + Edit event & Share */}
-      <Modal visible={showPostSuccessModal} animationType="slide" transparent>
-        <View style={styles.successModalOverlay}>
-          <View style={styles.successModalContent}>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.successModalScroll}>
-              <BusinessCard
+      {/* Post success modal: same layout as preview (BusinessPlanDetailPreview) + Edit & Share buttons */}
+      <Modal visible={showPostSuccessModal} animationType="slide" statusBarTranslucent>
+        <SafeAreaView style={styles.successModalFullScreen} edges={['top', 'bottom']}>
+          <View style={styles.successModalScroll}>
+            <View style={styles.businessPreviewWrap}>
+              <BusinessPlanDetailPreview
                 plan={{
                   ...formatPreviewData(),
                   plan_id: createdPlanIdForSuccess ?? 'preview',
                 }}
-                user={currentUser ? {
-                  id: currentUser.user_id,
-                  name: currentUser.name || 'Organizer',
-                  avatar: currentUser.profile_image || '',
-                  time: selectedDate ? selectedDate.toLocaleDateString() : '',
-                } : undefined}
-                attendeesCount={0}
-                isSwipeable={false}
-                hideActions
+                organizerName={currentUser?.name || 'Organizer'}
+                organizerAvatar={currentUser?.profile_image ?? null}
+                showOrganizer={true}
+                withStickyBar={true}
               />
-              <View style={styles.successModalButtons}>
-                <TouchableOpacity
-                  style={styles.successEditButton}
-                  onPress={() => {
-                    if (!createdPlanIdForSuccess) return;
-                    setShowPostSuccessModal(false);
-                    setCreatedPlanIdForSuccess(null);
-                    router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
-                  }}
-                >
-                  <Text style={styles.successEditButtonText}>View Event</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.successShareButton}
-                  onPress={() => {
-                    setShowPostSuccessModal(false);
-                    setShowShareToChatModal(true);
-                  }}
-                >
-                  <Text style={styles.successShareButtonText}>Share</Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+            </View>
+          </View>
+          <View style={[styles.previewStickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <TouchableOpacity
-              style={styles.successModalClose}
+              style={[styles.actionButton, styles.previewEditButton]}
               onPress={() => {
+                if (!createdPlanIdForSuccess) return;
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
-                if (openedFromMyPlansRef.current) {
-                  router.replace('/profile/your-plans');
-                } else {
-                  router.replace('/(tabs)');
-                }
+                router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
               }}
             >
-              <Ionicons name="close" size={24} color="#666" />
+              <Text style={styles.previewEditButtonText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.postButton]}
+              onPress={() => {
+                setShowPostSuccessModal(false);
+                setShowShareToChatModal(true);
+              }}
+            >
+              <Text style={styles.postButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          <TouchableOpacity
+            style={styles.successModalClose}
+            onPress={() => {
+              setShowPostSuccessModal(false);
+              setCreatedPlanIdForSuccess(null);
+              if (openedFromMyPlansRef.current) {
+                router.replace('/profile/your-plans');
+              } else {
+                router.replace('/(tabs)');
+              }
+            }}
+          >
+            <Ionicons name="close" size={24} color="#1C1C1E" />
+          </TouchableOpacity>
+        </SafeAreaView>
       </Modal>
 
       <ShareToChatModal
@@ -2514,59 +2509,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  successModalOverlay: {
+  successModalFullScreen: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successModalContent: {
-    width: '92%',
-    maxHeight: '85%',
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    overflow: 'hidden',
   },
   successModalScroll: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  successModalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  successEditButton: {
     flex: 1,
-    height: 48,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successEditButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
-  },
-  successShareButton: {
-    flex: 1,
-    height: 48,
-    backgroundColor: '#1C1C1E',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  successShareButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFF',
   },
   successModalClose: {
     position: 'absolute',
     top: 12,
-    right: 12,
-    padding: 8,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 10,
   },
   previewFullScreen: {

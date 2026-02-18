@@ -604,8 +604,28 @@ export default function NotificationsScreen() {
   };
 
   // Normal user: Notification 1st iteration — stacked cards (3 states) + list below, all real data
+  // Stacked cards only appear when you have created plans/events and received comment/reaction/join/repost on them
   const renderNormalUserStack = () => {
-    if (groupedPlanCards.length === 0) return null;
+    if (groupedPlanCards.length === 0) {
+      // Hint when user has other notifications but no "social on my plans" groups
+      const hasListItems =
+        timeGroupedNotifications.today.length > 0 ||
+        timeGroupedNotifications.yesterday.length > 0 ||
+        timeGroupedNotifications.earlierSections.length > 0;
+      if (hasListItems) {
+        return (
+          <View style={styles.groupedCardsContainer}>
+            <View style={styles.stackHint}>
+              <Ionicons name="layers-outline" size={20} color="#8E8E93" />
+              <Text style={styles.stackHintText}>
+                When you create plans and others react, comment or join, they’ll appear here as cards
+              </Text>
+            </View>
+          </View>
+        );
+      }
+      return null;
+    }
     return (
       <View style={styles.groupedCardsContainer}>
         {/* State 1: Summary card (stacked) */}
@@ -1093,6 +1113,20 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 20,
     backgroundColor: '#F2F2F7',
+  },
+  stackHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#E5E5EA',
+    borderRadius: 12,
+  },
+  stackHintText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#8E8E93',
   },
   listContainer: {
     backgroundColor: '#F2F2F7',

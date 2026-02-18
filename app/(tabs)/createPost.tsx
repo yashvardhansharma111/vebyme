@@ -11,6 +11,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -20,9 +21,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ShareToChatModal from '@/components/ShareToChatModal';
 
 // Tag options – categories same as business post; Day/Time with icons
 const DAY_TAGS = ['Today', 'Tomorrow', 'Weekend'];
@@ -80,7 +82,11 @@ export default function CreatePostScreen() {
   const [editMode, setEditMode] = useState(false);
   const [planId, setPlanId] = useState<string | null>(null);
   const [descriptionHeight, setDescriptionHeight] = useState(100);
+  const [showPostSuccessModal, setShowPostSuccessModal] = useState(false);
+  const [createdPlanIdForSuccess, setCreatedPlanIdForSuccess] = useState<string | null>(null);
+  const [showShareToChatModal, setShowShareToChatModal] = useState(false);
   const openedFromMyPlansRef = useRef(false);
+  const insets = useSafeAreaInsets();
 
   const descriptionWordCount = wordCount(description);
   const descriptionAtLimit = descriptionWordCount >= DESCRIPTION_MAX_WORDS;
@@ -244,6 +250,26 @@ export default function CreatePostScreen() {
     };
   };
 
+  const resetFormAndNavigate = () => {
+    setDescription('');
+    setTitle('');
+    setIsWomenOnly(false);
+    setPostType('individual');
+    setNumPeople('');
+    setSelectedDay('');
+    setSelectedTime('');
+    setSelectedCategory('');
+    setSelectedSubCategory('');
+    setMedia([]);
+    setShowPostSuccessModal(false);
+    setCreatedPlanIdForSuccess(null);
+    if (openedFromMyPlansRef.current) {
+      router.replace('/profile/your-plans');
+    } else {
+      router.back();
+    }
+  };
+
   const handlePreview = () => {
     if (!description.trim()) {
       Alert.alert('Validation', 'Please enter a description');
@@ -343,33 +369,13 @@ export default function CreatePostScreen() {
           ]);
         }
       } else {
-        // Create new post
+        // Create new post – show success modal (same as business post: preview + Edit / Share)
         response = await apiService.createPost(user.access_token, formData);
         if (response.success) {
-          Alert.alert('Success', 'Post created successfully!', [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Reset form
-                setDescription('');
-                setTitle('');
-                setIsWomenOnly(false);
-                setPostType('individual');
-                setNumPeople('');
-                setSelectedDay('');
-                setSelectedTime('');
-                setSelectedCategory('');
-                setSelectedSubCategory('');
-                setMedia([]);
-                setShowPreview(false);
-                if (openedFromMyPlansRef.current) {
-                  router.replace('/profile/your-plans');
-                } else {
-                  router.back();
-                }
-              },
-            },
-          ]);
+          const postId = (response as any)?.data?.post_id ?? (response as any)?.post_id ?? (response as any)?.data?.plan_id ?? null;
+          setCreatedPlanIdForSuccess(postId);
+          setShowPreview(false);
+          setShowPostSuccessModal(true);
         }
       }
     } catch (error: any) {
@@ -659,6 +665,70 @@ export default function CreatePostScreen() {
             </TouchableOpacity>
         </View>
       </SafeAreaView>
+
+      {/* Post success modal: same layout as preview (card + Edit & Share) */}
+      <Modal visible={showPostSuccessModal} animationType="slide" statusBarTranslucent>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaView style={styles.successModalContainer} edges={['top', 'bottom']}>
+            <ScrollView contentContainerStyle={styles.previewContainer}>
+              <Text style={styles.previewText}>Your post is live! Share it or view it.</Text>
+              <View style={styles.previewCardWrapper}>
+                {(() => {
+                  const previewData = formatPreviewData();
+                  return (
+                    <SwipeableEventCard
+                      user={previewData.user}
+                      event={previewData.event}
+                      onUserPress={() => {}}
+                    />
+                  );
+                })()}
+              </View>
+            </ScrollView>
+            <View style={[styles.successBottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              <TouchableOpacity
+                style={[styles.button, styles.editButton]}
+                onPress={() => {
+                  if (createdPlanIdForSuccess) {
+                    setShowPostSuccessModal(false);
+                    setCreatedPlanIdForSuccess(null);
+                    router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
+                  }
+                }}
+              >
+                <Text style={styles.editButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.postButton]}
+                onPress={() => {
+                  setShowPostSuccessModal(false);
+                  setShowShareToChatModal(true);
+                }}
+              >
+                <Text style={styles.postButtonText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.successModalClose} onPress={resetFormAndNavigate}>
+              <Ionicons name="close" size={24} color="#1C1C1E" />
+            </TouchableOpacity>
+          </SafeAreaView>
+        </GestureHandlerRootView>
+      </Modal>
+
+      <ShareToChatModal
+        visible={showShareToChatModal}
+        onClose={() => setShowShareToChatModal(false)}
+        postId={createdPlanIdForSuccess ?? ''}
+        postTitle={title}
+        postDescription={description}
+        postMedia={media.map((m) => ({ url: m.uri, type: m.type }))}
+        postTags={[selectedDay, selectedTime, selectedCategory].filter(Boolean)}
+        postCategorySub={selectedCategory ? [selectedCategory] : []}
+        postCategoryMain={selectedCategory}
+        postIsBusiness={false}
+        userId={user?.user_id ?? ''}
+        currentUserAvatar={currentUser?.profile_image ?? undefined}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -939,5 +1009,31 @@ const styles = StyleSheet.create({
   },
   previewCardWrapper: {
     marginBottom: 20,
+  },
+  successModalContainer: {
+    flex: 1,
+    backgroundColor: '#FFF',
+  },
+  successBottomBar: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingTop: 16,
+    backgroundColor: '#F2F2F7',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+  },
+  successModalClose: {
+    position: 'absolute',
+    top: 12,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E5E5EA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
