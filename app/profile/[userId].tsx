@@ -188,6 +188,14 @@ export default function OtherUserProfileScreen() {
     { key: 'x', icon: 'x', handle: socialMedia.x || socialMedia.twitter || 'Not added', url: (socialMedia.x || socialMedia.twitter) ? `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}` : null, isX: true },
   ];
 
+  // Business profile: link section entries (only show if user has added) – Google Drive, X, Snap, Instagram with colored icons
+  const businessLinkEntries: { key: string; icon: string; label: string; url: string | null; color: string }[] = [
+    ...(socialMedia.google_drive ? [{ key: 'google_drive', icon: 'document-text', label: 'Google Drive', url: socialMedia.google_drive.startsWith('http') ? socialMedia.google_drive : `https://drive.google.com/${socialMedia.google_drive}`, color: '#4285F4' }] : []),
+    ...((socialMedia.x || socialMedia.twitter) ? [{ key: 'x', icon: 'x', label: 'X', url: `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}`, color: '#000000' }] : []),
+    ...(socialMedia.snapchat ? [{ key: 'snapchat', icon: 'logo-snapchat', label: 'Snapchat', url: socialMedia.snapchat.startsWith('http') ? socialMedia.snapchat : `https://www.snapchat.com/add/${String(socialMedia.snapchat).replace(/^@/, '')}`, color: '#FFFC00' }] : []),
+    ...(instagramUrl ? [{ key: 'instagram', icon: 'logo-instagram', label: instagramId || 'Instagram', url: instagramUrl, color: '#E4405F' }] : []),
+  ];
+
   const copySocialLink = async (url: string, handle: string) => {
     await Clipboard.setStringAsync(url);
     Alert.alert('Copied!', `${handle} link copied to clipboard.`);
@@ -271,37 +279,35 @@ export default function OtherUserProfileScreen() {
           </View>
           {isBusinessProfile ? (
             <>
-              {/* Business: white card with rounded top – action buttons + Instagram + Previous Runs */}
-              <View key="business-content" style={styles.businessContentCard}>
-                {/* Two action buttons */}
-                <View style={styles.businessActionButtonsRow}>
-                  <TouchableOpacity
-                    style={styles.businessActionButton}
-                    onPress={() => instagramUrl && Linking.openURL(instagramUrl)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.businessActionButtonIconWrap}>
-                      <Ionicons name="link" size={20} color="#1C1C1E" />
-                    </View>
-                    <Text style={styles.businessActionButtonLabel} numberOfLines={1}>
-                      {viewedUser?.name?.split('.')[0] || 'Link'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.businessActionButton}
-                    onPress={() => instagramUrl && Linking.openURL(instagramUrl)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[styles.businessActionButtonIconWrap, styles.businessActionButtonIconPhotos]}>
-                      <Ionicons name="images" size={20} color="#1C1C1E" />
-                    </View>
-                    <Text style={styles.businessActionButtonLabel} numberOfLines={1}>
-                      Photos
-                    </Text>
-                  </TouchableOpacity>
+              {/* Business: link section (same UX as normal user – Google Drive, X, Snap, Instagram if added) */}
+              {businessLinkEntries.length > 0 && (
+                <View key="business-links" style={[styles.sectionCard, styles.socialCardFigma, { marginBottom: 16 }]}>
+                  {businessLinkEntries.map((entry, index) => (
+                    <React.Fragment key={entry.key}>
+                      {index > 0 && <View style={styles.hairlineDividerFigma} />}
+                      <TouchableOpacity
+                        style={styles.socialRow}
+                        onPress={() => entry.url && Linking.openURL(entry.url)}
+                        activeOpacity={entry.url ? 0.7 : 1}
+                        disabled={!entry.url}
+                      >
+                        {entry.key === 'x' ? (
+                          <Text style={styles.socialXIcon}>𝕏</Text>
+                        ) : (
+                          <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+                            <Ionicons name={entry.icon as any} size={24} color={entry.color} />
+                          </View>
+                        )}
+                        <Text style={[styles.socialHandle, !entry.url && styles.socialHandlePlaceholder]}>{entry.label}</Text>
+                      </TouchableOpacity>
+                    </React.Fragment>
+                  ))}
                 </View>
+              )}
 
-                {/* Instagram preview: logo + handle, inline WebView mini profile, then grid; tap opens full WebView modal */}
+              {/* Business: Instagram preview – same as before */}
+              <View key="business-content" style={styles.businessContentCard}>
+                {/* Instagram preview: logo + handle, inline WebView mini profile; tap opens full WebView modal */}
                 <View style={styles.businessInstaSection}>
                   <TouchableOpacity
                     style={styles.businessInstaHeader}
@@ -401,7 +407,7 @@ export default function OtherUserProfileScreen() {
                   </Modal>
                 )}
 
-                {/* Previous Runs – horizontal scroll */}
+                {/* Previous Runs – horizontal scroll; each card: image on top, white strip below with title + bio; tap -> business plan */}
                 <View style={styles.businessPreviousRunsSection}>
                   <View style={styles.businessPreviousRunsHeader}>
                     <Text style={styles.businessPreviousRunsTitle}>Previous Runs</Text>
@@ -428,7 +434,7 @@ export default function OtherUserProfileScreen() {
                         return (
                           <TouchableOpacity
                             key={planKey}
-                            style={[styles.businessPreviousRunCard, { width: recentPlanCardWidth }]}
+                            style={[styles.businessPreviousRunCardNew, { width: recentPlanCardWidth }]}
                             activeOpacity={0.95}
                             onPress={() =>
                               router.push({
@@ -437,24 +443,22 @@ export default function OtherUserProfileScreen() {
                               } as any)
                             }
                           >
-                            {hasImage ? (
-                              <Image
-                                source={{ uri: plan.media[0].url }}
-                                style={StyleSheet.absoluteFillObject}
-                                resizeMode="cover"
-                              />
-                            ) : (
-                              <View style={[StyleSheet.absoluteFillObject, styles.businessPreviousRunCardPlaceholder]} />
-                            )}
-                            <LinearGradient
-                              colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.85)']}
-                              style={styles.businessPreviousRunCardOverlay}
-                            />
-                            <View style={styles.businessPreviousRunCardContent}>
-                              <Text style={styles.businessPreviousRunCardTitle} numberOfLines={2}>
+                            <View style={styles.businessPreviousRunCardImageWrap}>
+                              {hasImage ? (
+                                <Image
+                                  source={{ uri: plan.media[0].url }}
+                                  style={styles.businessPreviousRunCardImage}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={[styles.businessPreviousRunCardImage, styles.businessPreviousRunCardPlaceholder]} />
+                              )}
+                            </View>
+                            <View style={styles.businessPreviousRunCardWhiteStrip}>
+                              <Text style={styles.businessPreviousRunCardTitleNew} numberOfLines={2}>
                                 {plan.title || 'Untitled Plan'}
                               </Text>
-                              <Text style={styles.businessPreviousRunCardDescription} numberOfLines={3}>
+                              <Text style={styles.businessPreviousRunCardDescriptionNew} numberOfLines={2}>
                                 {plan.description || 'No description'}
                               </Text>
                             </View>
@@ -1251,8 +1255,41 @@ const styles = StyleSheet.create({
     marginRight: 14,
     ...FIGMA_CARD_SHADOW,
   },
+  businessPreviousRunCardNew: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginRight: 14,
+    backgroundColor: '#FFF',
+    ...FIGMA_CARD_SHADOW,
+  },
+  businessPreviousRunCardImageWrap: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    overflow: 'hidden',
+  },
+  businessPreviousRunCardImage: {
+    width: '100%',
+    height: '100%',
+  },
   businessPreviousRunCardPlaceholder: {
     backgroundColor: '#2C2C2E',
+  },
+  businessPreviousRunCardWhiteStrip: {
+    backgroundColor: '#FFF',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingBottom: 14,
+  },
+  businessPreviousRunCardTitleNew: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  businessPreviousRunCardDescriptionNew: {
+    fontSize: 13,
+    color: '#3C3C43',
+    lineHeight: 18,
   },
   businessPreviousRunCardOverlay: {
     ...StyleSheet.absoluteFillObject,
