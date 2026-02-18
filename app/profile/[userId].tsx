@@ -188,8 +188,9 @@ export default function OtherUserProfileScreen() {
     { key: 'x', icon: 'x', handle: socialMedia.x || socialMedia.twitter || 'Not added', url: (socialMedia.x || socialMedia.twitter) ? `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}` : null, isX: true },
   ];
 
-  // Business profile: link section entries (only show if user has added) – Google Drive, X, Snap, Instagram with colored icons
+  // Business profile: link section entries – show all socials (Instagram, X, Snapchat, Google Drive) when added
   const businessLinkEntries: { key: string; icon: string; label: string; url: string | null; color: string }[] = [
+    ...(instagramUrl || instagramId ? [{ key: 'instagram', icon: 'logo-instagram', label: 'Instagram', url: instagramUrl || (instagramId ? `https://instagram.com/${instagramId}` : null), color: '#E4405F' }] : []),
     ...(socialMedia.google_drive ? [{ key: 'google_drive', icon: 'document-text', label: 'Google Drive', url: socialMedia.google_drive.startsWith('http') ? socialMedia.google_drive : `https://drive.google.com/${socialMedia.google_drive}`, color: '#4285F4' }] : []),
     ...((socialMedia.x || socialMedia.twitter) ? [{ key: 'x', icon: 'x', label: 'X', url: `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, '')}`, color: '#000000' }] : []),
     ...(socialMedia.snapchat ? [{ key: 'snapchat', icon: 'logo-snapchat', label: 'Snapchat', url: socialMedia.snapchat.startsWith('http') ? socialMedia.snapchat : `https://www.snapchat.com/add/${String(socialMedia.snapchat).replace(/^@/, '')}`, color: '#FFFC00' }] : []),

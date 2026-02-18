@@ -1213,9 +1213,9 @@ export default function CreateBusinessPostScreen() {
                         placeholderTextColor="#8E8E93"
                         editable={!isExistingTicket}
                       />
-                      {!editMode && (
+                      {(passes.length > 1) && (!editMode || !pass.isExisting) && (
                         <TouchableOpacity onPress={() => removePass(index)} style={styles.passRemoveButton}>
-                          <Ionicons name="close" size={20} color="#666" />
+                          <Ionicons name="trash-outline" size={20} color="#666" />
                         </TouchableOpacity>
                       )}
                     </View>

@@ -11,6 +11,7 @@ import {
   Alert,
   Modal,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,9 +51,6 @@ export default function EditProfileScreen() {
   }, [currentUser, user, dispatch]);
 
   const pickImage = async (source: 'camera' | 'gallery') => {
-    // Close modal first so the native picker can present (especially on iOS)
-    setShowPhotoModal(false);
-
     const runPicker = async () => {
       try {
         let result;
@@ -60,6 +58,7 @@ export default function EditProfileScreen() {
           const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
           if (!permissionResult.granted) {
             Alert.alert('Permission needed', 'Camera permission is required');
+            setShowPhotoModal(false);
             return;
           }
           result = await ImagePicker.launchCameraAsync({
@@ -71,6 +70,7 @@ export default function EditProfileScreen() {
           const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
           if (!permissionResult.granted) {
             Alert.alert('Permission needed', 'Photo library permission is required');
+            setShowPhotoModal(false);
             return;
           }
           result = await ImagePicker.launchImageLibraryAsync({
@@ -166,13 +166,17 @@ export default function EditProfileScreen() {
       } catch (error: any) {
         Alert.alert('Error', error.message || 'Failed to pick image');
         setUploading(false);
+        setShowPhotoModal(false);
       }
     };
 
-    // On iOS, present the native picker after the modal has fully dismissed to avoid presentation issues
     if (Platform.OS === 'ios') {
-      setTimeout(() => runPicker(), 500);
+      setShowPhotoModal(false);
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(() => runPicker(), 600);
+      });
     } else {
+      setShowPhotoModal(false);
       await runPicker();
     }
   };

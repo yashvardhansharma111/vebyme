@@ -112,7 +112,8 @@ export default function OverallAnalyticsScreen() {
 
   const eventTypeRows = data.per_event?.length
     ? data.per_event.slice(0, 6).map((ev, i) => {
-        const imageUrl = ev.media?.[0]?.url;
+        const mediaFirst = ev.media?.[0];
+        const imageUrl = typeof mediaFirst === 'string' ? mediaFirst : mediaFirst?.url;
         const dateStr = ev.created_at ? (() => {
           const d = new Date(ev.created_at);
           return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });

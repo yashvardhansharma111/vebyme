@@ -161,7 +161,7 @@ function PlanCardWithAnalytics({
           delayLongPress={400}
         >
           {hasImage ? (
-            <Image source={{ uri: plan.media![0].url }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
           ) : (
             <View style={[StyleSheet.absoluteFillObject, styles.planCardImagePlaceholder]} />
           )}
