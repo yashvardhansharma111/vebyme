@@ -23,6 +23,7 @@ interface NormalUserEventCardProps {
     media?: any[];
     category_main?: string;
     category_sub?: string[];
+    temporal_tags?: string[];
   } | null;
   interactions: Interaction[];
   created_at: string;
@@ -86,7 +87,8 @@ export default function NormalUserEventCard({
   const imageUrl = typeof mediaFirst === 'string' ? mediaFirst : mediaFirst?.url;
   const categoryMain = post?.category_main;
   const categorySub = post?.category_sub ?? [];
-  const tags = [...(categoryMain ? [categoryMain] : []), ...categorySub].slice(0, 3);
+  const temporalTags = post?.temporal_tags ?? [];
+  const tags = [...(categoryMain ? [categoryMain] : []), ...categorySub, ...temporalTags].slice(0, 5);
 
   const uniqueByUser = interactions.filter(
     (interaction, index, self) =>

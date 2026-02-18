@@ -277,6 +277,8 @@ export default function HomeScreen() {
             title: post.title || 'Untitled Post',
             description: post.description || 'No description',
             tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
+            category_sub: post.category_sub || [],
+            temporal_tags: post.temporal_tags || [],
             image: imageUrl,
             is_repost: post.is_repost || !!(post.repost_data),
             repost_data: post.repost_data || null,

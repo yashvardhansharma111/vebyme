@@ -240,6 +240,7 @@ export default function JoinModal({
                   returnKeyType="send"
                   onSubmitEditing={handleSendMessage}
                   autoFocus={true}
+                  textAlignVertical="center"
                 />
                 <TouchableOpacity
                   style={[
@@ -279,7 +280,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     alignItems: 'center',
-    paddingTop: 180,
+    paddingTop: 150,
   },
   cardSection: {
     flexShrink: 0,
@@ -429,9 +430,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     width: '100%',
     maxWidth: 360,
+    minHeight: 52,
   },
   input: {
     flex: 1,
+    minWidth: 0,
+    minHeight: 48,
     backgroundColor: '#FFF',
     borderRadius: 24,
     paddingVertical: 14,

@@ -59,13 +59,14 @@ const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
   'Social/Community': [],
 };
 
+// Icons match assets/icons/*.svg replaced by React icons: Map pin → location-outline, Ticket_alt → pricetag-outline, t-shirt → shirt-outline, etc. (see constants/assetIcons.ts)
 const ADDITIONAL_SETTINGS = [
-  { id: 'distance', label: 'Distance', icon: 'location', placeholder: 'e.g. 5k' },
-  { id: 'starting_point', label: 'Starting Point', icon: 'navigate', placeholder: 'e.g. Alienkind Indiranagar' },
-  { id: 'f&b', label: 'F&B', icon: 'restaurant', placeholder: 'e.g. Post Run Coffee' },
-  { id: 'dress_code', label: 'Dress Code', icon: 'shirt', placeholder: 'e.g. Cafe Joggers' },
-  { id: 'music_type', label: 'Music Type', icon: 'musical-notes', placeholder: 'e.g. Electronic' },
-  { id: 'links', label: 'Links', icon: 'link', placeholder: 'https://...' },
+  { id: 'distance', label: 'Distance', icon: 'location-outline', placeholder: 'e.g. 5k' },
+  { id: 'starting_point', label: 'Starting Point', icon: 'navigate-outline', placeholder: 'e.g. Alienkind Indiranagar' },
+  { id: 'f&b', label: 'F&B', icon: 'restaurant-outline', placeholder: 'e.g. Post Run Coffee' },
+  { id: 'dress_code', label: 'Dress Code', icon: 'shirt-outline', placeholder: 'e.g. Cafe Joggers' },
+  { id: 'music_type', label: 'Music Type', icon: 'musical-notes-outline', placeholder: 'e.g. Electronic' },
+  { id: 'links', label: 'Links', icon: 'link-outline', placeholder: 'https://...' },
   { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
 ];
 

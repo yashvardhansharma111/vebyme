@@ -43,11 +43,9 @@ function domainFromUrl(str: string): string | null {
 function isUrl(str: string): boolean {
   return /^https?:\/\/\S+/i.test(str.trim()) || /^[\w.-]+\.\w{2,}(\/.*)?$/i.test(str.trim());
 }
-// Hero takes top ~70%; text section starts from bottom 30%, overlaps image and slides up over it on scroll
-const HERO_HEIGHT = Math.max(280, SCREEN_HEIGHT * 0.7);
+// Hero image – white card starts exactly at bottom border of image (no gap, no overlap)
+const HERO_HEIGHT = Math.max(260, SCREEN_HEIGHT * 0.58);
 const HERO_OVERLAP = 24;
-/** How much the text sheet overlaps the hero so it visibly "comes out" over the image when scrolling */
-const TEXT_SHEET_OVERLAP = 80;
 const CONTENT_PADDING_H = 20;
 import GuestListModal from '@/components/GuestListModal';
 
@@ -104,6 +102,7 @@ export default function BusinessPlanDetailScreen() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [userHasTicket, setUserHasTicket] = useState<boolean | null>(null);
+  const [registering, setRegistering] = useState(false);
   const galleryScrollRef = useRef<ScrollView>(null);
   const heroScrollRef = useRef<ScrollView>(null);
   const screenWidth = Dimensions.get('window').width;
@@ -261,9 +260,11 @@ export default function BusinessPlanDetailScreen() {
       return;
     }
 
+    setRegistering(true);
     try {
       const alreadyRegistered = await apiService.hasTicketForPlan(planId, user.user_id);
       if (alreadyRegistered) {
+        setUserHasTicket(true);
         Alert.alert(
           'Already Registered',
           "You are already registered for this event. You can check your pass from your profile."
@@ -276,19 +277,17 @@ export default function BusinessPlanDetailScreen() {
         user.user_id,
         selectedPass || undefined
       );
-      
-      console.log('Registration response:', response);
-      
+
       if (response.success && response.data?.ticket) {
-        // Navigate to ticket display screen with ticket data
+        setUserHasTicket(true);
         const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
         router.push({
           pathname: '/ticket/[ticketId]',
-          params: { 
+          params: {
             ticketId: response.data.ticket.ticket_id,
             planId: planId,
-            ticketData: ticketData
-          }
+            ticketData: ticketData,
+          },
         } as any);
       } else {
         console.error('Registration response missing ticket:', response);
@@ -297,6 +296,8 @@ export default function BusinessPlanDetailScreen() {
     } catch (error: any) {
       console.error('Registration error:', error);
       Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+    } finally {
+      setRegistering(false);
     }
   };
 
@@ -348,6 +349,8 @@ export default function BusinessPlanDetailScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Full-screen blur white background (replaces solid black) */}
+      <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
       {/* HERO – fixed to screen */}
       <View
         style={[
@@ -399,25 +402,30 @@ export default function BusinessPlanDetailScreen() {
           />
       </View>
 
-      {/* ScrollView only for white card */}
+      {/* ScrollView – white card starts exactly where image ends (no gap) */}
       <ScrollView
-        style={{ flex: 1 }}
+        style={[styles.scrollBelowHero, { flex: 1 }]}
         contentContainerStyle={{
-          paddingTop: HERO_HEIGHT - TEXT_SHEET_OVERLAP,
+          paddingTop: HERO_HEIGHT,
           paddingBottom: 100,
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* WHITE CARD */}
+        {/* WHITE CARD – top edge on image bottom border; 5px horizontal margin; only top corners rounded */}
         <View
           style={[
             styles.contentOverlay,
             styles.contentOverlayShadow,
             {
-              paddingTop: TEXT_SHEET_OVERLAP + 16,
-              paddingHorizontal: CONTENT_PADDING_H + 8,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
+              marginHorizontal: 5,
+              paddingTop: 20,
+              paddingHorizontal: CONTENT_PADDING_H,
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              borderWidth: 0,
+              borderColor: 'transparent',
               backgroundColor: '#FFF',
             },
           ]}
@@ -543,8 +551,16 @@ export default function BusinessPlanDetailScreen() {
           </TouchableOpacity>
         )}
         {userHasTicket !== true && !isOwnEvent && (
-          <TouchableOpacity style={styles.bottomBarButton} onPress={handleRegister}>
-            <Text style={styles.registerButtonText}>Register</Text>
+          <TouchableOpacity
+            style={[styles.bottomBarButton, registering && styles.registerButtonGreyed]}
+            onPress={handleRegister}
+            disabled={registering}
+          >
+            {registering ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Text style={styles.registerButtonText}>Register</Text>
+            )}
           </TouchableOpacity>
         )}
         {userHasTicket !== true && isOwnEvent && (
@@ -704,14 +720,15 @@ const styles = StyleSheet.create({
   heroWrap: {
     width: SCREEN_WIDTH,
     overflow: 'hidden',
-    zIndex: 0,
-    elevation: 0,
+    zIndex: 10,
+    elevation: 10,
   },
   heroImage: {
     position: 'absolute',
     top: 0,
     left: 0,
     width: SCREEN_WIDTH,
+    backgroundColor: 'transparent',
   },
   heroScroll: {
     flex: 1,
@@ -868,11 +885,21 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 1,
   },
+  scrollBelowHero: {
+    backgroundColor: 'transparent',
+    zIndex: 11,
+    elevation: 11,
+  },
   contentOverlay: {
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
     minHeight: SCREEN_HEIGHT * 0.3,
+    overflow: 'hidden',
   },
   contentOverlayShadow: {
     shadowColor: '#000',
@@ -884,7 +911,7 @@ const styles = StyleSheet.create({
   contentOverlayInner: {
     backgroundColor: 'transparent',
     paddingHorizontal: 8,
-    paddingTop: 12,
+    paddingTop: 2,
   },
   venueDateCard: {
     backgroundColor: '#F2F2F7',

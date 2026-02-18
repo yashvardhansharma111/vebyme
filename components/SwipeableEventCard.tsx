@@ -9,11 +9,11 @@ import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
 import Avatar from './Avatar';
 
-// Merge tags + category_sub so all selected tags are visible (same as post creation)
+// Merge tags + category_sub + temporal_tags (day/time) so all selected tags are visible (same as post creation)
 function getAllEventTags(event: any): string[] {
   const from = (v: any) => (Array.isArray(v) ? v : v ? [String(v)] : []);
   const seen = new Set<string>();
-  [...from(event.tags), ...from(event.category_sub)].forEach((t) => {
+  [...from(event.tags), ...from(event.category_sub), ...from(event.temporal_tags)].forEach((t) => {
     const s = (t || '').trim();
     if (s) seen.add(s);
   });
