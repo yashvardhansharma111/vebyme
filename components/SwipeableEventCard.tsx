@@ -10,7 +10,7 @@ import { apiService } from '@/services/api';
 import { fontTitle, fontBody } from '@/constants/theme';
 import Avatar from './Avatar';
 
-// Merge tags + category_sub + temporal_tags (day/time) so all selected tags are visible (same as post creation)
+// Merge tags + category_sub + temporal_tags (for repost/embedded card)
 function getAllEventTags(event: any): string[] {
   const from = (v: any) => (Array.isArray(v) ? v : v ? [String(v)] : []);
   const seen = new Set<string>();
@@ -21,9 +21,36 @@ function getAllEventTags(event: any): string[] {
   return Array.from(seen);
 }
 
+const DAY_TIME_TAGS = ['Today', 'Tomorrow', 'Weekend', 'Morning', 'Evening', 'Night'];
+
+// First row: category only (category_main or first category_sub, or first non–day/time tag)
+function getCategoryTags(event: any): string[] {
+  const main = (event?.category_main || '').trim();
+  if (main) return [main];
+  const sub = event?.category_sub;
+  if (Array.isArray(sub) && sub.length > 0 && sub[0]) return [String(sub[0]).trim()].filter(Boolean);
+  const tags = event?.tags;
+  if (Array.isArray(tags)) {
+    const firstNonDayTime = tags.find((t: string) => !DAY_TIME_TAGS.includes(String(t).trim()));
+    if (firstNonDayTime) return [String(firstNonDayTime).trim()];
+  }
+  return [];
+}
+
+// Second row: day and time (temporal_tags)
+function getDayTimeTags(event: any): string[] {
+  const t = event?.temporal_tags;
+  if (Array.isArray(t) && t.length > 0) return t.map((x: any) => String(x).trim()).filter(Boolean);
+  const tags = event?.tags;
+  if (Array.isArray(tags)) return tags.filter((tag: string) => DAY_TIME_TAGS.includes(tag));
+  return [];
+}
+
 // --- The Base Event Card ---
 function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSharePress, onImagePress, onInteractedPillPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false, hideFooterActions = false, hideTags = false }: any) {
   const allTags = hideTags ? [] : getAllEventTags(event);
+  const categoryTags = hideTags ? [] : getCategoryTags(event);
+  const dayTimeTags = hideTags ? [] : getDayTimeTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
   const interactedUsers = event?.interacted_users || [];
   const interactionCount = event?.interaction_count ?? 0;
@@ -134,14 +161,28 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
               <Text style={styles.title}>{event.title}</Text>
               <Text style={styles.description} numberOfLines={4}>{event.description}</Text>
               <View style={styles.middleRow}>
-                {!hideTags && (
-                <View style={styles.tagsContainer}>
-                  {allTags.map((tag: string, index: number) => (
-                    <View key={index} style={styles.tag}>
-                      <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'checkbox'} size={12} color="#555" style={{ marginRight: 4 }} />
-                      <Text style={styles.tagText}>{tag}</Text>
+                {!hideTags && (categoryTags.length > 0 || dayTimeTags.length > 0) && (
+                <View style={styles.tagsColumn}>
+                  {categoryTags.length > 0 && (
+                    <View style={styles.tagsContainer}>
+                      {categoryTags.map((tag: string, index: number) => (
+                        <View key={`cat-${index}`} style={styles.tag}>
+                          <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'pricetag'} size={14} color="#555" style={{ marginRight: 6 }} />
+                          <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
+                  )}
+                  {dayTimeTags.length > 0 && (
+                    <View style={[styles.tagsContainer, styles.tagsContainerSecondRow]}>
+                      {dayTimeTags.map((tag: string, index: number) => (
+                        <View key={`dt-${index}`} style={styles.tag}>
+                          <Ionicons name="time-outline" size={14} color="#555" style={{ marginRight: 6 }} />
+                          <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
                 )}
                 {hasEventImage ? (
@@ -486,8 +527,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  userName: { fontSize: 14, fontWeight: '700', fontFamily: fontTitle, color: '#1C1C1E' },
-  userTime: { fontSize: 11, fontFamily: fontBody, color: '#8E8E93' },
+  userName: { fontSize: 16, fontWeight: '700', fontFamily: fontTitle, color: '#1C1C1E' },
+  userTime: { fontSize: 13, fontFamily: fontBody, color: '#8E8E93' },
   interactedPillPositioned: {
     position: 'absolute',
     top: -6,
@@ -698,12 +739,14 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: '500',
   },
-  title: { fontSize: 18, fontWeight: '800', fontFamily: fontTitle, color: '#1C1C1E', marginBottom: 8 },
-  description: { fontSize: 14, fontFamily: fontBody, color: '#444', lineHeight: 20, marginBottom: 16 },
+  title: { fontSize: 20, fontWeight: '800', fontFamily: fontTitle, color: '#1C1C1E', marginBottom: 8 },
+  description: { fontSize: 16, fontFamily: fontBody, color: '#444', lineHeight: 22, marginBottom: 16 },
   middleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  tagsContainer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  tagText: { fontSize: 12, fontWeight: '600', fontFamily: fontBody, color: '#333' },
+  tagsColumn: { flex: 1, flexDirection: 'column', gap: 8 },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagsContainerSecondRow: { marginTop: 0 },
+  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
+  tagText: { fontSize: 16, fontWeight: '600', fontFamily: fontBody, color: '#333' },
   eventImage: { width: 96, height: 96, borderRadius: 12, marginLeft: 12 },
   eventImagePlaceholder: {
     backgroundColor: '#E5E5EA',
@@ -726,7 +769,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16, fontFamily: fontTitle },
+  joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 17, fontFamily: fontTitle },
   joinButtonDisabled: {
     backgroundColor: '#C7C7CC',
     opacity: 0.9,

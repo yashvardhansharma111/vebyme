@@ -86,6 +86,7 @@ export default function CreatePostScreen() {
   const [createdPlanIdForSuccess, setCreatedPlanIdForSuccess] = useState<string | null>(null);
   const [showShareToChatModal, setShowShareToChatModal] = useState(false);
   const openedFromMyPlansRef = useRef(false);
+  const openedEditFromSuccessRef = useRef(false);
   const insets = useSafeAreaInsets();
 
   const descriptionWordCount = wordCount(description);
@@ -356,7 +357,10 @@ export default function CreatePostScreen() {
                 setShowPreview(false);
                 setEditMode(false);
                 setPlanId(null);
-                if (openedFromMyPlansRef.current) {
+                if (openedEditFromSuccessRef.current) {
+                  openedEditFromSuccessRef.current = false;
+                  router.replace('/(tabs)' as any);
+                } else if (openedFromMyPlansRef.current) {
                   router.replace('/profile/your-plans');
                 } else {
                   router.back();
@@ -440,7 +444,10 @@ export default function CreatePostScreen() {
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => {
-                if (editMode || openedFromMyPlansRef.current) {
+                if (openedEditFromSuccessRef.current) {
+                  openedEditFromSuccessRef.current = false;
+                  router.replace('/(tabs)' as any);
+                } else if (editMode || openedFromMyPlansRef.current) {
                   router.replace('/profile/your-plans');
                 } else {
                   router.back();
@@ -450,7 +457,7 @@ export default function CreatePostScreen() {
             >
               <Ionicons name="close" size={24} color="#000" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{editMode ? 'Edit Post' : 'New Post'}</Text>
+            <Text style={styles.headerTitle}>{editMode ? 'Edit Plan' : 'New Post'}</Text>
             <View style={{ width: 24 }} />
           </View>
 
@@ -691,8 +698,9 @@ export default function CreatePostScreen() {
                   onPress={() => {
                     if (createdPlanIdForSuccess) {
                       setShowPostSuccessModal(false);
-                      setCreatedPlanIdForSuccess(null);
-                      router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
+                      setPlanId(createdPlanIdForSuccess);
+                      setEditMode(true);
+                      openedEditFromSuccessRef.current = true;
                     }
                   }}
                 >
