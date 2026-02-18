@@ -1,5 +1,6 @@
 import BusinessCard from '@/components/BusinessCard';
 import { apiService } from '@/services/api';
+import { fontTitle, fontBody } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -369,8 +370,8 @@ export default function BusinessPostsScreen() {
                     <BusinessCard
                       containerStyle={styles.businessCardInListInner}
                       pillsAboveCard
+                      hideCardShadow
                       compactVerticalPadding
-                      fillHeight
                       descriptionNumberOfLines={2}
                       plan={{
                         plan_id: effectivePlanId,
@@ -485,16 +486,17 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+    zIndex: 0,
   },
   businessCardWrapper: {
-    width: Dimensions.get('window').width - 40,
-    height: Dimensions.get('window').height * 0.59,
+    width: Dimensions.get('window').width - 48,
     marginHorizontal: 20,
     marginBottom: 16,
+    alignSelf: 'center',
+    zIndex: 10,
   },
   businessCardInListInner: {
     width: '100%',
-    height: '100%',
   },
   businessCardInList: {
     marginBottom: 8,
@@ -502,10 +504,13 @@ const styles = StyleSheet.create({
   feed: {
     paddingTop: 12,
     paddingBottom: 12,
+    alignItems: 'center',
+    zIndex: 1,
   },
   safeArea: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    zIndex: 1,
   },
   headerWithFilters: {
     flexDirection: 'row',
@@ -533,6 +538,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#000000',
   },
   placeholder: {
@@ -552,9 +558,9 @@ const styles = StyleSheet.create({
     flex: 1, marginBottom: 16 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
-  activeFilterText: { color: '#FFF', fontWeight: '600' },
+  activeFilterText: { color: '#FFF', fontWeight: '600', fontFamily: fontBody },
   filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
-  filterText: { color: '#1C1C1E', fontWeight: '600' },
+  filterText: { color: '#1C1C1E', fontWeight: '600', fontFamily: fontBody },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
@@ -563,6 +569,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
+    fontFamily: fontBody,
     color: '#666',
   },
   errorContainer: {
@@ -572,6 +579,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
+    fontFamily: fontBody,
     color: '#FF3B30',
     textAlign: 'center',
     marginBottom: 16,
@@ -586,6 +594,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '600',
     fontSize: 14,
+    fontFamily: fontBody,
   },
   emptyContainer: {
     padding: 40,
@@ -595,6 +604,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: fontBody,
     color: '#666',
     marginBottom: 8,
   },
@@ -608,6 +618,7 @@ const styles = StyleSheet.create({
   createPlanCtaText: {
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#FFF',
   },
   emptySubtext: {

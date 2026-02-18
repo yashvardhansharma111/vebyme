@@ -3,6 +3,13 @@ import { StatusBar } from 'expo-status-bar';
 import { Provider } from 'react-redux';
 import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator, StyleSheet, Linking } from 'react-native';
+import { useFonts } from '@expo-google-fonts/figtree/useFonts';
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from '@expo-google-fonts/figtree';
 import 'react-native-reanimated';
 
 import { store } from '@/store/store';
@@ -82,6 +89,21 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </View>
+    );
+  }
+
   return (
     <Provider store={store}>
       <SnackbarProvider>

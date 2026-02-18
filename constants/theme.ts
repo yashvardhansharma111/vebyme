@@ -60,6 +60,13 @@ export const Fonts = Platform.select({
   },
 });
 
+/** Title font – use for headings, card titles, etc. (loaded from @expo-google-fonts/figtree) */
+export const fontTitle = 'Figtree_600SemiBold';
+/** Title font bold */
+export const fontTitleBold = 'Figtree_700Bold';
+/** Body font – use for descriptions, labels, body text. Add Gilroy .ttf to assets/fonts and load in app _layout for full support. */
+export const fontBody = 'Gilroy';
+
 // Border radius constants for rounded corners
 export const borderRadius = {
   sm: 8,

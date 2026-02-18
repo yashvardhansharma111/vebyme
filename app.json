@@ -68,7 +68,8 @@
           "savePhotosPermission": "Allow $(PRODUCT_NAME) to save the ticket to your photos.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

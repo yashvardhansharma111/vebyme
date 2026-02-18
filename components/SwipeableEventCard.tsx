@@ -7,6 +7,7 @@ import { useAppSelector } from '@/store/hooks';
 import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from './JoinModal';
 import ShareToChatModal from './ShareToChatModal';
 import { apiService } from '@/services/api';
+import { fontTitle, fontBody } from '@/constants/theme';
 import Avatar from './Avatar';
 
 // Merge tags + category_sub + temporal_tags (day/time) so all selected tags are visible (same as post creation)
@@ -454,6 +455,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: fontBody,
     color: '#1C1C1E',
   },
   cardWrapper: {
@@ -484,8 +486,8 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  userName: { fontSize: 14, fontWeight: '700', color: '#1C1C1E' },
-  userTime: { fontSize: 11, color: '#8E8E93' },
+  userName: { fontSize: 14, fontWeight: '700', fontFamily: fontTitle, color: '#1C1C1E' },
+  userTime: { fontSize: 11, fontFamily: fontBody, color: '#8E8E93' },
   interactedPillPositioned: {
     position: 'absolute',
     top: -6,
@@ -530,11 +532,13 @@ const styles = StyleSheet.create({
   repostTitle: {
     fontSize: 22,
     fontWeight: '800',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 8,
   },
   repostDescription: {
     fontSize: 15,
+    fontFamily: fontBody,
     color: '#444',
     lineHeight: 22,
     marginBottom: 14,
@@ -592,6 +596,7 @@ const styles = StyleSheet.create({
   },
   embeddedDescription: {
     fontSize: 14,
+    fontFamily: fontBody,
     color: 'rgba(255,255,255,0.95)',
     lineHeight: 20,
     marginBottom: 10,
@@ -693,12 +698,12 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontWeight: '500',
   },
-  title: { fontSize: 18, fontWeight: '800', color: '#1C1C1E', marginBottom: 8 },
-  description: { fontSize: 14, color: '#444', lineHeight: 20, marginBottom: 16 },
+  title: { fontSize: 18, fontWeight: '800', fontFamily: fontTitle, color: '#1C1C1E', marginBottom: 8 },
+  description: { fontSize: 14, fontFamily: fontBody, color: '#444', lineHeight: 20, marginBottom: 16 },
   middleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   tagsContainer: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
-  tagText: { fontSize: 12, fontWeight: '600', color: '#333' },
+  tagText: { fontSize: 12, fontWeight: '600', fontFamily: fontBody, color: '#333' },
   eventImage: { width: 96, height: 96, borderRadius: 12, marginLeft: 12 },
   eventImagePlaceholder: {
     backgroundColor: '#E5E5EA',
@@ -721,7 +726,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+  joinButtonText: { color: '#FFF', fontWeight: '700', fontSize: 16, fontFamily: fontTitle },
   joinButtonDisabled: {
     backgroundColor: '#C7C7CC',
     opacity: 0.9,
@@ -762,6 +767,7 @@ const styles = StyleSheet.create({
   joinedListTitle: {
     fontSize: 18,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 16,
   },

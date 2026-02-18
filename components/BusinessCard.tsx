@@ -13,6 +13,7 @@ const TEXT_INSET = 7;
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import { apiService, getWebBaseUrl } from '@/services/api';
+import { fontTitle, fontBody } from '@/constants/theme';
 import Avatar from './Avatar';
 import GuestListModal from './GuestListModal';
 
@@ -75,6 +76,8 @@ interface BusinessCardProps {
   compactVerticalPadding?: boolean;
   /** Max lines for description (default 4). Use 2 for business plans list. */
   descriptionNumberOfLines?: number;
+  /** When true, no shadow on the card (e.g. business-posts list) */
+  hideCardShadow?: boolean;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -98,7 +101,8 @@ function BusinessCardBase({
   fillHeight = false,
   compactVerticalPadding = false,
   descriptionNumberOfLines = 4,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean; descriptionNumberOfLines?: number }) {
+  hideCardShadow = false,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean; descriptionNumberOfLines?: number; hideCardShadow?: boolean }) {
   const router = useRouter();
   const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
@@ -193,7 +197,7 @@ function BusinessCardBase({
         activeOpacity={0.98}
       >
         {/* 1. Image top 70% – when pillsAboveCard, marginTop leaves room for pills above */}
-        <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove]}>
+        <View style={[styles.cardInner, pillsAboveCard && styles.cardInnerWithPillsAbove, hideCardShadow && styles.cardInnerNoShadow]}>
         <View style={styles.imageSection}>
           {mainImage ? (
             <TouchableOpacity
@@ -418,6 +422,7 @@ export default function BusinessCard({
   fillHeight = false,
   compactVerticalPadding = false,
   descriptionNumberOfLines = 4,
+  hideCardShadow = false,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -515,6 +520,7 @@ export default function BusinessCard({
           fillHeight={fillHeight}
           compactVerticalPadding={compactVerticalPadding}
           descriptionNumberOfLines={descriptionNumberOfLines}
+          hideCardShadow={hideCardShadow}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -559,6 +565,7 @@ export default function BusinessCard({
           fillHeight={fillHeight}
           compactVerticalPadding={compactVerticalPadding}
           descriptionNumberOfLines={descriptionNumberOfLines}
+          hideCardShadow={hideCardShadow}
         />
       </Swipeable>
       <GuestListModal
@@ -582,7 +589,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   cardWrapper: {
-    marginHorizontal: 16,
+    marginHorizontal: 1,
     marginBottom: 16,
     height: CARD_FIXED_HEIGHT,
     position: 'relative',
@@ -616,6 +623,13 @@ const styles = StyleSheet.create({
   },
   cardInnerWithPillsAbove: {
     marginTop: 44,
+  },
+  cardInnerNoShadow: {
+    shadowColor: 'transparent',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
   },
   imageSection: {
     width: '100%',
@@ -670,7 +684,7 @@ const styles = StyleSheet.create({
   organizerPill: {
     position: 'absolute',
     top: -20,
-    left: 4,
+    left: 10,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -688,7 +702,7 @@ const styles = StyleSheet.create({
   },
   organizerPillAbove: {
     top: 16,
-    left: -6,
+    left: 0,
     backgroundColor: '#FFF',
   },
   interactedPillAbove: {
@@ -709,10 +723,12 @@ const styles = StyleSheet.create({
   organizerName: {
     fontSize: 14,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
   },
   organizerTime: {
     fontSize: 11,
+    fontFamily: fontBody,
     color: '#8E8E93',
   },
   interactedPillOnImage: {
@@ -752,11 +768,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 4,
   },
   description: {
     fontSize: 14,
+    fontFamily: fontBody,
     color: '#3C3C43',
     lineHeight: 20,
     marginBottom: 8,
@@ -788,6 +806,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 13,
     fontWeight: '500',
+    fontFamily: fontBody,
     color: '#1C1C1E',
   },
   footer: {
@@ -817,6 +836,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontWeight: '700',
     fontSize: 16,
+    fontFamily: fontTitle,
   },
   registerButtonGreyed: {
     backgroundColor: '#C5C5D0',
@@ -855,6 +875,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: fontBody,
     color: '#1C1C1E',
   },
   galleryOverlay: {

@@ -26,6 +26,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import Avatar from '@/components/Avatar';
 import ShareToChatModal from '@/components/ShareToChatModal';
+import { fontTitle, fontBody } from '@/constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -792,10 +793,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   backButtonCircle: {
     width: 40,
@@ -837,10 +838,10 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     maxWidth: 200,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
   },
   organizerPillCenter: {
     flexDirection: 'row',
@@ -943,11 +944,13 @@ const styles = StyleSheet.create({
   venueDateTitle: {
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     textAlign: 'left',
   },
   venueDateSubtitle: {
     fontSize: 12,
+    fontFamily: fontBody,
     color: '#6B7280',
     marginTop: 2,
     textAlign: 'left',
@@ -970,6 +973,7 @@ const styles = StyleSheet.create({
   categoryPillHeading: {
     fontSize: 12,
     fontWeight: '700',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 4,
     textAlign: 'center',
@@ -977,6 +981,7 @@ const styles = StyleSheet.create({
   categoryPillValue: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: fontBody,
     color: '#6B7280',
     lineHeight: 18,
     textAlign: 'center',
@@ -1068,11 +1073,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: '800',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 10,
   },
   description: {
     fontSize: 14,
+    fontFamily: fontBody,
     color: '#444',
     lineHeight: 21,
     marginBottom: 20,
@@ -1114,6 +1121,7 @@ const styles = StyleSheet.create({
   ticketsTitle: {
     fontSize: 18,
     fontWeight: '800',
+    fontFamily: fontTitle,
     color: '#1C1C1E',
     marginBottom: 14,
   },
@@ -1178,6 +1186,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '700',
+    fontFamily: fontTitle,
   },
   registerButtonTextGreyed: {
     color: '#8E8E93',
@@ -1190,6 +1199,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     paddingHorizontal: CONTENT_PADDING_H,
     paddingTop: 12,
+    zIndex: 50,
+    elevation: 50,
   },
   bottomBarButton: {
     backgroundColor: '#1C1C1E',

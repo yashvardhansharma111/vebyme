@@ -512,6 +512,7 @@ export default function HomeScreen() {
                           isSwipeable={false}
                           containerStyle={styles.businessHorizontalCardInner}
                           fillHeight={true}
+                          descriptionNumberOfLines={2}
                           showArrowButton={true}
                           onArrowPress={() => router.push({ pathname: '/business-posts', params: { filter: activeFilter ?? '' } } as any)}
                           onPress={() => {
