@@ -13,7 +13,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
@@ -109,6 +109,7 @@ export default function OtherUserProfileScreen() {
   const profileImageUri = resolveProfileImageUri(viewedUser?.profile_image ?? undefined);
   const showProfileImage = !!profileImageUri && !profileImageError;
 
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const topSectionHeight = screenHeight * 0.5;
   const overlapPx = Math.round(topSectionHeight * 0.05);
@@ -193,33 +194,56 @@ export default function OtherUserProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* 1. Top section: profile image only (no blur) */}
-        <View key="top-section" style={[styles.topSection, { height: topSectionHeight }]}>
-          {showProfileImage ? (
-            <Image
-              source={{ uri: profileImageUri! }}
-              style={styles.profileBackgroundImage}
-              resizeMode="cover"
-              onError={() => setProfileImageError(true)}
-            />
-          ) : (
-            <View style={styles.profileBackgroundPlaceholder} />
-          )}
+    <View style={styles.container}>
+      {/* 1. Hero – fixed; image only (stays when scrolling) */}
+      <View
+        key="top-section"
+        style={[
+          styles.heroWrap,
+          {
+            height: topSectionHeight,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        {showProfileImage ? (
+          <Image
+            source={{ uri: profileImageUri! }}
+            style={styles.profileBackgroundImage}
+            resizeMode="cover"
+            onError={() => setProfileImageError(true)}
+          />
+        ) : (
+          <View style={styles.profileBackgroundPlaceholder} />
+        )}
+      </View>
 
-          {/* Back button */}
-          <TouchableOpacity
-            style={styles.backButtonFigma}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <BlurView intensity={24} tint="light" style={StyleSheet.absoluteFill} />
-            <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
-          </TouchableOpacity>
-        </View>
+      {/* Back button – fixed overlay (stays when scrolling) */}
+      <View style={[styles.stickyBackOverlay, { paddingTop: insets.top + 12 }]} pointerEvents="box-none">
+        <TouchableOpacity
+          style={styles.backButtonFigma}
+          onPress={() => router.back()}
+          activeOpacity={0.8}
+        >
+          <BlurView intensity={24} tint="light" style={StyleSheet.absoluteFill} />
+          <Ionicons name="chevron-back" size={24} color="#1C1C1E" />
+        </TouchableOpacity>
+      </View>
 
-        {/* 2. Bottom section: curved top, overlaps image by 5%; name + bio in text section */}
+      {/* 2. ScrollView – text section scrolls over the image */}
+      <ScrollView
+        style={styles.scrollBelowHero}
+        contentContainerStyle={{
+          paddingTop: topSectionHeight,
+          paddingBottom: 40,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Bottom section: curved top, overlaps image; name + bio + cards */}
         <View
           key="bottom-section"
           style={[
@@ -689,7 +713,7 @@ export default function OtherUserProfileScreen() {
           <View key="bottom-spacer" style={{ height: 40 }} />
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -707,6 +731,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f3f3f3',
   },
+  heroWrap: {
+    width: '100%',
+    overflow: 'hidden',
+    zIndex: 10,
+    elevation: 10,
+  },
   topSection: {
     width: '100%',
     position: 'relative',
@@ -719,18 +749,29 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#4A3B69',
   },
-  backButtonFigma: {
+  stickyBackOverlay: {
     position: 'absolute',
-    top: 21,
-    left: 20,
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 20,
+  },
+  backButtonFigma: {
     width: 48,
     height: 48,
     borderRadius: 100,
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
     ...FIGMA_CARD_SHADOW,
+  },
+  scrollBelowHero: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    zIndex: 11,
+    elevation: 11,
   },
   profileTextSection: {
     alignSelf: 'stretch',
