@@ -168,6 +168,7 @@ export default function CreateBusinessPostScreen() {
     isEditFlowRef.current = false;
   }, []);
 
+  // Do not reset form when screen gains focus with no saved draft – avoids clearing user input when they open Create Plan at start or return to the screen
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -175,10 +176,10 @@ export default function CreateBusinessPostScreen() {
         if (cancelled) return;
         if (planDataStr) return;
         if (isEditFlowRef.current) return;
-        resetForm();
+        // Previously we called resetForm() here, which cleared the form (including start time) every time the screen was focused without a draft. Removed so the plan is not cancelled/cleared when the user opens the screen.
       });
       return () => { cancelled = true; };
-    }, [resetForm])
+    }, [])
   );
 
   useEffect(() => {
@@ -1560,6 +1561,7 @@ export default function CreateBusinessPostScreen() {
                 if (!createdPlanIdForSuccess) return;
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
+                resetForm();
                 router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
               }}
             >
@@ -1570,6 +1572,7 @@ export default function CreateBusinessPostScreen() {
               onPress={() => {
                 setShowPostSuccessModal(false);
                 setShowShareToChatModal(true);
+                resetForm();
               }}
             >
               <Text style={styles.postButtonText}>Share</Text>
@@ -1580,6 +1583,7 @@ export default function CreateBusinessPostScreen() {
             onPress={() => {
               setShowPostSuccessModal(false);
               setCreatedPlanIdForSuccess(null);
+              resetForm();
               if (openedFromMyPlansRef.current) {
                 router.replace('/profile/your-plans');
               } else {

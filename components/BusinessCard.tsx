@@ -73,6 +73,8 @@ interface BusinessCardProps {
   fillHeight?: boolean;
   /** When true, reduce vertical padding/margin (e.g. business-posts list) */
   compactVerticalPadding?: boolean;
+  /** Max lines for description (default 4). Use 2 for business plans list. */
+  descriptionNumberOfLines?: number;
 }
 
 // Base Business Card – "Happening near me": image behind, white content panel overlay on bottom, user pill on top-left border
@@ -95,7 +97,8 @@ function BusinessCardBase({
   pillsAboveCard = false,
   fillHeight = false,
   compactVerticalPadding = false,
-}: Omit<BusinessCardProps, 'isSwipeable'> & { onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean }) {
+  descriptionNumberOfLines = 4,
+}: Omit<BusinessCardProps, 'isSwipeable'> & { onSharePress?: () => void; onGuestListPress?: () => void; interactedUsers?: Array<{ id: string; avatar?: string | null }>; hideActions?: boolean; hideRegisterButton?: boolean; registerButtonGreyed?: boolean; pillsAboveCard?: boolean; fillHeight?: boolean; compactVerticalPadding?: boolean; descriptionNumberOfLines?: number }) {
   const router = useRouter();
   const planMedia = plan.media && plan.media.length > 0 ? plan.media : [];
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
@@ -117,12 +120,14 @@ function BusinessCardBase({
   const distanceLabel = detailByType('distance')?.title || detailByType('distance')?.description;
   const fbLabel = detailByType('f&b')?.title || detailByType('f&b')?.description;
   const locationLabel = plan.location_text?.trim();
-  // Event tags: price, distance, F&B, location; category_main, category_sub; then temporal (day/time)
-  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location' | 'category' | 'temporal'; label: string }[] = [];
+  // Tags order: Amount, Additional settings (add_details), Category
+  const cardTags: { type: 'price' | 'distance' | 'fb' | 'location' | 'category' | 'temporal' | 'additional'; label: string }[] = [];
   if (firstTicketPrice != null && firstTicketPrice > 0) cardTags.push({ type: 'price', label: `₹${firstTicketPrice}` });
-  if (distanceLabel) cardTags.push({ type: 'distance', label: distanceLabel });
-  if (fbLabel) cardTags.push({ type: 'fb', label: fbLabel });
-  if (locationLabel) cardTags.push({ type: 'location', label: locationLabel });
+  else if (firstTicketPrice === 0 || (passes.length > 0 && firstTicketPrice == null)) cardTags.push({ type: 'price', label: 'Free' });
+  addDetails.forEach((d) => {
+    const label = d.title || d.description || d.detail_type;
+    if (label && String(label).trim()) cardTags.push({ type: 'additional', label: String(label).trim() });
+  });
   if (plan.category_main) cardTags.push({ type: 'category', label: plan.category_main });
   if (plan.category_sub?.length) {
     for (const sub of plan.category_sub) {
@@ -134,7 +139,7 @@ function BusinessCardBase({
       if (t) cardTags.push({ type: 'temporal', label: t });
     }
   }
-  const tagsToShow = cardTags.slice(0, 8);
+  const tagsToShow = cardTags.slice(0, 10);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = async () => {
@@ -215,7 +220,7 @@ function BusinessCardBase({
         <View style={styles.textBottom} pointerEvents="box-none">
           <View style={styles.textBottomInner}>
             <Text style={styles.title}>{plan.title}</Text>
-            <Text style={styles.description} numberOfLines={4} ellipsizeMode="tail">
+            <Text style={styles.description} numberOfLines={descriptionNumberOfLines} ellipsizeMode="tail">
               {plan.description}
             </Text>
             {tagsToShow.length > 0 && (
@@ -229,11 +234,13 @@ function BusinessCardBase({
                 {tagsToShow.map((item, index) => (
                   <View key={`${item.type}-${index}-${item.label}`} style={styles.tag}>
                     {item.type === 'price' ? (
-                      <Ionicons name="checkmark-circle" size={12} color="#3C3C43" style={styles.tagIcon} />
+                      <Ionicons name="cash-outline" size={12} color="#3C3C43" style={styles.tagIcon} />
                     ) : item.type === 'category' ? (
                       <Ionicons name="pricetag-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
                     ) : item.type === 'temporal' ? (
                       <Ionicons name="time-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
+                    ) : item.type === 'additional' ? (
+                      <Ionicons name="options-outline" size={10} color="#3C3C43" style={styles.tagIcon} />
                     ) : (
                       <Ionicons name="ellipse" size={8} color="#3C3C43" style={styles.tagIcon} />
                     )}
@@ -410,6 +417,7 @@ export default function BusinessCard({
   pillsAboveCard = false,
   fillHeight = false,
   compactVerticalPadding = false,
+  descriptionNumberOfLines = 4,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector((state) => state.auth);
   const [saving, setSaving] = useState(false);
@@ -506,6 +514,7 @@ export default function BusinessCard({
           pillsAboveCard={pillsAboveCard}
           fillHeight={fillHeight}
           compactVerticalPadding={compactVerticalPadding}
+          descriptionNumberOfLines={descriptionNumberOfLines}
         />
         <GuestListModal
           visible={showGuestListModal}
@@ -549,6 +558,7 @@ export default function BusinessCard({
           pillsAboveCard={pillsAboveCard}
           fillHeight={fillHeight}
           compactVerticalPadding={compactVerticalPadding}
+          descriptionNumberOfLines={descriptionNumberOfLines}
         />
       </Swipeable>
       <GuestListModal

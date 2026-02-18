@@ -513,7 +513,7 @@ export default function HomeScreen() {
                           containerStyle={styles.businessHorizontalCardInner}
                           fillHeight={true}
                           showArrowButton={true}
-                          onArrowPress={() => router.push('/business-posts')}
+                          onArrowPress={() => router.push({ pathname: '/business-posts', params: { filter: activeFilter ?? '' } } as any)}
                           onPress={() => {
                             router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}

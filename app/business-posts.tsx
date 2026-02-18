@@ -2,9 +2,9 @@ import BusinessCard from '@/components/BusinessCard';
 import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Alert, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { ActivityIndicator, Alert, Dimensions, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAppSelector } from '@/store/hooks';
 import { useSnackbar } from '@/context/SnackbarContext';
@@ -25,9 +25,10 @@ interface FeedPost {
   type?: string;
 }
 
-const FILTERS = ['Clubs', 'Today', 'Tomorrow', 'Music', 'Cafe', 'Comedy', 'Sports', 'Travel'];
-const CATEGORY_FILTERS = ['Clubs', 'Music', 'Cafe', 'Travel', 'Comedy', 'Sports'];
-const TEMPORAL_FILTERS = ['Today', 'Tomorrow'];
+// Align with home feed so filters and pre-population work consistently
+const FILTERS = ['Running', 'Social', 'Fitness', 'Sports', 'Today', 'Tomorrow', 'Weekend'];
+const CATEGORY_FILTERS = ['Running', 'Social', 'Fitness', 'Sports'];
+const TEMPORAL_FILTERS = ['Today', 'Tomorrow', 'Weekend'];
 
 function isEventDateInRange(eventDate: string | Date | undefined, filter: string): boolean {
   if (!eventDate) return false;
@@ -36,8 +37,10 @@ function isEventDateInRange(eventDate: string | Date | undefined, filter: string
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
   const eventDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayOfWeek = d.getDay();
   if (filter === 'Today') return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
   if (filter === 'Tomorrow') return eventDayStart >= tomorrowStart && eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000;
+  if (filter === 'Weekend') return dayOfWeek === 0 || dayOfWeek === 6;
   return false;
 }
 
@@ -85,6 +88,7 @@ export default function BusinessPostsScreen() {
   } | null>(null);
   const [plansUserHasTicket, setPlansUserHasTicket] = useState<Record<string, boolean>>({});
   const router = useRouter();
+  const params = useLocalSearchParams<{ filter?: string }>();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const { showSnackbar } = useSnackbar();
@@ -269,9 +273,19 @@ export default function BusinessPostsScreen() {
     }
   }, [user, activeFilter, formatFeedData]);
 
+  const appliedInitialFilter = useRef(false);
+  // Pre-populate filter when opened from home feed (e.g. "See all" with a category selected)
   useEffect(() => {
-    loadFeed();
-  }, [loadFeed]);
+    if (appliedInitialFilter.current) return;
+    appliedInitialFilter.current = true;
+    const filterFromHome = params.filter?.trim();
+    if (filterFromHome && FILTERS.includes(filterFromHome)) {
+      setActiveFilter(filterFromHome);
+      loadFeed(false, filterFromHome);
+    } else {
+      loadFeed();
+    }
+  }, [loadFeed, params.filter]);
 
   const onRefresh = useCallback(() => {
     loadFeed(true);
@@ -351,11 +365,13 @@ export default function BusinessPostsScreen() {
                   const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
                   const effectivePlanId = rawPost?.repost_data?.original_plan_id || item.id;
                   return (
+                    <View key={item.id} style={styles.businessCardWrapper}>
                     <BusinessCard
-                      key={item.id}
-                      containerStyle={styles.businessCardInList}
+                      containerStyle={styles.businessCardInListInner}
                       pillsAboveCard
                       compactVerticalPadding
+                      fillHeight
+                      descriptionNumberOfLines={2}
                       plan={{
                         plan_id: effectivePlanId,
                         title: item.event.title,
@@ -420,6 +436,7 @@ export default function BusinessPostsScreen() {
                         setShowBusinessShareModal(true);
                       }}
                     />
+                    </View>
                   );
                 })}
               </View>
@@ -468,6 +485,16 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+  },
+  businessCardWrapper: {
+    width: Dimensions.get('window').width - 40,
+    height: Dimensions.get('window').height * 0.59,
+    marginHorizontal: 20,
+    marginBottom: 16,
+  },
+  businessCardInListInner: {
+    width: '100%',
+    height: '100%',
   },
   businessCardInList: {
     marginBottom: 8,
