@@ -1186,6 +1186,31 @@ class ApiService {
   async getBusinessOverallAnalytics(months: number = 1) {
     return this.request<any>(`/analytics/business/overall?months=${months}`, { method: 'GET' });
   }
+
+  // Form APIs
+  async getForm(formId: string) {
+    return this.request<any>(`/form/${formId}`, { method: 'GET' });
+  }
+
+  async submitFormResponse(body: Record<string, unknown>) {
+    return this.request<any>('/form/response/submit', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async getFormResponse(registrationId: string) {
+    return this.request<any>(`/form/response/by-registration/${registrationId}`, {
+      method: 'GET',
+    });
+  }
+
+  async getPlanFormResponses(planId: string, formId?: string) {
+    const query = formId ? `?formId=${formId}` : '';
+    return this.request<any>(`/form/responses/by-plan/${planId}${query}`, {
+      method: 'GET',
+    });
+  }
 }
 
 export const apiService = new ApiService();

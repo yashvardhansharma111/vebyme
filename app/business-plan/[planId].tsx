@@ -49,6 +49,7 @@ const HERO_HEIGHT = Math.max(260, SCREEN_HEIGHT * 0.58);
 const HERO_OVERLAP = 24;
 const CONTENT_PADDING_H = 20;
 import GuestListModal from '@/components/GuestListModal';
+import FormFiller from '@/components/FormFiller';
 
 // Pass cards use the event's main image as background (see plan.media below)
 
@@ -106,6 +107,11 @@ export default function BusinessPlanDetailScreen() {
   const galleryPaddingV = 20;
   const gallerySlideWidth = screenWidth - galleryPaddingH * 2;
 
+  // Form-related state
+  const [form, setForm] = useState<any>(null);
+  const [showFormFiller, setShowFormFiller] = useState(false);
+  const [formLoadingError, setFormLoadingError] = useState<string | null>(null);
+
   useEffect(() => {
     loadPlan();
   }, [planId]);
@@ -135,6 +141,20 @@ export default function BusinessPlanDetailScreen() {
             }
           } catch (error) {
             console.error('Failed to load organizer:', error);
+          }
+        }
+
+        // Load form if form_id is present
+        if (response.data.form_id) {
+          try {
+            const formResponse = await apiService.getForm(response.data.form_id);
+            if (formResponse.data) {
+              setForm(formResponse.data);
+              setFormLoadingError(null);
+            }
+          } catch (error) {
+            console.error('Failed to load form:', error);
+            setFormLoadingError('Could not load registration form');
           }
         }
       }
@@ -256,6 +276,19 @@ export default function BusinessPlanDetailScreen() {
       return;
     }
 
+    // If form is attached, show form first
+    if (form && form.fields && form.fields.length > 0) {
+      setShowFormFiller(true);
+      return;
+    }
+
+    // Otherwise proceed with registration
+    await completeRegistration();
+  };
+
+  const completeRegistration = async (formResponses?: Record<string, any>) => {
+    if (!user?.user_id || !planId) return;
+
     setRegistering(true);
     try {
       const alreadyRegistered = await apiService.hasTicketForPlan(planId, user.user_id);
@@ -275,6 +308,22 @@ export default function BusinessPlanDetailScreen() {
       );
 
       if (response.success && response.data?.ticket) {
+        // Submit form response if available
+        if (form && formResponses && response.data.registration_id) {
+          try {
+            await apiService.submitFormResponse({
+              form_id: form.form_id,
+              registration_id: response.data.registration_id,
+              plan_id: planId,
+              user_id: user.user_id,
+              responses: formResponses
+            });
+          } catch (formError) {
+            console.error('Failed to submit form response:', formError);
+            // Continue anyway - registration was successful
+          }
+        }
+
         setUserHasTicket(true);
         const ticketData = encodeURIComponent(JSON.stringify(response.data.ticket));
         router.push({
@@ -294,6 +343,7 @@ export default function BusinessPlanDetailScreen() {
       Alert.alert('Registration Failed', error.message || 'Failed to register for event');
     } finally {
       setRegistering(false);
+      setShowFormFiller(false);
     }
   };
 
@@ -700,6 +750,19 @@ export default function BusinessPlanDetailScreen() {
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Form Filler Modal */}
+      {form && form.fields && (
+        <FormFiller
+          fields={form.fields}
+          visible={showFormFiller}
+          onSubmit={async (responses) => {
+            await completeRegistration(responses);
+          }}
+          onCancel={() => setShowFormFiller(false)}
+          loading={registering}
+        />
+      )}
     </View>
   );
 }
