@@ -68,6 +68,8 @@ const ADDITIONAL_SETTINGS = [
   { id: 'f&b', label: 'F&B', icon: 'restaurant-outline', placeholder: 'e.g. Post Run Coffee' },
   { id: 'dress_code', label: 'Dress Code', icon: 'shirt-outline', placeholder: 'e.g. Cafe Joggers' },
   { id: 'music_type', label: 'Music Type', icon: 'musical-notes-outline', placeholder: 'e.g. Electronic' },
+  // Strava profile link – only relevant when category is Running.
+  { id: 'strava_link', label: 'Strava Link', icon: 'link-outline', placeholder: 'https://www.strava.com/athletes/...' },
   { id: 'links', label: 'Links', icon: 'link-outline', placeholder: 'https://...' },
   { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
 ];
@@ -119,6 +121,17 @@ export default function CreateBusinessPostScreen() {
   const [passes, setPasses] = useState<Pass[]>([]);
   const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<string[]>([]);
   const [additionalDetails, setAdditionalDetails] = useState<{ [key: string]: { title: string; description: string } }>({});
+
+  // remove strava link when category changes away from Running
+  useEffect(() => {
+    if (selectedCategory && selectedCategory !== 'Running') {
+      setSelectedAdditionalSettings((prev) => prev.filter((id) => id !== 'strava_link'));
+      setAdditionalDetails((prev) => {
+        const { strava_link, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [selectedCategory]);
   const [womenOnly, setWomenOnly] = useState(false);
   const [hideGuestListFromViewers, setHideGuestListFromViewers] = useState(false);
   const [shareToAnnouncementGroup, setShareToAnnouncementGroup] = useState(false);
@@ -1350,7 +1363,7 @@ export default function CreateBusinessPostScreen() {
             {additionalSettingsExpanded && (
             <>
             <View style={styles.settingsGrid}>
-              {ADDITIONAL_SETTINGS.map((setting) => (
+              {ADDITIONAL_SETTINGS.filter(s => s.id !== 'strava_link' || selectedCategory === 'Running').map((setting) => (
                 <TouchableOpacity
                   key={setting.id}
                   style={[
