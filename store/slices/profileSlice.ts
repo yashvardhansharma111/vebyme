@@ -10,6 +10,9 @@ interface UserProfile {
   bio: string;
   interests: string[];
   gender?: string;
+  age_range?: string | null;
+  eula_accepted_at?: string | null;
+  eula_version?: string | null;
   phone_number?: string;
   is_business?: boolean;
   business_id?: string;
@@ -103,7 +106,7 @@ export const fetchUserStats = createAsyncThunk(
 export const updateProfile = createAsyncThunk(
   'profile/updateProfile',
   async (
-    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string; social_media?: { instagram?: string; twitter?: string; x?: string; facebook?: string; snapchat?: string } } },
+    { session_id, data }: { session_id: string; data: { name?: string; bio?: string; profile_image?: string; interests?: string[]; gender?: string; age_range?: string | null; accept_eula?: boolean; eula_version?: string; social_media?: { instagram?: string; twitter?: string; x?: string; facebook?: string; snapchat?: string } } },
     { rejectWithValue }
   ) => {
     try {

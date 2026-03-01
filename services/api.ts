@@ -473,6 +473,9 @@ class ApiService {
     profile_image?: string;
     interests?: string[];
     gender?: string;
+    age_range?: string | null;
+    accept_eula?: boolean;
+    eula_version?: string;
     social_media?: { instagram?: string; twitter?: string; x?: string; facebook?: string; snapchat?: string };
   }) {
     return this.request<any>('/user/update', {
@@ -497,6 +500,32 @@ class ApiService {
     return this.request<any[]>(`/user/saved-posts?user_id=${user_id}`, {
       method: 'GET',
     });
+  }
+
+  async blockUser(blocked_user_id: string, reason?: string) {
+    return this.request<{ block_id?: string; blocker_id?: string; blocked_user_id?: string; created_at?: string }>(
+      '/user/block',
+      {
+        method: 'POST',
+        body: JSON.stringify({ blocked_user_id, reason }),
+      }
+    );
+  }
+
+  async unblockUser(blocked_user_id: string) {
+    return this.request<any>('/user/unblock', {
+      method: 'POST',
+      body: JSON.stringify({ blocked_user_id }),
+    });
+  }
+
+  async getBlockedUsers() {
+    return this.request<{ blocked_users: Array<{ blocked_user_id: string; created_at?: string; reason?: string | null }> }>(
+      '/user/blocks',
+      {
+        method: 'GET',
+      }
+    );
   }
 
   async savePost(accessToken: string, user_id: string, post_id: string) {

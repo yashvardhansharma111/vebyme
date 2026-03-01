@@ -1,6 +1,5 @@
 import { apiService } from '@/services/api';
 import { updateProfile } from '@/store/slices/profileSlice';
-import CalendarPicker from '@/components/CalendarPicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
@@ -24,31 +23,25 @@ import {
 } from 'react-native';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
-function formatDOB(date: Date): string {
-  const d = date.getDate().toString().padStart(2, '0');
-  const m = (date.getMonth() + 1).toString().padStart(2, '0');
-  const y = date.getFullYear();
-  return `${d}/${m}/${y}`;
-}
-
 export default function SignupProfileScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
 
   const [name, setName] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState('');
-  const [dobDate, setDobDate] = useState<Date | null>(null);
+  const [ageRange, setAgeRange] = useState<string>('');
   const [gender, setGender] = useState<string>('');
   const [bio, setBio] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [acceptedGuidelines, setAcceptedGuidelines] = useState(false);
   
   // Modal State
   const [showGenderPicker, setShowGenderPicker] = useState(false);
-  const [showDobPicker, setShowDobPicker] = useState(false);
+  const [showAgeRangePicker, setShowAgeRangePicker] = useState(false);
 
   const genders = ['Male', 'Female', 'Other'];
+  const ageRanges = ['18–22', '23–27', '28–35', '36+'];
 
   const handleImagePicker = async () => {
     try {
@@ -97,16 +90,16 @@ export default function SignupProfileScreen() {
       Alert.alert('Validation', 'Please enter your name');
       return;
     }
-    if (!dateOfBirth.trim()) {
-      Alert.alert('Validation', 'Please select your date of birth');
-      return;
-    }
     if (!gender) {
       Alert.alert('Validation', 'Please select your gender');
       return;
     }
     if (!bio.trim()) {
       Alert.alert('Validation', 'Please add a short bio');
+      return;
+    }
+    if (!acceptedGuidelines) {
+      Alert.alert('Validation', 'Please accept the Terms & Community Guidelines to continue');
       return;
     }
 
@@ -122,7 +115,9 @@ export default function SignupProfileScreen() {
         name: name.trim(),
         bio: bio.trim(),
         gender: gender.toLowerCase(),
-        dob: dateOfBirth,
+        age_range: ageRange || undefined,
+        accept_eula: true,
+        eula_version: 'v1',
       };
 
       if (profileImage) {
@@ -195,16 +190,16 @@ export default function SignupProfileScreen() {
                     />
                 </View>
 
-                {/* Date of Birth */}
+                {/* Age range */}
                 <View style={styles.inputGroup}>
                     <TouchableOpacity
                         style={styles.input}
-                        onPress={() => setShowDobPicker(true)}
+                        onPress={() => setShowAgeRangePicker(true)}
                     >
-                        <Text style={[styles.inputText, !dateOfBirth && styles.placeholderText]}>
-                            {dateOfBirth || 'Date of Birth (DD/MM/YYYY)'}
+                        <Text style={[styles.inputText, !ageRange && styles.placeholderText]}>
+                            {ageRange || 'Age range (optional)'}
                         </Text>
-                        <Ionicons name="calendar-outline" size={22} color="#6B7280" />
+                        <Ionicons name="chevron-down" size={22} color="#6B7280" />
                     </TouchableOpacity>
                 </View>
 
@@ -234,6 +229,23 @@ export default function SignupProfileScreen() {
                     />
                 </View>
 
+                {/* Terms / Community guidelines acceptance */}
+                <TouchableOpacity
+                  style={styles.checkboxRow}
+                  onPress={() => setAcceptedGuidelines((v) => !v)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.checkbox, acceptedGuidelines && styles.checkboxChecked]}>
+                    {acceptedGuidelines ? <Ionicons name="checkmark" size={16} color="#FFF" /> : null}
+                  </View>
+                  <Text style={styles.checkboxText}>
+                    I agree to the Terms & Community Guidelines
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.checkboxHelperText}>
+                  Required to keep vybeme safe.
+                </Text>
+
             </View>
           </ScrollView>
 
@@ -256,18 +268,44 @@ export default function SignupProfileScreen() {
 
         {/* --- MODALS --- */}
 
-        {/* DOB Calendar Picker */}
-        <CalendarPicker
-          visible={showDobPicker}
-          selectedDate={dobDate}
-          onDateSelect={(date) => {
-            setDobDate(date);
-            setDateOfBirth(formatDOB(date));
-            setShowDobPicker(false);
-          }}
-          onClose={() => setShowDobPicker(false)}
-          maximumDate={new Date()}
-        />
+        {/* Age range picker */}
+        <Modal visible={showAgeRangePicker} transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowAgeRangePicker(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Select age range</Text>
+              {ageRanges.map((r, index) => (
+                <TouchableOpacity
+                  key={r}
+                  style={[styles.modalOption, index === ageRanges.length - 1 && styles.modalOptionLast]}
+                  onPress={() => {
+                    setAgeRange(r);
+                    setShowAgeRangePicker(false);
+                  }}
+                >
+                  <Text style={[styles.modalOptionText, ageRange === r && styles.selectedText]}>{r}</Text>
+                  {ageRange === r && <Ionicons name="checkmark" size={20} color="#1C1C1E" />}
+                </TouchableOpacity>
+              ))}
+              <View style={styles.hairlineDivider} />
+              <TouchableOpacity
+                style={[styles.modalOption, styles.modalOptionLast]}
+                onPress={() => {
+                  setAgeRange('');
+                  setShowAgeRangePicker(false);
+                }}
+              >
+                <Text style={styles.modalOptionText}>Skip</Text>
+              </TouchableOpacity>
+              <Text style={styles.helperText}>
+                Used to recommend age-relevant plans.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Gender Selection Modal */}
         <Modal visible={showGenderPicker} transparent animationType="fade">
@@ -469,5 +507,47 @@ const styles = StyleSheet.create({
   selectedText: {
     color: '#1C1C1E',
     fontWeight: '600',
+  },
+  hairlineDivider: {
+    height: 1,
+    backgroundColor: '#F2F2F2',
+    marginTop: 8,
+  },
+  helperText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  checkboxRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#1C1C1E',
+    borderColor: '#1C1C1E',
+  },
+  checkboxText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#111827',
+    fontWeight: '600',
+  },
+  checkboxHelperText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#6B7280',
   },
 });

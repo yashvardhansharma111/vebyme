@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -104,8 +104,14 @@ export default function OtherUserProfileScreen() {
   const [profileImageError, setProfileImageError] = useState(false);
   const [recentPlansModalVisible, setRecentPlansModalVisible] = useState(false);
   const [showInstagramWebView, setShowInstagramWebView] = useState(false);
+  const [blockedUserIds, setBlockedUserIds] = useState<Set<string>>(new Set());
+  const [blockingBusy, setBlockingBusy] = useState(false);
 
   const isOwnProfile = !!userId && !!currentUser?.user_id && String(userId) === String(currentUser.user_id);
+  const isBlocked = useMemo(() => {
+    if (!userId) return false;
+    return blockedUserIds.has(String(userId));
+  }, [blockedUserIds, userId]);
   const profileImageUri = resolveProfileImageUri(viewedUser?.profile_image ?? undefined);
   const showProfileImage = !!profileImageUri && !profileImageError;
 
@@ -126,6 +132,23 @@ export default function OtherUserProfileScreen() {
   }, [dispatch, userId]);
 
   useEffect(() => {
+    let mounted = true;
+    if (!currentUser?.access_token) return;
+    apiService
+      .getBlockedUsers()
+      .then((res) => {
+        if (!mounted) return;
+        if (res.success && res.data?.blocked_users) {
+          setBlockedUserIds(new Set(res.data.blocked_users.map((b) => String(b.blocked_user_id))));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.access_token]);
+
+  useEffect(() => {
     setProfileImageError(false);
   }, [viewedUser?.profile_image]);
 
@@ -142,6 +165,52 @@ export default function OtherUserProfileScreen() {
     } finally {
       setLoadingPlans(false);
     }
+  };
+
+  const handleToggleBlock = () => {
+    if (!userId) return;
+    if (blockingBusy) return;
+
+    const targetId = String(userId);
+    const nextIsBlocked = !isBlocked;
+
+    Alert.alert(
+      nextIsBlocked ? 'Block User' : 'Unblock User',
+      nextIsBlocked
+        ? 'They will not be able to message you and you will not see each other\'s content.'
+        : 'This will allow this user to interact with you again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: nextIsBlocked ? 'Block' : 'Unblock',
+          style: 'destructive',
+          onPress: async () => {
+            setBlockingBusy(true);
+            try {
+              const res = nextIsBlocked
+                ? await apiService.blockUser(targetId)
+                : await apiService.unblockUser(targetId);
+
+              if (!res.success) {
+                Alert.alert('Error', res.message || 'Failed');
+                return;
+              }
+
+              setBlockedUserIds((prev) => {
+                const s = new Set(prev);
+                if (nextIsBlocked) s.add(targetId);
+                else s.delete(targetId);
+                return s;
+              });
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Failed');
+            } finally {
+              setBlockingBusy(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleReport = () => {
@@ -476,10 +545,16 @@ export default function OtherUserProfileScreen() {
 
               {/* Business profile: Report only */}
               {!isOwnProfile && (
-                <TouchableOpacity style={styles.businessReportButton} onPress={handleReport} activeOpacity={0.7}>
-                  <Ionicons name="flag-outline" size={22} color="#FF3B30" />
-                  <Text style={styles.businessReportButtonText}>Report</Text>
-                </TouchableOpacity>
+                <View style={{ gap: 10 }}>
+                  <TouchableOpacity style={styles.businessReportButton} onPress={handleToggleBlock} activeOpacity={0.7} disabled={blockingBusy}>
+                    <Ionicons name={isBlocked ? 'lock-open-outline' : 'ban-outline'} size={22} color="#FF3B30" />
+                    <Text style={styles.businessReportButtonText}>{blockingBusy ? 'Please wait…' : (isBlocked ? 'Unblock' : 'Block')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.businessReportButton} onPress={handleReport} activeOpacity={0.7}>
+                    <Ionicons name="flag-outline" size={22} color="#FF3B30" />
+                    <Text style={styles.businessReportButtonText}>Report</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </>
           ) : (
@@ -693,6 +768,13 @@ export default function OtherUserProfileScreen() {
                 {!isOwnProfile && (
                   <>
                     <View style={styles.hairlineDividerFigma} />
+                    <TouchableOpacity style={styles.actionRow} onPress={handleToggleBlock} activeOpacity={0.7} disabled={blockingBusy}>
+                      <Ionicons name={isBlocked ? 'lock-open-outline' : 'ban-outline'} size={24} color="#FF3B30" />
+                      <Text style={[styles.actionRowText, styles.actionRowTextDanger]}>
+                        {blockingBusy ? 'Please wait…' : (isBlocked ? 'Unblock User' : 'Block User')}
+                      </Text>
+                    </TouchableOpacity>
+                    <View style={styles.hairlineDividerFigma} />
                     <TouchableOpacity style={styles.actionRow} onPress={handleReport} activeOpacity={0.7}>
                       <Ionicons name="person-remove-outline" size={24} color="#FF3B30" />
                       <Text style={[styles.actionRowText, styles.actionRowTextDanger]}>Report User</Text>
@@ -711,10 +793,16 @@ export default function OtherUserProfileScreen() {
               )}
             </React.Fragment>
           ) : !isOwnProfile ? (
-            <TouchableOpacity key="actions-report-only" style={styles.reportOnlyButton} onPress={handleReport} activeOpacity={0.7}>
-              <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
-              <Text style={styles.reportOnlyText}>Report User</Text>
-            </TouchableOpacity>
+            <View key="actions-report-only" style={{ gap: 10 }}>
+              <TouchableOpacity style={styles.reportOnlyButton} onPress={handleToggleBlock} activeOpacity={0.7} disabled={blockingBusy}>
+                <Ionicons name={isBlocked ? 'lock-open-outline' : 'ban-outline'} size={18} color="#FF3B30" />
+                <Text style={styles.reportOnlyText}>{blockingBusy ? 'Please wait…' : (isBlocked ? 'Unblock User' : 'Block User')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.reportOnlyButton} onPress={handleReport} activeOpacity={0.7}>
+                <Ionicons name="person-remove-outline" size={18} color="#FF3B30" />
+                <Text style={styles.reportOnlyText}>Report User</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
             </>
           )}
