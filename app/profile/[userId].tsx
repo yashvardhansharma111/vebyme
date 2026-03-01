@@ -10,6 +10,7 @@ import {
   Alert,
   useWindowDimensions,
   Linking,
+  Share,
   Modal,
   Pressable,
 } from 'react-native';
@@ -22,7 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchUserProfile, fetchUserStats } from '@/store/slices/profileSlice';
-import { apiService } from '@/services/api';
+import { apiService, getWebBaseUrl } from '@/services/api';
 import { extractInstagramIdFromUrl, getInstagramProfileUrl } from '@/utils/social';
 import { WebView } from 'react-native-webview';
 import { EventCard } from '@/components/SwipeableEventCard';
@@ -268,6 +269,31 @@ export default function OtherUserProfileScreen() {
   const copySocialLink = async (url: string, handle: string) => {
     await Clipboard.setStringAsync(url);
     Alert.alert('Copied!', `${handle} link copied to clipboard.`);
+  };
+
+  const latestBusinessPlanLink = userId
+    ? `${getWebBaseUrl().replace(/\/$/, '')}/go/business/${encodeURIComponent(String(userId))}`
+    : null;
+
+  const handleShareLatestPlanLink = async () => {
+    if (!latestBusinessPlanLink) return;
+    try {
+      await Share.share({
+        title: `${viewedUser?.name || 'Business'} on vybeme.`,
+        message: `Check out the latest event from ${viewedUser?.name || 'this business'}.\n\n${latestBusinessPlanLink}`,
+        url: latestBusinessPlanLink,
+      });
+    } catch (e: any) {
+      const msg = String(e?.message || '').toLowerCase();
+      if (msg.includes('cancel') || msg.includes('dismiss')) return;
+      Alert.alert('Error', e?.message || 'Failed to share link');
+    }
+  };
+
+  const handleCopyLatestPlanLink = async () => {
+    if (!latestBusinessPlanLink) return;
+    await Clipboard.setStringAsync(latestBusinessPlanLink);
+    Alert.alert('Copied!', 'Latest plan link copied to clipboard.');
   };
 
   return (
@@ -542,6 +568,19 @@ export default function OtherUserProfileScreen() {
                   )}
                 </View>
               </View>
+
+              {isOwnProfile && latestBusinessPlanLink && (
+                <View style={styles.businessOwnerShareWrap}>
+                  <TouchableOpacity style={styles.businessOwnerShareButton} onPress={handleShareLatestPlanLink} activeOpacity={0.8}>
+                    <Ionicons name="share-social-outline" size={18} color="#1C1C1E" />
+                    <Text style={styles.businessOwnerShareText}>Share latest plan link</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.businessOwnerCopyButton} onPress={handleCopyLatestPlanLink} activeOpacity={0.8}>
+                    <Ionicons name="copy-outline" size={18} color="#1C1C1E" />
+                    <Text style={styles.businessOwnerShareText}>Copy latest plan link</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* Business profile: Report only */}
               {!isOwnProfile && (
@@ -1442,6 +1481,35 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#FF3B30',
+  },
+  businessOwnerShareWrap: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  businessOwnerShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  businessOwnerCopyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  businessOwnerShareText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1C1C1E',
   },
   hairlineDivider: {
     height: 2,

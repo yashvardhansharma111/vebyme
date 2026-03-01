@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Share,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,6 +34,10 @@ interface Attendee {
   checked_in_via?: 'qr' | 'manual' | null;
   price_paid: number;
   created_at: string;
+  age_range?: string | null;
+  gender?: string | null;
+  running_experience?: string | null;
+  what_brings_you?: string | null;
 }
 
 export default function AttendeeListScreen() {
@@ -49,6 +54,7 @@ export default function AttendeeListScreen() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statistics, setStatistics] = useState({ total: 0, checked_in: 0, pending: 0 });
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     // If planId provided, load attendees
@@ -131,6 +137,44 @@ export default function AttendeeListScreen() {
       attendee.ticket_number?.toLowerCase().includes(query)
     );
   });
+
+  const buildCsvExport = () => {
+    const escape = (v: string | null | undefined) => {
+      const s = String(v ?? '').replace(/\r?\n/g, ' ').replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const headers = ['Name', 'Gender', 'Age range', 'Running experience', 'What brings you', 'Ticket number', 'Checked in', 'Registered at'];
+    const rows = attendees.map((a) => [
+      escape(a.user?.name ?? 'Guest'),
+      escape(a.gender ?? null),
+      escape(a.age_range ?? null),
+      escape(a.running_experience ?? null),
+      escape(a.what_brings_you ?? null),
+      escape(a.ticket_number ?? null),
+      escape(a.checked_in ? (a.checked_in_at ?? 'Yes') : 'No'),
+      escape(a.created_at ? new Date(a.created_at).toISOString() : null),
+    ]);
+    const csvBody = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const filename = `attendees-${selectedPlanId ?? 'event'}-${new Date().toISOString().slice(0, 10)}.csv`;
+    return { csvBody, filename };
+  };
+
+  const handleShareAttendees = async () => {
+    if (sharing || attendees.length === 0) return;
+    setSharing(true);
+    try {
+      const { csvBody, filename } = buildCsvExport();
+      await Share.share({
+        title: 'Attendee list',
+        message: `Post-event attendee list (${filename})\n\n${csvBody}`,
+      });
+    } catch (error: any) {
+      if (String(error?.message || '').toLowerCase().includes('dismissed')) return;
+      Alert.alert('Error', error?.message || 'Failed to share attendee list');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -225,6 +269,15 @@ export default function AttendeeListScreen() {
         <Text style={styles.statsText}>
           Checked In: {statistics.checked_in}/{statistics.total}
         </Text>
+        {attendees.length > 0 && (
+          <TouchableOpacity
+            style={[styles.shareButton, sharing && styles.shareButtonDisabled]}
+            onPress={handleShareAttendees}
+            disabled={sharing}
+          >
+            <Text style={styles.shareButtonText}>{sharing ? 'Sharing...' : 'Share attendee list'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Attendee List */}
@@ -349,11 +402,30 @@ const styles = StyleSheet.create({
   statsContainer: {
     paddingHorizontal: 20,
     marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   statsText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1C1C1E',
+    flexShrink: 1,
+  },
+  shareButton: {
+    backgroundColor: '#4A3B69',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
+  },
+  shareButtonDisabled: {
+    opacity: 0.6,
+  },
+  shareButtonText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   listContainer: {
     flex: 1,

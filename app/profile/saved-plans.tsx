@@ -315,7 +315,7 @@ export default function SavedPlansScreen() {
                   onSharePress={async () => {
                     try {
                       const baseUrl = getWebBaseUrl().replace(/\/$/, '');
-                      const planUrl = `${baseUrl}/post/${plan.post_id}`;
+                      const planUrl = `${baseUrl}/go/post/${plan.post_id}`;
                       const shareMessage = `Check out this plan: ${plan.title || 'Untitled Plan'}\n\n${planUrl}`;
                       await Share.share({ message: shareMessage, url: planUrl, title: plan.title || 'Plan' });
                     } catch (e: any) {
