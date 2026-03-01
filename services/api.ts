@@ -1217,8 +1217,30 @@ class ApiService {
   }
 
   // Form APIs
+  async createForm(body: Record<string, unknown>) {
+    return this.request<{ form_id: string; name: string }>('/form', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
   async getForm(formId: string) {
     return this.request<any>(`/form/${formId}`, { method: 'GET' });
+  }
+
+  async getUserForms(userId: string) {
+    return this.request<{ forms: any[] }>(`/form/by-user/${userId}`, { method: 'GET' });
+  }
+
+  async updateForm(formId: string, body: Record<string, unknown>) {
+    return this.request<any>(`/form/${formId}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  }
+
+  async deleteForm(formId: string) {
+    return this.request<any>(`/form/${formId}`, { method: 'DELETE' });
   }
 
   async submitFormResponse(body: Record<string, unknown>) {
@@ -1240,7 +1262,13 @@ class ApiService {
       method: 'GET',
     });
   }
+
+  async getPlanRegistrationCount(planId: string) {
+    return this.request<{ count: number }>(`/ticket/registration-count/${planId}`, {
+      method: 'GET',
+    });
+  }
 }
 
 export const apiService = new ApiService();
-
+export { ApiService };

@@ -112,6 +112,10 @@ export default function BusinessPlanDetailScreen() {
   const [showFormFiller, setShowFormFiller] = useState(false);
   const [formLoadingError, setFormLoadingError] = useState<string | null>(null);
 
+  // Registration limit state
+  const [eventFull, setEventFull] = useState(false);
+  const [registrationCount, setRegistrationCount] = useState(0);
+
   useEffect(() => {
     loadPlan();
   }, [planId]);
@@ -156,6 +160,21 @@ export default function BusinessPlanDetailScreen() {
             console.error('Failed to load form:', error);
             setFormLoadingError('Could not load registration form');
           }
+        }
+
+        // Check registration limit if set
+        if (response.data.registration_limit) {
+          try {
+            const countRes = await apiService.getPlanRegistrationCount(response.data.plan_id);
+            const count = countRes.data?.count || 0;
+            setRegistrationCount(count);
+            setEventFull(count >= response.data.registration_limit);
+          } catch (error) {
+            console.error('Failed to check registration count:', error);
+            setEventFull(false);
+          }
+        } else {
+          setEventFull(false);
         }
       }
     } catch (error: any) {
@@ -340,7 +359,15 @@ export default function BusinessPlanDetailScreen() {
       }
     } catch (error: any) {
       console.error('Registration error:', error);
-      Alert.alert('Registration Failed', error.message || 'Failed to register for event');
+      const errorMsg = error.message || 'Failed to register for event';
+      
+      // Check if error is due to event being full
+      if (errorMsg.includes('capacity') || errorMsg.includes('full')) {
+        setEventFull(true);
+        Alert.alert('Event Full', 'This event has reached its maximum capacity and registrations are now closed.');
+      } else {
+        Alert.alert('Registration Failed', errorMsg);
+      }
     } finally {
       setRegistering(false);
       setShowFormFiller(false);
@@ -602,17 +629,27 @@ export default function BusinessPlanDetailScreen() {
           </TouchableOpacity>
         )}
         {userHasTicket !== true && !isOwnEvent && (
-          <TouchableOpacity
-            style={[styles.bottomBarButton, registering && styles.registerButtonGreyed]}
-            onPress={handleRegister}
-            disabled={registering}
-          >
-            {registering ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.registerButtonText}>Register</Text>
+          <>
+            {eventFull && (
+              <View style={styles.eventFullContainer}>
+                <Ionicons name="warning" size={20} color="#DD2C00" />
+                <Text style={styles.eventFullText}>This event has reached maximum capacity</Text>
+              </View>
             )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.bottomBarButton, (registering || eventFull) && styles.registerButtonGreyed]}
+              onPress={handleRegister}
+              disabled={registering || eventFull}
+            >
+              {registering ? (
+                <ActivityIndicator size="small" color="#FFF" />
+              ) : (
+                <Text style={[styles.registerButtonText, eventFull && styles.registerButtonTextGreyed]}>
+                  {eventFull ? 'Event Full' : 'Register'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </>
         )}
         {userHasTicket !== true && isOwnEvent && (
           <TouchableOpacity style={[styles.bottomBarButton, styles.registerButtonGreyed]} disabled>
@@ -1278,4 +1315,23 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 6,
   },
-});
+  eventFullContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFEBEE',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  eventFullText: {
+    marginLeft: 10,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#DD2C00',
+    flex: 1,
+    textAlign: 'center',
+  },});

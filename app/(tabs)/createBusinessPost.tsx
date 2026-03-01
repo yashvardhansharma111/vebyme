@@ -32,6 +32,8 @@ import BusinessPlanDetailPreview from '@/components/BusinessPlanDetailPreview';
 import { EventCard } from '@/components/SwipeableEventCard';
 import CalendarPicker from '@/components/CalendarPicker';
 import ShareToChatModal from '@/components/ShareToChatModal';
+import FormBuilder, { FormField } from '@/components/FormBuilder';
+import FormSelector from '@/components/FormSelector';
 
 const CATEGORY_TAGS = ['Running', 'Sports', 'Fitness/Training', 'Social/Community'];
 
@@ -137,6 +139,17 @@ export default function CreateBusinessPostScreen() {
   const openedFromMyPlansRef = useRef(false);
   const insets = useSafeAreaInsets();
 
+  // Form-related state
+  const [formId, setFormId] = useState<string | null>(null);
+  const [showFormSelector, setShowFormSelector] = useState(false);
+  const [showFormBuilder, setShowFormBuilder] = useState(false);
+  const [savingForm, setSavingForm] = useState(false);
+  const [attachFormEnabled, setAttachFormEnabled] = useState(false);
+
+  // Registration limit state
+  const [limitRegistrationEnabled, setLimitRegistrationEnabled] = useState(false);
+  const [registrationLimit, setRegistrationLimit] = useState('');
+
   const resetForm = useCallback(() => {
     setTitle('');
     setDescription('');
@@ -165,6 +178,10 @@ export default function CreateBusinessPostScreen() {
     setPlanId(null);
     setShowTicketPreview(false);
     setPreviewPassIndex(0);
+    setFormId(null);
+    setAttachFormEnabled(false);
+    setLimitRegistrationEnabled(false);
+    setRegistrationLimit('');
     isEditFlowRef.current = false;
   }, []);
 
@@ -295,6 +312,18 @@ export default function CreateBusinessPostScreen() {
               type: item.type === 'video' ? ('video' as const) : ('image' as const),
             }));
             setMedia(mediaItems);
+          }
+
+          // Handle form_id
+          if (planData.form_id) {
+            setFormId(planData.form_id);
+            setAttachFormEnabled(true);
+          }
+
+          // Handle registration limit
+          if (planData.registration_limit) {
+            setLimitRegistrationEnabled(true);
+            setRegistrationLimit(String(planData.registration_limit));
           }
           
           // Clear AsyncStorage after loading
@@ -456,6 +485,41 @@ export default function CreateBusinessPostScreen() {
         ...additionalDetails,
         [settingId]: { title: '', description: '' },
       });
+    }
+  };
+
+  // Form handlers
+  const handleFormSelectorSelect = async (selectedFormId: string) => {
+    setFormId(selectedFormId);
+    setShowFormSelector(false);
+  };
+
+  const handleFormBuilderSave = async (fields: FormField[]) => {
+    if (!user?.user_id) {
+      Alert.alert('Error', 'User ID not available');
+      return;
+    }
+
+    setSavingForm(true);
+    try {
+      const response = await apiService.createForm({
+        user_id: user.user_id,
+        name: `Form ${new Date().toLocaleDateString()}`,
+        description: 'Custom registration form',
+        fields: fields,
+      });
+
+      if (response.success && response.data?.form_id) {
+        setFormId(response.data.form_id);
+        setShowFormBuilder(false);
+        Alert.alert('Success', 'Form created successfully');
+      } else {
+        Alert.alert('Error', 'Failed to create form');
+      }
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create form');
+    } finally {
+      setSavingForm(false);
     }
   };
 
@@ -658,6 +722,12 @@ export default function CreateBusinessPostScreen() {
       }
       if (addDetails.length > 0) {
         planData.add_details = addDetails;
+      }
+      if (formId) {
+        planData.form_id = formId;
+      }
+      if (limitRegistrationEnabled && registrationLimit) {
+        planData.registration_limit = parseInt(registrationLimit, 10);
       }
       if (editMode && planId) {
         planData.is_women_only = womenOnly;
@@ -1392,6 +1462,95 @@ export default function CreateBusinessPostScreen() {
                   thumbColor="#FFF"
                 />
               </View>
+
+              {/* Attach Form */}
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Attach Form</Text>
+                <Switch
+                  value={attachFormEnabled}
+                  onValueChange={(v) => {
+                    setAttachFormEnabled(v);
+                    if (!v) setFormId(null);
+                  }}
+                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
+                  thumbColor="#FFF"
+                />
+              </View>
+
+              {attachFormEnabled && (
+                <View style={styles.formSection}>
+                  {formId ? (
+                    <View style={styles.formSelectedContainer}>
+                      <View style={styles.formSelectedContent}>
+                        <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                        <View style={styles.formSelectedInfo}>
+                          <Text style={styles.formSelectedLabel}>Form Attached</Text>
+                          <Text style={styles.formSelectedId}>{formId}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setFormId(null)}
+                        style={styles.formRemoveButton}
+                      >
+                        <Ionicons name="close" size={20} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={styles.formActionButtons}>
+                      <TouchableOpacity
+                        style={styles.formSelectButton}
+                        onPress={() => setShowFormSelector(true)}
+                      >
+                        <Ionicons name="document" size={18} color="#007AFF" />
+                        <Text style={styles.formSelectButtonText}>Select Existing Form</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.formCreateButton}
+                        onPress={() => setShowFormBuilder(true)}
+                      >
+                        <Ionicons name="add-circle" size={18} color="#FFF" />
+                        <Text style={styles.formCreateButtonText}>Create New Form</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* Limit Registration */}
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Limit Registration</Text>
+                <Switch
+                  value={limitRegistrationEnabled}
+                  onValueChange={(v) => {
+                    setLimitRegistrationEnabled(v);
+                    if (!v) setRegistrationLimit('');
+                  }}
+                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
+                  thumbColor="#FFF"
+                />
+              </View>
+
+              {limitRegistrationEnabled && (
+                <View style={styles.registrationLimitContainer}>
+                  <TextInput
+                    style={styles.registrationLimitInput}
+                    placeholder="Maximum number of attendees"
+                    placeholderTextColor="#9CA3AF"
+                    value={registrationLimit}
+                    onChangeText={(text) => {
+                      // Only allow numeric input
+                      const numText = text.replace(/[^0-9]/g, '');
+                      setRegistrationLimit(numText);
+                    }}
+                    keyboardType="number-pad"
+                  />
+                  {registrationLimit && (
+                    <Text style={styles.registrationLimitHint}>
+                      Maximum {registrationLimit} attendee{registrationLimit !== '1' ? 's' : ''}
+                    </Text>
+                  )}
+                </View>
+              )}
             </View>
             </>
             )}
@@ -1609,6 +1768,27 @@ export default function CreateBusinessPostScreen() {
         postIsBusiness={true}
         userId={user?.user_id ?? ''}
         currentUserAvatar={currentUser?.profile_image ?? undefined}
+      />
+
+      {/* Form Selector Modal */}
+      <FormSelector
+        visible={showFormSelector}
+        userId={user?.user_id ?? ''}
+        onSelect={handleFormSelectorSelect}
+        onCreateNew={() => {
+          setShowFormSelector(false);
+          setShowFormBuilder(true);
+        }}
+        onCancel={() => setShowFormSelector(false)}
+        loading={savingForm}
+      />
+
+      {/* Form Builder Modal */}
+      <FormBuilder
+        visible={showFormBuilder}
+        onSave={handleFormBuilderSave}
+        onCancel={() => setShowFormBuilder(false)}
+        loading={savingForm}
       />
     </SafeAreaView>
   );
@@ -2640,4 +2820,101 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  formSection: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  formSelectedContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  formSelectedContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  formSelectedInfo: {
+    flex: 1,
+  },
+  formSelectedLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16A34A',
+  },
+  formSelectedId: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  formRemoveButton: {
+    padding: 6,
+  },
+  formActionButtons: {
+    gap: 10,
+  },
+  formSelectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    backgroundColor: '#FFF',
+  },
+  formSelectButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  formCreateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+  },
+  formCreateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFF',
+  },
+  registrationLimitContainer: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+  },
+  registrationLimitInput: {
+    fontSize: 14,
+    color: '#1C1C1E',
+    padding: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    marginBottom: 8,
+  },
+  registrationLimitHint: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
 });
+

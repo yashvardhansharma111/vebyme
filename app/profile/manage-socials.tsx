@@ -33,6 +33,8 @@ const INITIAL_SOCIALS: SocialPlatform[] = [
   { id: 'instagram', baseUrl: 'instagram.com/', value: '', enabled: true, iconName: 'logo-instagram' },
   { id: 'x', baseUrl: 'x.com/', value: '', enabled: true, iconName: '', isCustomIcon: true },
   { id: 'snapchat', baseUrl: 'snapchat.com/', value: '', enabled: true, iconName: 'logo-snapchat' },
+  { id: 'whatsapp', baseUrl: 'wa.me/', value: '', enabled: true, iconName: 'logo-whatsapp' },
+  { id: 'strava', baseUrl: 'strava.com/', value: '', enabled: true, iconName: 'bicycle' },
 ];
 
 export default function ManageSocialsScreen() {
@@ -63,6 +65,8 @@ export default function ManageSocialsScreen() {
       { ...INITIAL_SOCIALS[0], value: sm.instagram || '', enabled: true },
       { ...INITIAL_SOCIALS[1], value: sm.x || sm.twitter || '', enabled: true },
       { ...INITIAL_SOCIALS[2], value: sm.snapchat || '', enabled: true },
+      { ...INITIAL_SOCIALS[3], value: sm.whatsapp || '', enabled: true },
+      { ...INITIAL_SOCIALS[4], value: sm.strava || '', enabled: true },
     ]);
     setLoading(false);
   }, [currentUser]);
@@ -86,13 +90,15 @@ export default function ManageSocialsScreen() {
     }
     setSaving(true);
     try {
-      const social_media: { instagram?: string; x?: string; snapchat?: string } = {};
+      const social_media: { instagram?: string; x?: string; snapchat?: string; whatsapp?: string; strava?: string } = {};
       socials.forEach((s) => {
         const v = s.value?.trim();
         if (s.enabled && v) {
           if (s.id === 'instagram') social_media.instagram = extractInstagramIdFromUrl(v) || v.replace(/^@/, '');
           if (s.id === 'x') social_media.x = v.replace(/^@/, '');
           if (s.id === 'snapchat') social_media.snapchat = v.replace(/^@/, '');
+          if (s.id === 'whatsapp') social_media.whatsapp = v;
+          if (s.id === 'strava') social_media.strava = v;
         }
       });
       await dispatch(updateProfile({ session_id: user.session_id, data: { social_media } })).unwrap();
