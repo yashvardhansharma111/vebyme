@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   Modal,
@@ -68,6 +69,9 @@ export default function NotificationsScreen() {
   const [creatingGroup, setCreatingGroup] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
@@ -87,6 +91,8 @@ export default function NotificationsScreen() {
   const { currentUser } = useAppSelector((state) => state.profile);
   const isBusinessUser = currentUser?.is_business === true;
 
+  const PAGE_SIZE = 15;
+
   const openUserProfile = useCallback(
     (userId: string) => {
       if (!userId) return;
@@ -104,30 +110,29 @@ export default function NotificationsScreen() {
     try {
       if (isRefresh) {
         setIsRefreshing(true);
+        setOffset(0);
+        setHasMore(true);
       } else {
         setIsLoading(true);
       }
 
-      const response = await apiService.getNotifications(user.user_id);
-      // API returns { success, message, data: array }; use .data when present
-      const list = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
-      if (list.length >= 0) {
-        setNotifications(list);
-        const totalInteractions = list.reduce((acc: number, g: any) => acc + (g?.interactions?.length ?? 0), 0);
-        const individualTypes = ['post_live', 'event_ended', 'event_ended_registered', 'event_ended_attended', 'free_event_cancelled', 'paid_event_cancelled', 'registration_successful', 'plan_shared_chat'];
-        const individualCount = list.reduce((acc: number, g: any) => acc + (g?.interactions?.filter((i: any) => i?.type && individualTypes.includes(i.type))?.length ?? 0), 0);
-        console.log('[Notifications] loadNotifications: groups=', list.length, 'total interactions=', totalInteractions, 'individual (spec) types=', individualCount);
-        setViewMode('summary');
-        setSelectedEventId(null);
-        // Mark all as read when user opens/sees the list so badge decrements
-        const allIds = list.flatMap((g: any) => (g?.interactions ?? []).map((i: any) => i?.notification_id).filter(Boolean));
-        if (allIds.length > 0) {
-          Promise.all(allIds.map((id: string) => apiService.markNotificationAsRead(id).catch(() => null)))
-            .catch(() => null)
-            .finally(() => dispatch(setUnreadCount(0)));
-        } else {
-          dispatch(setUnreadCount(0));
-        }
+      const response = await apiService.getNotifications(user.user_id, { limit: PAGE_SIZE, offset: 0 });
+      const raw: any = response?.data ?? response;
+      const groups = Array.isArray(raw?.groups) ? raw.groups : (Array.isArray(raw) ? raw : []);
+      setNotifications(groups);
+      setOffset(typeof raw?.next_offset === 'number' ? raw.next_offset : groups.length);
+      setHasMore(Boolean(raw?.has_more));
+      setViewMode('summary');
+      setSelectedEventId(null);
+
+      // Mark loaded notifications as read (incremental)
+      const allIds = groups.flatMap((g: any) => (g?.interactions ?? []).map((i: any) => i?.notification_id).filter(Boolean));
+      if (allIds.length > 0) {
+        Promise.all(allIds.map((id: string) => apiService.markNotificationAsRead(id).catch(() => null)))
+          .catch(() => null)
+          .finally(() => dispatch(setUnreadCount(0)));
+      } else {
+        dispatch(setUnreadCount(0));
       }
     } catch (error: any) {
       console.error('Error loading notifications:', error);
@@ -139,6 +144,42 @@ export default function NotificationsScreen() {
       setIsRefreshing(false);
     }
   }, [isAuthenticated, user]);
+
+  const loadMoreNotifications = useCallback(async () => {
+    if (!isAuthenticated || !user?.user_id) return;
+    if (isLoadingMore || isLoading || isRefreshing || !hasMore) return;
+
+    try {
+      setIsLoadingMore(true);
+      const response = await apiService.getNotifications(user.user_id, { limit: PAGE_SIZE, offset });
+      const raw: any = response?.data ?? response;
+      const groups = Array.isArray(raw?.groups) ? raw.groups : [];
+      if (groups.length > 0) {
+        setNotifications((prev) => {
+          const seen = new Set(prev.map((g) => String(g.post_id) + '|' + String(g.created_at)));
+          const next = [...prev];
+          groups.forEach((g: any) => {
+            const key = String(g.post_id) + '|' + String(g.created_at);
+            if (!seen.has(key)) next.push(g);
+          });
+          return next;
+        });
+        setOffset(typeof raw?.next_offset === 'number' ? raw.next_offset : (offset + groups.length));
+        setHasMore(Boolean(raw?.has_more));
+
+        const allIds = groups.flatMap((g: any) => (g?.interactions ?? []).map((i: any) => i?.notification_id).filter(Boolean));
+        if (allIds.length > 0) {
+          Promise.all(allIds.map((id: string) => apiService.markNotificationAsRead(id).catch(() => null))).catch(() => null);
+        }
+      } else {
+        setHasMore(false);
+      }
+    } catch {
+      setHasMore(false);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasMore, isAuthenticated, isLoading, isLoadingMore, isRefreshing, offset, user?.user_id]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -816,6 +857,17 @@ export default function NotificationsScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
+        onScroll={({ nativeEvent }) => {
+          const paddingToBottom = 200;
+          const isNearBottom =
+            nativeEvent.layoutMeasurement.height + nativeEvent.contentOffset.y >=
+            nativeEvent.contentSize.height - paddingToBottom;
+
+          if (isNearBottom) {
+            loadMoreNotifications();
+          }
+        }}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={() => loadNotifications(true)} />
         }
@@ -957,6 +1009,12 @@ export default function NotificationsScreen() {
             {renderNormalUserList()}
           </>
         )}
+
+        {isLoadingMore ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator size="small" color="#6B5B8E" />
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Group Creation Modal - Business user only */}

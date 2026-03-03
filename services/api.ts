@@ -970,8 +970,12 @@ class ApiService {
   }
 
   // Notification APIs
-  async getNotifications(user_id: string) {
-    return this.request<any[]>(`/notifications/list?user_id=${user_id}`, {
+  async getNotifications(user_id: string, pagination?: { limit?: number; offset?: number }) {
+    const qs = new URLSearchParams();
+    qs.set('user_id', String(user_id));
+    if (pagination?.limit != null) qs.set('limit', String(pagination.limit));
+    if (pagination?.offset != null) qs.set('offset', String(pagination.offset));
+    return this.request<any>(`/notifications/list?${qs.toString()}`, {
       method: 'GET',
     });
   }
@@ -1025,8 +1029,6 @@ class ApiService {
     }>(`/chat/lists?user_id=${user_id}`, {
       method: 'GET',
     });
-    const groups = res?.data?.groups ?? [];
-    console.log('[API] getChatLists:', { user_id, groupsCount: groups.length, groupIds: groups.map((g: any) => g?.group_id) });
     return res;
   }
 
@@ -1050,8 +1052,12 @@ class ApiService {
     });
   }
 
-  async getMessages(group_id: string) {
-    return this.request<any[]>(`/chat/messages/${group_id}`, {
+  async getMessages(group_id: string, opts?: { limit?: number; before?: string }) {
+    const qs = new URLSearchParams();
+    if (opts?.limit) qs.set('limit', String(opts.limit));
+    if (opts?.before) qs.set('before', String(opts.before));
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return this.request<any>(`/chat/messages/${group_id}${suffix}`, {
       method: 'GET',
     });
   }

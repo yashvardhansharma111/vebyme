@@ -1,4 +1,4 @@
-import SwipeableEventCard from '@/components/SwipeableEventCard';
+import SwipeableEventCard, { EventCard } from '@/components/SwipeableEventCard';
 import { apiService } from '@/services/api';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { fetchCurrentUser } from '@/store/slices/profileSlice';
@@ -403,10 +403,13 @@ export default function CreatePostScreen() {
           <ScrollView contentContainerStyle={styles.previewContainer}>
             <Text style={styles.previewText}>User will see your post like this!</Text>
             <View style={styles.previewCardWrapper}>
-              <SwipeableEventCard
+              <EventCard
                 user={previewData.user}
                 event={previewData.event}
                 onUserPress={() => {}}
+                onJoinPress={() => {}}
+                onSharePress={() => {}}
+                hideFooterActions={true}
               />
             </View>
           </ScrollView>

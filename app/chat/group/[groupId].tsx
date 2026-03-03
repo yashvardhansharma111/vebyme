@@ -145,6 +145,9 @@ export default function GroupChatScreen() {
   const [availablePlans, setAvailablePlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [typingLabel, setTypingLabel] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [beforeCursor, setBeforeCursor] = useState<string | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
   const TYPING_DEBOUNCE_MS = 2000;
@@ -158,16 +161,14 @@ export default function GroupChatScreen() {
   useEffect(() => {
     if (groupId) {
       loadGroupDetails();
-      loadMessages();
-      const interval = setInterval(loadMessages, 2000);
-      return () => clearInterval(interval);
+      loadMessages(true);
     }
   }, [groupId]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (groupId) {
-        loadMessages();
+        loadMessages(true);
       }
     }, [groupId])
   );
@@ -213,14 +214,30 @@ export default function GroupChatScreen() {
     }
   };
 
-  const loadMessages = async () => {
+  const PAGE_SIZE = 40;
+
+  const loadMessages = async (reset = false) => {
     if (!groupId) return;
     try {
-      const response = await apiService.getMessages(groupId);
+      if (reset) {
+        setLoading(true);
+        setLoadingMore(false);
+        setHasMore(true);
+        setBeforeCursor(null);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const response = await apiService.getMessages(groupId, {
+        limit: PAGE_SIZE,
+        before: reset ? undefined : (beforeCursor ?? undefined),
+      });
       if (response.data) {
-        const raw = response.data;
-        const list = Array.isArray(raw) ? raw : (raw?.messages ?? []);
-        setMessages(list.map((m: any) => {
+        const raw: any = response.data;
+        const list = Array.isArray(raw?.messages)
+          ? raw.messages
+          : (Array.isArray(raw) ? raw : []);
+        const normalized = list.map((m: any) => {
           const content = m.content;
           const isPlanContent = typeof content === 'object' && content && (content.title != null || content.plan_id != null);
           if (m.type === 'plan' && !m.shared_plan && content) {
@@ -230,9 +247,24 @@ export default function GroupChatScreen() {
             return { ...m, type: 'plan', shared_plan: content };
           }
           return m;
-        }));
+        });
+
+        setMessages((prev) => {
+          const base = reset ? [] : prev;
+          const seen = new Set(base.map((x) => x.message_id));
+          const next = [...base];
+          normalized.forEach((m: any) => {
+            if (!seen.has(m.message_id)) next.push(m);
+          });
+          return next;
+        });
+
+        const nextBefore = raw?.next_before ?? null;
+        const more = raw?.has_more;
+        setBeforeCursor(nextBefore);
+        setHasMore(Boolean(more));
         // Typing indicator: show others who are typing (not self)
-        const typingUsers = Array.isArray(raw) ? [] : (raw?.typing_users ?? []);
+        const typingUsers = raw?.typing_users ?? [];
         const othersTyping = (typingUsers as { user_id: string; name: string }[]).filter(
           (u) => String(u.user_id) !== String(user?.user_id)
         );
@@ -251,6 +283,7 @@ export default function GroupChatScreen() {
       console.error('Error loading messages:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -267,7 +300,7 @@ export default function GroupChatScreen() {
       await apiService.sendMessage(groupId, user.user_id, 'text', content);
       setInputText('');
       setTypingLabel(null);
-      await loadMessages();
+      await loadMessages(true);
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -716,10 +749,21 @@ export default function GroupChatScreen() {
           data={invertedData}
           renderItem={renderMessage}
           ListFooterComponent={renderPlanCard}
+          ListHeaderComponent={loadingMore ? (
+            <View style={{ paddingVertical: 10 }}>
+              <ActivityIndicator size="small" color="#8E8E93" />
+            </View>
+          ) : null}
           keyExtractor={(item) => ('merged' in item && item.merged ? item.message_id + '_merged' : item.message_id)}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           inverted
+          onEndReachedThreshold={0.2}
+          onEndReached={() => {
+            if (hasMore && !loadingMore && !loading) {
+              loadMessages(false);
+            }
+          }}
         />
 
         {/* Typing indicator */}

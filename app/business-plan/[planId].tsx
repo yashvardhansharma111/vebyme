@@ -451,11 +451,30 @@ export default function BusinessPlanDetailScreen() {
               contentContainerStyle={[styles.heroScrollContent, { height: heroTotalHeight }]}
             >
               {planMedia.map((item, i) => (
-                <Image key={i} source={{ uri: item.url }} style={[styles.heroImageSlide, { height: heroTotalHeight }]} resizeMode="cover" />
+                <TouchableOpacity
+                  key={i}
+                  activeOpacity={0.95}
+                  onPress={() => {
+                    setHeroImageIndex(i);
+                    setGalleryIndex(i);
+                    setShowImageGallery(true);
+                  }}
+                >
+                  <Image source={{ uri: item.url }} style={[styles.heroImageSlide, { height: heroTotalHeight }]} resizeMode="cover" />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           ) : (
-            <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: heroTotalHeight }]} resizeMode="cover" />
+            <TouchableOpacity
+              activeOpacity={0.95}
+              onPress={() => {
+                setHeroImageIndex(0);
+                setGalleryIndex(0);
+                setShowImageGallery(true);
+              }}
+            >
+              <Image source={{ uri: heroImageUri }} style={[styles.heroImage, { height: heroTotalHeight }]} resizeMode="cover" />
+            </TouchableOpacity>
           )}
 
           <View style={[styles.topSafe, { bottom: 24, top: undefined }]}>
@@ -468,11 +487,6 @@ export default function BusinessPlanDetailScreen() {
             )}
           </View>
 
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => { setGalleryIndex(heroImageIndex); setShowImageGallery(true); }}
-          />
       </View>
 
       {/* ScrollView – white card starts exactly where image ends (no gap) */}
@@ -484,22 +498,13 @@ export default function BusinessPlanDetailScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* WHITE CARD – top edge on image bottom border; 5px horizontal margin; only top corners rounded */}
+        {/* WHITE CARD – match home feed card sizing */}
         <View
           style={[
             styles.contentOverlay,
             styles.contentOverlayShadow,
             {
-              marginHorizontal: 5,
-              paddingTop: 20,
-              paddingHorizontal: CONTENT_PADDING_H,
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              borderBottomLeftRadius: 0,
-              borderBottomRightRadius: 0,
-              borderWidth: 0,
-              borderColor: 'transparent',
-              backgroundColor: '#FFF',
+              marginHorizontal: CONTENT_PADDING_H,
             },
           ]}
         >
@@ -1003,26 +1008,21 @@ const styles = StyleSheet.create({
   },
   contentOverlay: {
     backgroundColor: '#FFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderWidth: 0,
-    borderColor: 'transparent',
+    borderRadius: 24,
+    padding: 20,
     minHeight: SCREEN_HEIGHT * 0.3,
     overflow: 'hidden',
   },
   contentOverlayShadow: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   contentOverlayInner: {
     backgroundColor: 'transparent',
-    paddingHorizontal: 8,
-    paddingTop: 2,
+    paddingTop: 28,
   },
   venueDateCard: {
     backgroundColor: '#F2F2F7',

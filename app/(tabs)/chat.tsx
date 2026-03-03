@@ -79,18 +79,7 @@ export default function ChatScreen() {
       setLoading(true);
       const response = await apiService.getChatLists(user.user_id);
 
-      // Log for announcement group debugging
       const groupsList = response?.data?.groups || [];
-      const announcementGroups = groupsList.filter((g: any) => g.is_announcement_group);
-      console.log('[Chat] getChatLists response:', {
-        groupsCount: groupsList.length,
-        groupIds: groupsList.map((g: any) => g.group_id),
-        announcementGroupCount: announcementGroups.length,
-        hasAnnouncementGroup: announcementGroups.length > 0,
-      });
-      if (groupsList.length > 0 && announcementGroups.length === 0) {
-        console.log('[Chat] No announcement group in list. Backend /chat/lists may not include it.');
-      }
 
       if (response.data) {
         setTheirPlans(response.data.their_plans || []);
@@ -122,7 +111,6 @@ export default function ChatScreen() {
                 ...(d ? { is_announcement_group: !!d.is_announcement_group } : {}),
               };
               finalGroups = [announcementItem, ...groupsList];
-              console.log('[Chat] Announcement group added to list (was missing from backend)', { group_id: annGroupId });
             }
           } catch (annErr: any) {
             console.warn('[Chat] Could not load announcement group for list:', annErr?.message ?? annErr);

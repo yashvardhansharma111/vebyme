@@ -3,8 +3,8 @@ import { apiService } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import { ActivityIndicator, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { ActivityIndicator, FlatList, Platform, RefreshControl, SafeAreaView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppSelector } from '@/store/hooks';
 import LoginModal from '@/components/LoginModal';
 
@@ -50,12 +50,17 @@ export default function FeedScreen() {
   const [events, setEvents] = useState<FormattedEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const router = useRouter();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
   const { currentUser } = useAppSelector((state) => state.profile);
   const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
+
+  const PAGE_SIZE = 12;
 
   const fetchUserProfile = useCallback(async (user_id: string) => {
     if (userCache[user_id]) return userCache[user_id];
@@ -169,31 +174,74 @@ export default function FeedScreen() {
     return formatted;
   }, [fetchUserProfile]);
 
+  const filtersForRequest = useMemo(() => {
+    const filters: any = {};
+    if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
+      filters.category_main = activeFilter.toLowerCase();
+    }
+    return filters;
+  }, [activeFilter]);
+
   const loadFeed = useCallback(async (isRefresh = false) => {
     try {
-      if (isRefresh) setIsRefreshing(true);
-      else setIsLoading(true);
-      setError(null);
-      const filters: any = {};
-      if (activeFilter && CATEGORY_FILTERS.includes(activeFilter)) {
-        filters.category_main = activeFilter.toLowerCase();
+      if (isRefresh) {
+        setIsRefreshing(true);
+        setOffset(0);
+        setHasMore(true);
+      } else {
+        setIsLoading(true);
       }
-      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 30, offset: 0 });
+      setError(null);
+      const response = await apiService.getHomeFeed(user?.user_id, filtersForRequest, { limit: PAGE_SIZE, offset: 0 });
       if (response.data && Array.isArray(response.data)) {
         const regularOnly = response.data.filter((p: any) => p.type !== 'business');
         const formatted = await formatFeedData(regularOnly);
         setEvents(formatted);
+        setOffset(formatted.length);
+        setHasMore(response.data.length >= PAGE_SIZE);
       } else {
         setEvents([]);
+        setOffset(0);
+        setHasMore(false);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to load feed');
       setEvents([]);
+      setOffset(0);
+      setHasMore(false);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user, activeFilter, formatFeedData]);
+  }, [user, filtersForRequest, formatFeedData]);
+
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || isLoading || isRefreshing || !hasMore) return;
+    try {
+      setIsLoadingMore(true);
+      const response = await apiService.getHomeFeed(user?.user_id, filtersForRequest, { limit: PAGE_SIZE, offset });
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+        const regularOnly = response.data.filter((p: any) => p.type !== 'business');
+        const formatted = await formatFeedData(regularOnly);
+        setEvents((prev) => {
+          const seen = new Set(prev.map((e) => e.id));
+          const next = [...prev];
+          formatted.forEach((e) => {
+            if (!seen.has(e.id)) next.push(e);
+          });
+          return next;
+        });
+        setOffset((prev) => prev + formatted.length);
+        setHasMore(response.data.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch {
+      setHasMore(false);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [filtersForRequest, formatFeedData, hasMore, isLoading, isLoadingMore, isRefreshing, offset, user?.user_id]);
 
   useEffect(() => {
     loadFeed();
@@ -211,6 +259,35 @@ export default function FeedScreen() {
     }
   };
 
+  const renderHeader = () => (
+    <>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#FFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>What others are planning</Text>
+        <View style={styles.placeholder} />
+      </View>
+      <View style={styles.filterScroll}>
+        <FlatList
+          horizontal
+          data={FILTERS}
+          keyExtractor={(item) => item}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+          renderItem={({ item }) => {
+            const isActive = activeFilter === item;
+            return (
+              <TouchableOpacity style={isActive ? styles.activeFilterChip : styles.filterChip} onPress={() => setActiveFilter(item)}>
+                <Text style={isActive ? styles.activeFilterText : styles.filterText}>{item}</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -220,74 +297,71 @@ export default function FeedScreen() {
         style={styles.topGradient}
       />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>What others are planning</Text>
-          <View style={styles.placeholder} />
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadFeed(true)} tintColor="#FFF" />}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-            {FILTERS.map((f, i) => {
-              const isActive = activeFilter === f;
-              return (
-                <TouchableOpacity key={i} style={isActive ? styles.activeFilterChip : styles.filterChip} onPress={() => setActiveFilter(f)}>
-                  <Text style={isActive ? styles.activeFilterText : styles.filterText}>{f}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {isLoading && events.length === 0 ? (
+        {isLoading && events.length === 0 ? (
+          <>
+            {renderHeader()}
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#4A3B69" />
               <Text style={styles.loadingText}>Loading feed...</Text>
             </View>
-          ) : error && events.length === 0 ? (
+          </>
+        ) : error && events.length === 0 ? (
+          <>
+            {renderHeader()}
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity style={styles.retryButton} onPress={() => loadFeed()}>
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <View style={styles.feed}>
-              {events.map((item) => (
-                <SwipeableEventCard
-                  key={item.id}
-                  user={item.user}
-                  event={item.event}
-                  postId={item.id}
-                  isRepost={item.event.is_repost || false}
-                  originalAuthor={item.event.original_author_name}
-                  originalPostTitle={item.event.original_post_title}
-                  originalPostDescription={item.event.original_post_description}
-                  onUserPress={(userId: string) => {
-                    if (isAuthenticated) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
-                    else setShowLoginModal(true);
-                  }}
-                  onRequireAuth={() => {
-                    if (!isAuthenticated) setShowLoginModal(true);
-                  }}
-                />
-              ))}
-
-              {/* CTA at end of home feed */}
-              <View style={styles.ctaSection}>
-                <Text style={styles.ctaText}>Didn&apos;t find a plan,</Text>
-                <TouchableOpacity style={styles.createCtaButton} onPress={handleCreateYourOwn} activeOpacity={0.8}>
-                  <Text style={styles.createCtaButtonText}>Create your own</Text>
-                </TouchableOpacity>
+          </>
+        ) : (
+          <FlatList
+            data={events}
+            keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderHeader}
+            contentContainerStyle={styles.listContent}
+            renderItem={({ item }) => (
+              <SwipeableEventCard
+                user={item.user}
+                event={item.event}
+                postId={item.id}
+                isRepost={item.event.is_repost || false}
+                originalAuthor={item.event.original_author_name}
+                originalPostTitle={item.event.original_post_title}
+                originalPostDescription={item.event.original_post_description}
+                onUserPress={(userId: string) => {
+                  if (isAuthenticated) router.push({ pathname: '/profile/[userId]', params: { userId } } as any);
+                  else setShowLoginModal(true);
+                }}
+                onRequireAuth={() => {
+                  if (!isAuthenticated) setShowLoginModal(true);
+                }}
+              />
+            )}
+            refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadFeed(true)} tintColor="#FFF" />}
+            onEndReachedThreshold={0.5}
+            onEndReached={loadMore}
+            ListFooterComponent={
+              <View style={styles.listFooter}>
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color="#4A3B69" />
+                ) : (
+                  <>
+                    {!hasMore ? (
+                      <View style={styles.ctaSection}>
+                        <Text style={styles.ctaText}>Didn&apos;t find a plan,</Text>
+                        <TouchableOpacity style={styles.createCtaButton} onPress={handleCreateYourOwn} activeOpacity={0.8}>
+                          <Text style={styles.createCtaButtonText}>Create your own</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                  </>
+                )}
               </View>
-            </View>
-          )}
-        </ScrollView>
+            }
+          />
+        )}
       </SafeAreaView>
 
       <LoginModal
@@ -323,14 +397,14 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 18, fontWeight: '700', color: '#FFF' },
   placeholder: { width: 40 },
-  scrollContainer: { paddingBottom: 120, paddingTop: 8 },
-  filterScroll: { marginBottom: 20 },
+  filterScroll: { marginBottom: 12 },
   filterContent: { paddingHorizontal: 20, gap: 12 },
   activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   activeFilterText: { color: '#FFF', fontWeight: '600' },
   filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
   filterText: { color: '#1C1C1E', fontWeight: '600' },
-  feed: { paddingBottom: 24 },
+  listContent: { paddingBottom: 120, paddingTop: 8 },
+  listFooter: { paddingBottom: 24 },
   loadingContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
   loadingText: { marginTop: 12, fontSize: 14, color: '#666' },
   errorContainer: { padding: 40, alignItems: 'center', justifyContent: 'center' },
