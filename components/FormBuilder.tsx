@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 export interface FormField {
@@ -76,6 +77,40 @@ export default function FormBuilder({
     setFields(newFields);
   };
 
+  const addOption = (fieldIndex: number) => {
+    const newFields = [...fields];
+    const opts = newFields[fieldIndex].options || [];
+    newFields[fieldIndex].options = [...opts, ''];
+    setFields(newFields);
+  };
+
+  const updateOption = (fieldIndex: number, optionIndex: number, value: string) => {
+    const newFields = [...fields];
+    const opts = newFields[fieldIndex].options || [];
+    // if user pasted comma separated values, split into multiple options
+    if (value.includes(',')) {
+      const parts = value.split(',').map((p) => p.trim()).filter(Boolean);
+      // replace current index with first part, insert remaining after
+      opts[optionIndex] = parts[0];
+      const rest = parts.slice(1);
+      if (rest.length > 0) {
+        opts.splice(optionIndex + 1, 0, ...rest);
+      }
+    } else {
+      opts[optionIndex] = value;
+    }
+    newFields[fieldIndex].options = opts;
+    setFields(newFields);
+  };
+
+  const removeOption = (fieldIndex: number, optionIndex: number) => {
+    const newFields = [...fields];
+    const opts = newFields[fieldIndex].options || [];
+    opts.splice(optionIndex, 1);
+    newFields[fieldIndex].options = opts;
+    setFields(newFields);
+  };
+
   const deleteField = (index: number) => {
     setFields(fields.filter((_, i) => i !== index));
   };
@@ -104,30 +139,17 @@ export default function FormBuilder({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <View style={styles.header}>
-          <Pressable onPress={onCancel} style={styles.headerButton}>
-            <Text style={styles.headerButtonText}>Cancel</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Form Builder</Text>
-          <Pressable
-            onPress={handleSave}
-            disabled={loading}
-            style={[styles.headerButton, loading && styles.disabledButton]}
-          >
-            <Text style={[styles.headerButtonText, styles.saveButton]}>Save</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView style={styles.content}>
-          {fields.map((field, index) => (
-            <View key={field.field_id} style={styles.fieldCard}>
-              <View style={styles.fieldHeader}>
-                <Text style={styles.fieldIndex}>{index + 1}</Text>
-                <View style={styles.fieldHeaderActions}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flex}
+        >
+          <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
+            {fields.map((field, index) => (
+              <View key={field.field_id} style={styles.fieldCard}>
+                <View style={styles.fieldHeader}>
+                  <Text style={styles.fieldIndex}>{index + 1}</Text>
+                  <View style={styles.fieldHeaderActions}>
                   <Pressable
                     onPress={() => moveFieldUp(index)}
                     disabled={index === 0}
@@ -207,18 +229,28 @@ export default function FormBuilder({
 
               {['select', 'radio', 'checkbox'].includes(field.type) && (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Options (comma-separated)</Text>
-                  <TextInput
-                    style={[styles.input, { minHeight: 80 }]}
-                    placeholder="Option 1, Option 2, Option 3"
-                    multiline
-                    value={field.options?.join(', ') || ''}
-                    onChangeText={(text) => {
-                      const opts = text.split(',').map((o) => o.trim()).filter(Boolean);
-                      updateField(index, { options: opts });
-                    }}
-                    placeholderTextColor="#999"
-                  />
+                  <Text style={styles.label}>Options</Text>
+                  {(field.options || []).map((opt, oidx) => (
+                    <View key={oidx} style={styles.optionRow}>
+                      <TextInput
+                        style={[styles.input, { flex: 1 }]}
+                        placeholder={`Option ${oidx + 1}`}
+                        value={opt}
+                        onChangeText={(text) => updateOption(index, oidx, text)}
+                        placeholderTextColor="#999"
+                      />
+                      <Pressable onPress={() => removeOption(index, oidx)} style={styles.optionRemove}>
+                        <Ionicons name="trash" size={20} color="#FF3B30" />
+                      </Pressable>
+                    </View>
+                  ))}
+                  <Pressable onPress={() => addOption(index)} style={styles.addOptionButton}>
+                    <Ionicons name="add-circle" size={20} color="#007AFF" />
+                    <Text style={styles.addOptionText}>Add Option</Text>
+                  </Pressable>
+                  <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
+                    You can also paste comma-separated values; commas will be preserved.
+                  </Text>
                 </View>
               )}
 
@@ -239,9 +271,23 @@ export default function FormBuilder({
             <Text style={styles.addFieldButtonText}>Add Field</Text>
           </Pressable>
 
-          <View style={{ height: 100 }} />
+          <View style={{ height: 20 }} />
         </ScrollView>
+
+        <View style={styles.footerButtonContainer}>
+          <Pressable onPress={onCancel} style={[styles.footerButton, styles.cancelButton]}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            onPress={handleSave}
+            disabled={loading}
+            style={[styles.footerButton, styles.saveButtonContainer, loading && styles.disabledButton]}
+          >
+            <Text style={[styles.saveButtonText]}>Save</Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
+    </SafeAreaView>
     </Modal>
   );
 }
@@ -250,6 +296,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -284,6 +333,43 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  scrollContentContainer: {
+    paddingBottom: 20,
+  },
+  footerButtonContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  footerButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  saveButtonContainer: {
+    backgroundColor: '#007AFF',
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
   fieldCard: {
     backgroundColor: '#fff',
@@ -383,5 +469,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  optionRemove: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  addOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addOptionText: {
+    marginLeft: 4,
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

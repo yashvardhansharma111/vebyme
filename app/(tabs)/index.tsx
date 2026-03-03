@@ -489,6 +489,7 @@ export default function HomeScreen() {
                     const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
                     // For reposts, use original plan id so plan detail and APIs (e.g. getBusinessPlan) don't 404
                     const effectivePlanId = item.event?.repost_data?.original_plan_id || item.id;
+                    const userHasInteracted = item.event?.interacted_users?.some((u: any) => u.id === user?.user_id);
                     return (
                       <View key={item.id} style={styles.businessHorizontalCard}>
                         <BusinessCard
@@ -520,7 +521,7 @@ export default function HomeScreen() {
                             router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                           }}
                           hideRegisterButton={false}
-                          registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId]}
+                          registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId] || userHasInteracted}
                           onRegisterPress={() => {
                             if (!isAuthenticated || !user?.user_id) {
                               router.push('/login');

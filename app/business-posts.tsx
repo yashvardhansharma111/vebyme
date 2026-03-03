@@ -365,6 +365,7 @@ export default function BusinessPostsScreen() {
                 {events.map((item, index) => {
                   const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
                   const effectivePlanId = rawPost?.repost_data?.original_plan_id || item.id;
+                  const userHasInteracted = item.event?.interacted_users?.some((u: any) => u.id === user?.user_id);
                   return (
                     <View key={item.id} style={styles.businessCardWrapper}>
                     <BusinessCard
@@ -393,7 +394,7 @@ export default function BusinessPostsScreen() {
                       interactedUsers={item.event?.interacted_users}
                       isSwipeable={true}
                       hideRegisterButton={false}
-                      registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId]}
+                      registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId] || userHasInteracted}
                       onPress={() => {
                         router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
                       }}
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   businessCardWrapper: {
-    width: Dimensions.get('window').width - 48,
+    width: Dimensions.get('window').width - 40, // full width minus container padding
     marginHorizontal: 20,
     marginBottom: 16,
     alignSelf: 'center',

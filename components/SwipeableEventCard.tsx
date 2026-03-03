@@ -228,6 +228,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
   const hasEventImage = event?.image && String(event.image).trim();
   const swipeableRef = useRef<Swipeable>(null);
   const isOwnPost = !!(authUser?.user_id && (String(user?.id) === String(authUser.user_id) || String(user?.user_id) === String(authUser.user_id) || String(event?.user_id) === String(authUser.user_id)));
+  const userHasInteracted = event?.interacted_users?.some((u: any) => String(u.id) === String(authUser?.user_id));
   
   // Logic: Reveal the Left Action (Save icon) when swiping
   const renderLeftActions = (progress: any, dragX: any) => {
@@ -326,7 +327,7 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
               onRequireAuth?.();
             }
           }}
-          joinDisabled={isOwnPost}
+          joinDisabled={isOwnPost || userHasInteracted}
           onSharePress={handleShare}
           isRepost={isRepost}
           repostData={event.repost_data}

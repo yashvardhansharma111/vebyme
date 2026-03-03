@@ -5,7 +5,8 @@ import { Animated, Dimensions, Image, Modal, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 
-const CARD_FIXED_HEIGHT = 400;
+const SCREEN = Dimensions.get('window');
+const CARD_FIXED_HEIGHT = Math.round(SCREEN.height * 0.35); // ~30-40% of viewport height
 const CARD_IMAGE_PERCENT = 0.7;
 const CARD_WHITE_PERCENT = 0.3;
 const FLOATING_BUTTON_SIZE = 48;
@@ -132,12 +133,33 @@ function BusinessCardBase({
     const label = d.title || d.description || d.detail_type;
     if (label && String(label).trim()) cardTags.push({ type: 'additional', label: String(label).trim() });
   });
-  if (plan.category_main) cardTags.push({ type: 'category', label: plan.category_main });
+  
+  // Helper to capitalize first letter
+  const capitalizeLabel = (label: string): string => {
+    return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
+  };
+  
+  // Add category_main and track it to avoid duplicates
+  const addedCategories = new Set<string>();
+  if (plan.category_main) {
+    const capitalizedMain = capitalizeLabel(plan.category_main);
+    cardTags.push({ type: 'category', label: capitalizedMain });
+    addedCategories.add(capitalizedMain.toLowerCase());
+  }
+  
+  // Add category_sub, but skip duplicates (case-insensitive) and capitalize
   if (plan.category_sub?.length) {
     for (const sub of plan.category_sub) {
-      if (sub) cardTags.push({ type: 'category', label: sub });
+      if (sub) {
+        const capitalizedSub = capitalizeLabel(sub);
+        if (!addedCategories.has(capitalizedSub.toLowerCase())) {
+          cardTags.push({ type: 'category', label: capitalizedSub });
+          addedCategories.add(capitalizedSub.toLowerCase());
+        }
+      }
     }
   }
+  
   if (plan.temporal_tags?.length) {
     for (const t of plan.temporal_tags) {
       if (t) cardTags.push({ type: 'temporal', label: t });
