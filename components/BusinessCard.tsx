@@ -139,6 +139,7 @@ function BusinessCardBase({
   const mainImage = planMedia.length > 0 ? planMedia[0].url : undefined;
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryViewportWidth, setGalleryViewportWidth] = useState(0);
   const galleryScrollRef = useRef<ScrollView>(null);
   const cardImageScrollRef = useRef<ScrollView>(null);
   const [cardImageIndex, setCardImageIndex] = useState(0);
@@ -621,7 +622,7 @@ function BusinessCardBase({
             style={[
               styles.galleryContentWrap,
               {
-                paddingHorizontal: galleryPaddingH,
+                paddingHorizontal: 0,
                 paddingTop: 20,
                 paddingBottom: 20,
                 margin: 20,
@@ -633,6 +634,16 @@ function BusinessCardBase({
               ref={galleryScrollRef}
               horizontal
               pagingEnabled
+              onLayout={(e) => {
+                const w = Math.ceil(e.nativeEvent.layout.width);
+                if (w > 0) setGalleryViewportWidth(w);
+              }}
+              snapToInterval={galleryViewportWidth || gallerySlideWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              disableIntervalMomentum
+              bounces={false}
+              overScrollMode="never"
               showsHorizontalScrollIndicator={false}
               style={styles.galleryScroll}
               contentContainerStyle={styles.galleryScrollContent}
@@ -646,7 +657,13 @@ function BusinessCardBase({
               {planMedia.map((item, index) => (
                 <View
                   key={index}
-                  style={[styles.gallerySlide, { width: gallerySlideWidth }]}
+                  style={[
+                    styles.gallerySlide,
+                    {
+                      width: galleryViewportWidth || gallerySlideWidth,
+                      paddingHorizontal: galleryPaddingH,
+                    },
+                  ]}
                 >
                   <Image
                     source={{ uri: item.url }}

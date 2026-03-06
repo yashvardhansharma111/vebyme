@@ -98,6 +98,7 @@ export default function BusinessPlanDetailScreen() {
   const [heroImageIndex, setHeroImageIndex] = useState(0);
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryViewportWidth, setGalleryViewportWidth] = useState(0);
   const [showShareModal, setShowShareModal] = useState(false);
   const [userHasTicket, setUserHasTicket] = useState<boolean | null>(null);
   const [registering, setRegistering] = useState(false);
@@ -136,12 +137,13 @@ export default function BusinessPlanDetailScreen() {
 
   useEffect(() => {
     if (showImageGallery && galleryScrollRef.current) {
+      const w = galleryViewportWidth || gallerySlideWidth;
       const t = setTimeout(() => {
-        galleryScrollRef.current?.scrollTo({ x: galleryIndex * gallerySlideWidth, animated: false });
+        galleryScrollRef.current?.scrollTo({ x: galleryIndex * w, animated: false });
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [showImageGallery, galleryIndex, gallerySlideWidth]);
+  }, [showImageGallery, galleryIndex, gallerySlideWidth, galleryViewportWidth]);
 
   const pauseHeroAutoScroll = () => {
     heroAutoScrollPausedRef.current = true;
@@ -847,13 +849,23 @@ export default function BusinessPlanDetailScreen() {
         <SafeAreaView style={styles.galleryOverlay} edges={['top', 'bottom']}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowImageGallery(false)} />
           <View
-            style={[styles.galleryContentWrap, { paddingHorizontal: galleryPaddingH, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV, margin: 20 }]}
+            style={[styles.galleryContentWrap, { paddingHorizontal: 0, paddingTop: galleryPaddingV, paddingBottom: galleryPaddingV, margin: 20 }]}
             pointerEvents="box-none"
           >
             <ScrollView
               ref={galleryScrollRef}
               horizontal
               pagingEnabled
+              onLayout={(e) => {
+                const w = Math.ceil(e.nativeEvent.layout.width);
+                if (w > 0) setGalleryViewportWidth(w);
+              }}
+              snapToInterval={galleryViewportWidth || gallerySlideWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              disableIntervalMomentum
+              bounces={false}
+              overScrollMode="never"
               showsHorizontalScrollIndicator={false}
               style={styles.galleryScroll}
               contentContainerStyle={styles.galleryScrollContent}
@@ -864,7 +876,16 @@ export default function BusinessPlanDetailScreen() {
               }}
             >
               {planMedia.map((item, index) => (
-                <View key={index} style={[styles.gallerySlide, { width: gallerySlideWidth }]}>
+                <View
+                  key={index}
+                  style={[
+                    styles.gallerySlide,
+                    {
+                      width: galleryViewportWidth || gallerySlideWidth,
+                      paddingHorizontal: galleryPaddingH,
+                    },
+                  ]}
+                >
                   <Image source={{ uri: item.url }} style={styles.galleryImage} resizeMode="contain" />
                 </View>
               ))}
