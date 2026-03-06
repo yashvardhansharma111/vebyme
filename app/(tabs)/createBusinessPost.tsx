@@ -1,12 +1,12 @@
-import { apiService } from '@/services/api';
-import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchCurrentUser } from '@/store/slices/profileSlice';
-import { setPostCreated } from '@/store/slices/postCreatedSlice';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiService } from "@/services/api";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchCurrentUser } from "@/store/slices/profileSlice";
+import { setPostCreated } from "@/store/slices/postCreatedSlice";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Alert,
@@ -21,27 +21,36 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import BusinessCard from '@/components/BusinessCard';
-import BusinessPlanDetailPreview from '@/components/BusinessPlanDetailPreview';
-import { EventCard } from '@/components/SwipeableEventCard';
-import CalendarPicker from '@/components/CalendarPicker';
-import ShareToChatModal from '@/components/ShareToChatModal';
-import FormBuilder, { FormField } from '@/components/FormBuilder';
-import FormSelector from '@/components/FormSelector';
+} from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
+import FontAwesome5 from "@expo/vector-icons/FontAwesome5";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import BusinessCard from "@/components/BusinessCard";
+import BusinessPlanDetailPreview from "@/components/BusinessPlanDetailPreview";
+import { EventCard } from "@/components/SwipeableEventCard";
+import CalendarPicker from "@/components/CalendarPicker";
+import ShareToChatModal from "@/components/ShareToChatModal";
+import FormBuilder, { FormField } from "@/components/FormBuilder";
+import FormSelector from "@/components/FormSelector";
 
-const CATEGORY_TAGS = ['Running', 'Sports', 'Fitness/Training', 'Social/Community'];
+const CATEGORY_TAGS = [
+  "Running",
+  "Sports",
+  "Fitness/Training",
+  "Social/Community",
+];
 
 const CATEGORY_ICONS: Record<string, string> = {
-  'Running': 'walk-outline',
-  'Sports': 'basketball-outline',
-  'Fitness/Training': 'barbell-outline',
-  'Social/Community': 'people-outline',
+  Running: "walk-outline",
+  Sports: "basketball-outline",
+  "Fitness/Training": "barbell-outline",
+  "Social/Community": "people-outline",
 };
 
 // Previously used categories – hidden per design; uncomment to restore
@@ -57,23 +66,62 @@ const CATEGORY_ICONS: Record<string, string> = {
 const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
   Running: [],
   Sports: [],
-  'Fitness/Training': [],
-  'Social/Community': [],
+  "Fitness/Training": [],
+  "Social/Community": [],
 };
 
 // Icons match assets/icons/*.svg replaced by React icons: Map pin → location-outline, Ticket_alt → pricetag-outline, t-shirt → shirt-outline, etc. (see constants/assetIcons.ts)
 const ADDITIONAL_SETTINGS = [
-  { id: 'distance', label: 'Distance', icon: 'location-outline', placeholder: 'e.g. 5k' },
-  { id: 'starting_point', label: 'Starting Point', icon: 'navigate-outline', placeholder: 'e.g. Alienkind Indiranagar' },
-  { id: 'f&b', label: 'F&B', icon: 'restaurant-outline', placeholder: 'e.g. Post Run Coffee' },
-  { id: 'dress_code', label: 'Dress Code', icon: 'shirt-outline', placeholder: 'e.g. Cafe Joggers' },
-  { id: 'music_type', label: 'Music Type', icon: 'musical-notes-outline', placeholder: 'e.g. Electronic' },
+  {
+    id: "distance",
+    label: "Distance",
+    icon: "location-outline",
+    placeholder: "e.g. 5k",
+  },
+  {
+    id: "starting_point",
+    label: "Starting Point",
+    icon: "navigate-outline",
+    placeholder: "e.g. Alienkind Indiranagar",
+  },
+  {
+    id: "f&b",
+    label: "F&B",
+    icon: "restaurant-outline",
+    placeholder: "e.g. Post Run Coffee",
+  },
+  {
+    id: "dress_code",
+    label: "Dress Code",
+    icon: "shirt-outline",
+    placeholder: "e.g. Cafe Joggers",
+  },
+  {
+    id: "music_type",
+    label: "Music Type",
+    icon: "musical-notes-outline",
+    placeholder: "e.g. Electronic",
+  },
   // Strava profile link – only relevant when category is Running.
-  { id: 'strava_link', label: 'Strava Link', icon: 'link-outline', placeholder: 'https://www.strava.com/athletes/...' },
-  { id: 'links', label: 'Links', icon: 'link-outline', placeholder: 'https://...' },
-  { id: 'google_drive_link', label: 'Link for photos', icon: 'cloud-download-outline', placeholder: 'https://drive.google.com/recent_run' },
+  {
+    id: "strava_link",
+    label: "Strava Link",
+    icon: "link-outline",
+    placeholder: "https://www.strava.com/athletes/...",
+  },
+  {
+    id: "links",
+    label: "Links",
+    icon: "link-outline",
+    placeholder: "https://...",
+  },
+  {
+    id: "google_drive_link",
+    label: "Link for photos",
+    icon: "cloud-download-outline",
+    placeholder: "https://drive.google.com/recent_run",
+  },
 ];
-
 
 interface Pass {
   pass_id: string;
@@ -81,7 +129,7 @@ interface Pass {
   price: number;
   description: string;
   capacity?: number;
-  media?: { uri: string; type: 'image' }[];
+  media?: { uri: string; type: "image" }[];
   isExisting?: boolean; // true when loaded from plan (edit mode) – not removable/editable
 }
 
@@ -94,7 +142,7 @@ export default function CreateBusinessPostScreen() {
   // Redirect to login when not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      router.replace('/login');
+      router.replace("/login");
     }
   }, [isAuthenticated, router]);
 
@@ -102,30 +150,40 @@ export default function CreateBusinessPostScreen() {
   const isBusinessUser = currentUser?.is_business === true;
 
   // Form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [media, setMedia] = useState<{ uri: string; type: 'image' | 'video' }[]>([]);
-  const [location, setLocation] = useState('Bengaluru');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [media, setMedia] = useState<
+    { uri: string; type: "image" | "video" }[]
+  >([]);
+  const [location, setLocation] = useState("Bengaluru");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [timeEnabled, setTimeEnabled] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [endTime, setEndTime] = useState<Date | null>(null);
-  const [startTimeText, setStartTimeText] = useState('');
-  const [endTimeText, setEndTimeText] = useState('');
+  const [startTimeText, setStartTimeText] = useState("");
+  const [endTimeText, setEndTimeText] = useState("");
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
+    [],
+  );
   const [ticketsEnabled, setTicketsEnabled] = useState(false);
   const [passes, setPasses] = useState<Pass[]>([]);
-  const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<string[]>([]);
-  const [additionalDetails, setAdditionalDetails] = useState<{ [key: string]: { title: string; description: string } }>({});
+  const [selectedAdditionalSettings, setSelectedAdditionalSettings] = useState<
+    string[]
+  >([]);
+  const [additionalDetails, setAdditionalDetails] = useState<{
+    [key: string]: { title: string; description: string };
+  }>({});
 
   // remove strava link when category changes away from Running
   useEffect(() => {
-    if (selectedCategory && selectedCategory !== 'Running') {
-      setSelectedAdditionalSettings((prev) => prev.filter((id) => id !== 'strava_link'));
+    if (selectedCategory && selectedCategory !== "Running") {
+      setSelectedAdditionalSettings((prev) =>
+        prev.filter((id) => id !== "strava_link"),
+      );
       setAdditionalDetails((prev) => {
         const { strava_link, ...rest } = prev;
         return rest;
@@ -133,8 +191,10 @@ export default function CreateBusinessPostScreen() {
     }
   }, [selectedCategory]);
   const [womenOnly, setWomenOnly] = useState(false);
-  const [hideGuestListFromViewers, setHideGuestListFromViewers] = useState(false);
-  const [shareToAnnouncementGroup, setShareToAnnouncementGroup] = useState(false);
+  const [hideGuestListFromViewers, setHideGuestListFromViewers] =
+    useState(false);
+  const [shareToAnnouncementGroup, setShareToAnnouncementGroup] =
+    useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -142,11 +202,14 @@ export default function CreateBusinessPostScreen() {
   const [showTicketPreview, setShowTicketPreview] = useState(false);
   const [previewPassIndex, setPreviewPassIndex] = useState<number>(0);
   const [showPostSuccessModal, setShowPostSuccessModal] = useState(false);
-  const [createdPlanIdForSuccess, setCreatedPlanIdForSuccess] = useState<string | null>(null);
+  const [createdPlanIdForSuccess, setCreatedPlanIdForSuccess] = useState<
+    string | null
+  >(null);
   const [showShareToChatModal, setShowShareToChatModal] = useState(false);
-  const [startAmPm, setStartAmPm] = useState<'AM' | 'PM'>('AM');
-  const [endAmPm, setEndAmPm] = useState<'AM' | 'PM'>('PM');
-  const [additionalSettingsExpanded, setAdditionalSettingsExpanded] = useState(false);
+  const [startAmPm, setStartAmPm] = useState<"AM" | "PM">("AM");
+  const [endAmPm, setEndAmPm] = useState<"AM" | "PM">("PM");
+  const [additionalSettingsExpanded, setAdditionalSettingsExpanded] =
+    useState(false);
   const [descriptionHeight, setDescriptionHeight] = useState(100);
   const isEditFlowRef = useRef(false);
   const openedFromMyPlansRef = useRef(false);
@@ -158,27 +221,30 @@ export default function CreateBusinessPostScreen() {
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
   const [attachFormEnabled, setAttachFormEnabled] = useState(false);
-  const [mostRecentFormFields, setMostRecentFormFields] = useState<FormField[]>([]);
+  const [mostRecentFormFields, setMostRecentFormFields] = useState<FormField[]>(
+    [],
+  );
 
   // Registration limit state
-  const [limitRegistrationEnabled, setLimitRegistrationEnabled] = useState(false);
-  const [registrationLimit, setRegistrationLimit] = useState('');
+  const [limitRegistrationEnabled, setLimitRegistrationEnabled] =
+    useState(false);
+  const [registrationLimit, setRegistrationLimit] = useState("");
 
   const resetForm = useCallback(() => {
-    setTitle('');
-    setDescription('');
+    setTitle("");
+    setDescription("");
     setMedia([]);
-    setLocation('');
+    setLocation("");
     setSelectedDate(null);
     setShowDatePicker(false);
     setTimeEnabled(false);
     setStartTime(null);
     setEndTime(null);
-    setStartTimeText('');
-    setEndTimeText('');
+    setStartTimeText("");
+    setEndTimeText("");
     setShowStartTimePicker(false);
     setShowEndTimePicker(false);
-    setSelectedCategory('');
+    setSelectedCategory("");
     setSelectedSubcategories([]);
     setTicketsEnabled(false);
     setPasses([]);
@@ -195,7 +261,7 @@ export default function CreateBusinessPostScreen() {
     setFormId(null);
     setAttachFormEnabled(false);
     setLimitRegistrationEnabled(false);
-    setRegistrationLimit('');
+    setRegistrationLimit("");
     isEditFlowRef.current = false;
   }, []);
 
@@ -203,14 +269,16 @@ export default function CreateBusinessPostScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      AsyncStorage.getItem('planForCreation').then((planDataStr) => {
+      AsyncStorage.getItem("planForCreation").then((planDataStr) => {
         if (cancelled) return;
         if (planDataStr) return;
         if (isEditFlowRef.current) return;
         // Previously we called resetForm() here, which cleared the form (including start time) every time the screen was focused without a draft. Removed so the plan is not cancelled/cleared when the user opens the screen.
       });
-      return () => { cancelled = true; };
-    }, [])
+      return () => {
+        cancelled = true;
+      };
+    }, []),
   );
 
   useEffect(() => {
@@ -221,9 +289,11 @@ export default function CreateBusinessPostScreen() {
 
   useEffect(() => {
     if (!isBusinessUser && currentUser) {
-      Alert.alert('Access Denied', 'Only business users can create business plans', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      Alert.alert(
+        "Access Denied",
+        "Only business users can create business plans",
+        [{ text: "OK", onPress: () => router.back() }],
+      );
     }
   }, [isBusinessUser, currentUser, router]);
 
@@ -231,11 +301,11 @@ export default function CreateBusinessPostScreen() {
   useEffect(() => {
     const loadPlanData = async () => {
       try {
-        const planDataStr = await AsyncStorage.getItem('planForCreation');
+        const planDataStr = await AsyncStorage.getItem("planForCreation");
         if (planDataStr) {
           openedFromMyPlansRef.current = true;
           const planData = JSON.parse(planDataStr);
-          const isEdit = planData.mode === 'edit';
+          const isEdit = planData.mode === "edit";
           if (isEdit) isEditFlowRef.current = true;
           setEditMode(isEdit);
           if (isEdit) {
@@ -246,44 +316,54 @@ export default function CreateBusinessPostScreen() {
           if (planData.title) setTitle(planData.title);
           if (planData.description) setDescription(planData.description);
           if (planData.location_text) setLocation(planData.location_text);
-          if (planData.category_main) setSelectedCategory(planData.category_main);
+          if (planData.category_main)
+            setSelectedCategory(planData.category_main);
           if (planData.category_sub && Array.isArray(planData.category_sub)) {
             setSelectedSubcategories(planData.category_sub);
           }
           if (planData.is_women_only) setWomenOnly(planData.is_women_only);
-          if (planData.allow_view_guest_list === false) setHideGuestListFromViewers(true);
-          else if (planData.allow_view_guest_list) setHideGuestListFromViewers(false);
-          if (planData.reshare_to_announcement_group) setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
-          
+          if (planData.allow_view_guest_list === false)
+            setHideGuestListFromViewers(true);
+          else if (planData.allow_view_guest_list)
+            setHideGuestListFromViewers(false);
+          if (planData.reshare_to_announcement_group)
+            setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
+
           // Handle date
           if (planData.date) {
             setSelectedDate(new Date(planData.date));
           }
-          
+
           // Handle time
           if (planData.time) {
             setTimeEnabled(true);
             setStartTimeText(planData.time);
             const timeMatch = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
             if (timeMatch) {
-              setStartAmPm(timeMatch[3].toUpperCase() as 'AM' | 'PM');
+              setStartAmPm(timeMatch[3].toUpperCase() as "AM" | "PM");
               let hours = parseInt(timeMatch[1], 10);
               const minutes = parseInt(timeMatch[2], 10);
-              if (timeMatch[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-              if (timeMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+              if (timeMatch[3].toUpperCase() === "PM" && hours !== 12)
+                hours += 12;
+              if (timeMatch[3].toUpperCase() === "AM" && hours === 12)
+                hours = 0;
               const timeDate = new Date();
               timeDate.setHours(hours, minutes, 0, 0);
               setStartTime(timeDate);
             }
             if (planData.end_time) {
               setEndTimeText(planData.end_time);
-              const endMatch = planData.end_time.match(/(\d+):(\d+)\s*(AM|PM)/i);
+              const endMatch = planData.end_time.match(
+                /(\d+):(\d+)\s*(AM|PM)/i,
+              );
               if (endMatch) {
-                setEndAmPm(endMatch[3].toUpperCase() as 'AM' | 'PM');
+                setEndAmPm(endMatch[3].toUpperCase() as "AM" | "PM");
                 let hours = parseInt(endMatch[1], 10);
                 const minutes = parseInt(endMatch[2], 10);
-                if (endMatch[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-                if (endMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+                if (endMatch[3].toUpperCase() === "PM" && hours !== 12)
+                  hours += 12;
+                if (endMatch[3].toUpperCase() === "AM" && hours === 12)
+                  hours = 0;
                 const timeDate = new Date();
                 timeDate.setHours(hours, minutes, 0, 0);
                 setEndTime(timeDate);
@@ -294,25 +374,40 @@ export default function CreateBusinessPostScreen() {
           // Handle passes/tickets (normalize pass media to { uri, type }); mark as existing so they can't be removed/edited
           if (planData.passes && planData.passes.length > 0) {
             setTicketsEnabled(true);
-            setPasses(planData.passes.map((p: any) => ({
-              ...p,
-              isExisting: true,
-              media: p.media && p.media.length > 0
-                ? [{ uri: typeof p.media[0] === 'string' ? p.media[0] : p.media[0].url, type: 'image' as const }]
-                : undefined,
-            })));
+            setPasses(
+              planData.passes.map((p: any) => ({
+                ...p,
+                isExisting: true,
+                media:
+                  p.media && p.media.length > 0
+                    ? [
+                        {
+                          uri:
+                            typeof p.media[0] === "string"
+                              ? p.media[0]
+                              : p.media[0].url,
+                          type: "image" as const,
+                        },
+                      ]
+                    : undefined,
+              })),
+            );
           }
 
           // Handle additional details (additional_info may have heading + description)
           if (planData.add_details && planData.add_details.length > 0) {
             const settings: string[] = [];
-            const details: { [key: string]: { title: string; description: string } } = {};
+            const details: {
+              [key: string]: { title: string; description: string };
+            } = {};
             planData.add_details.forEach((detail: any) => {
               settings.push(detail.detail_type);
-              const isAdditionalInfo = detail.detail_type === 'additional_info';
+              const isAdditionalInfo = detail.detail_type === "additional_info";
               details[detail.detail_type] = {
-                title: isAdditionalInfo ? (detail.heading ?? detail.title ?? '') : (detail.title ?? ''),
-                description: detail.description || '',
+                title: isAdditionalInfo
+                  ? (detail.heading ?? detail.title ?? "")
+                  : (detail.title ?? ""),
+                description: detail.description || "",
               };
             });
             setSelectedAdditionalSettings(settings);
@@ -323,7 +418,8 @@ export default function CreateBusinessPostScreen() {
           if (planData.media && planData.media.length > 0) {
             const mediaItems = planData.media.map((item: any) => ({
               uri: item.url,
-              type: item.type === 'video' ? ('video' as const) : ('image' as const),
+              type:
+                item.type === "video" ? ("video" as const) : ("image" as const),
             }));
             setMedia(mediaItems);
           }
@@ -339,12 +435,12 @@ export default function CreateBusinessPostScreen() {
             setLimitRegistrationEnabled(true);
             setRegistrationLimit(String(planData.registration_limit));
           }
-          
+
           // Clear AsyncStorage after loading
-          await AsyncStorage.removeItem('planForCreation');
+          await AsyncStorage.removeItem("planForCreation");
         }
       } catch (error) {
-        console.error('Error loading plan data:', error);
+        console.error("Error loading plan data:", error);
       }
     };
 
@@ -355,23 +451,29 @@ export default function CreateBusinessPostScreen() {
 
   const handleAddMedia = () => {
     if (media.length >= MAX_MEDIA) {
-      Alert.alert('Limit reached', `You can add up to ${MAX_MEDIA} images per post.`);
+      Alert.alert(
+        "Limit reached",
+        `You can add up to ${MAX_MEDIA} images per post.`,
+      );
       return;
     }
-    Alert.alert('Add Image', 'Choose source', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Camera', onPress: () => handleAddMediaFromSource('camera') },
-      { text: 'Gallery', onPress: () => handleAddMediaFromSource('gallery') },
+    Alert.alert("Add Image", "Choose source", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Camera", onPress: () => handleAddMediaFromSource("camera") },
+      { text: "Gallery", onPress: () => handleAddMediaFromSource("gallery") },
     ]);
   };
 
-  const handleAddMediaFromSource = async (source: 'camera' | 'gallery') => {
+  const handleAddMediaFromSource = async (source: "camera" | "gallery") => {
     try {
       let result;
-      if (source === 'camera') {
+      if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Please grant camera permission to take photos.');
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "Please grant camera permission to take photos.",
+          );
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -380,9 +482,13 @@ export default function CreateBusinessPostScreen() {
           quality: 0.8,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Please grant photo library permission.');
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "Please grant photo library permission.",
+          );
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -394,15 +500,17 @@ export default function CreateBusinessPostScreen() {
         });
       }
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newItems = result.assets.slice(0, MAX_MEDIA - media.length).map((asset) => ({
-          uri: asset.uri,
-          type: 'image' as const,
-        }));
+        const newItems = result.assets
+          .slice(0, MAX_MEDIA - media.length)
+          .map((asset) => ({
+            uri: asset.uri,
+            type: "image" as const,
+          }));
         setMedia((prev) => [...prev, ...newItems].slice(0, MAX_MEDIA));
       }
     } catch (error) {
-      console.error('Error picking media:', error);
-      Alert.alert('Error', 'Failed to pick media');
+      console.error("Error picking media:", error);
+      Alert.alert("Error", "Failed to pick media");
     }
   };
 
@@ -415,20 +523,32 @@ export default function CreateBusinessPostScreen() {
   };
 
   const handleAddPassImage = (passIndex: number) => {
-    Alert.alert('Add Image', 'Choose source', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Camera', onPress: () => handleAddPassImageFromSource(passIndex, 'camera') },
-      { text: 'Gallery', onPress: () => handleAddPassImageFromSource(passIndex, 'gallery') },
+    Alert.alert("Add Image", "Choose source", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Camera",
+        onPress: () => handleAddPassImageFromSource(passIndex, "camera"),
+      },
+      {
+        text: "Gallery",
+        onPress: () => handleAddPassImageFromSource(passIndex, "gallery"),
+      },
     ]);
   };
 
-  const handleAddPassImageFromSource = async (passIndex: number, source: 'camera' | 'gallery') => {
+  const handleAddPassImageFromSource = async (
+    passIndex: number,
+    source: "camera" | "gallery",
+  ) => {
     try {
       let result;
-      if (source === 'camera') {
+      if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Please grant camera permission to take photos.');
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "Please grant camera permission to take photos.",
+          );
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -437,9 +557,13 @@ export default function CreateBusinessPostScreen() {
           quality: 0.8,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert('Permission needed', 'Please grant photo library permission.');
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "Please grant photo library permission.",
+          );
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -451,12 +575,15 @@ export default function CreateBusinessPostScreen() {
       }
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const updated = [...passes];
-        updated[passIndex] = { ...updated[passIndex], media: [{ uri: result.assets[0].uri, type: 'image' as const }] };
+        updated[passIndex] = {
+          ...updated[passIndex],
+          media: [{ uri: result.assets[0].uri, type: "image" as const }],
+        };
         setPasses(updated);
       }
     } catch (error) {
-      console.error('Error picking pass image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      console.error("Error picking pass image:", error);
+      Alert.alert("Error", "Failed to pick image");
     }
   };
 
@@ -469,9 +596,9 @@ export default function CreateBusinessPostScreen() {
   const addPass = () => {
     const newPass: Pass = {
       pass_id: `pass_${Date.now()}`,
-      name: '',
+      name: "",
       price: -1,
-      description: '',
+      description: "",
       capacity: 1,
     };
     setPasses([...passes, newPass]);
@@ -489,7 +616,9 @@ export default function CreateBusinessPostScreen() {
 
   const toggleAdditionalSetting = (settingId: string) => {
     if (selectedAdditionalSettings.includes(settingId)) {
-      setSelectedAdditionalSettings(selectedAdditionalSettings.filter(id => id !== settingId));
+      setSelectedAdditionalSettings(
+        selectedAdditionalSettings.filter((id) => id !== settingId),
+      );
       const updated = { ...additionalDetails };
       delete updated[settingId];
       setAdditionalDetails(updated);
@@ -497,7 +626,7 @@ export default function CreateBusinessPostScreen() {
       setSelectedAdditionalSettings([...selectedAdditionalSettings, settingId]);
       setAdditionalDetails({
         ...additionalDetails,
-        [settingId]: { title: '', description: '' },
+        [settingId]: { title: "", description: "" },
       });
     }
   };
@@ -549,7 +678,7 @@ export default function CreateBusinessPostScreen() {
 
   const handleFormBuilderSave = async (fields: FormField[]) => {
     if (!user?.user_id) {
-      Alert.alert('Error', 'User ID not available');
+      Alert.alert("Error", "User ID not available");
       return;
     }
 
@@ -558,31 +687,34 @@ export default function CreateBusinessPostScreen() {
       const response = await apiService.createForm({
         user_id: user.user_id,
         name: `Form ${new Date().toLocaleDateString()}`,
-        description: 'Custom registration form',
+        description: "Custom registration form",
         fields: fields,
       });
 
       if (response.success && response.data?.form_id) {
         setFormId(response.data.form_id);
         setShowFormBuilder(false);
-        Alert.alert('Success', 'Form created successfully');
+        Alert.alert("Success", "Form created successfully");
       } else {
-        Alert.alert('Error', 'Failed to create form');
+        Alert.alert("Error", "Failed to create form");
       }
     } catch (error) {
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to create form');
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to create form",
+      );
     } finally {
       setSavingForm(false);
     }
   };
 
   const formatTime = (date: Date | null): string => {
-    if (!date) return '';
+    if (!date) return "";
     const hours = date.getHours();
     const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const ampm = hours >= 12 ? "PM" : "AM";
     const displayHours = hours % 12 || 12;
-    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
   };
 
   const parseTimeText = (text: string): Date | null => {
@@ -591,75 +723,110 @@ export default function CreateBusinessPostScreen() {
     let hours = parseInt(timeMatch[1], 10);
     const minutes = Math.min(59, Math.max(0, parseInt(timeMatch[2], 10)));
     const ampm = timeMatch[3].toUpperCase();
-    if (ampm === 'PM' && hours !== 12) hours += 12;
-    if (ampm === 'AM' && hours === 12) hours = 0;
+    if (ampm === "PM" && hours !== 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
     hours = Math.min(23, Math.max(0, hours));
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
     return date;
   };
 
+  // utility to validate URLs (used by the Strava field)
+  const isValidUrl = (text: string) => {
+    try {
+      new URL(text);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const formatPreviewData = () => {
     const add_details = selectedAdditionalSettings.map((settingId) => {
-      const isAdditionalInfo = settingId === 'additional_info';
+      const isAdditionalInfo = settingId === "additional_info";
       return {
         detail_type: settingId,
-        title: additionalDetails[settingId]?.title ?? (isAdditionalInfo ? '' : (ADDITIONAL_SETTINGS.find((s) => s.id === settingId)?.label ?? settingId)),
-        description: additionalDetails[settingId]?.description ?? '',
-        ...(isAdditionalInfo ? { heading: additionalDetails[settingId]?.title ?? '' } : {}),
+        title:
+          additionalDetails[settingId]?.title ??
+          (isAdditionalInfo
+            ? ""
+            : (ADDITIONAL_SETTINGS.find((s) => s.id === settingId)?.label ??
+              settingId)),
+        description: additionalDetails[settingId]?.description ?? "",
+        ...(isAdditionalInfo
+          ? { heading: additionalDetails[settingId]?.title ?? "" }
+          : {}),
       };
     });
     return {
-      plan_id: 'preview',
-      title: title || 'Event Title',
-      description: description || 'Event description',
-      media: media.length > 0 ? media.map((m) => ({ url: m.uri, type: m.type })) : [],
+      plan_id: "preview",
+      title: title || "Event Title",
+      description: description || "Event description",
+      media:
+        media.length > 0
+          ? media.map((m) => ({ url: m.uri, type: m.type }))
+          : [],
       location_text: location || undefined,
       date: selectedDate ? selectedDate : undefined,
       time: (() => {
         const s = startTime || parseTimeText(startTimeText);
         return timeEnabled && s ? formatTime(s) : undefined;
       })(),
-      category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
+      category_sub:
+        selectedSubcategories.length > 0
+          ? selectedSubcategories
+          : selectedCategory
+            ? [selectedCategory]
+            : [],
       add_details: add_details.length > 0 ? add_details : undefined,
-      passes: passes.filter((p) => p.name && p.price >= 0).map((p) => ({
-        pass_id: p.pass_id,
-        name: p.name,
-        price: p.price,
-        description: p.description ?? '',
-        media: p.media?.map((m) => ({ url: m.uri, type: m.type })),
-      })),
-      user: currentUser ? {
-        user_id: currentUser.user_id,
-        name: currentUser.name || 'Organizer',
-        profile_image: currentUser.profile_image ?? undefined,
-      } : undefined,
+      passes: passes
+        .filter((p) => p.name && p.price >= 0)
+        .map((p) => ({
+          pass_id: p.pass_id,
+          name: p.name,
+          price: p.price,
+          description: p.description ?? "",
+          media: p.media?.map((m) => ({ url: m.uri, type: m.type })),
+        })),
+      user: currentUser
+        ? {
+            user_id: currentUser.user_id,
+            name: currentUser.name || "Organizer",
+            profile_image: currentUser.profile_image ?? undefined,
+          }
+        : undefined,
     };
   };
 
   const handlePreview = () => {
     if (media.length === 0) {
-      Alert.alert('Validation', 'Please add at least one image to preview the plan.');
+      Alert.alert(
+        "Validation",
+        "Please add at least one image to preview the plan.",
+      );
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Validation', 'Title is required');
+      Alert.alert("Validation", "Title is required");
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Validation', 'Plan Description is required');
+      Alert.alert("Validation", "Plan Description is required");
       return;
     }
     if (!selectedCategory) {
-      Alert.alert('Validation', 'Category is required');
+      Alert.alert("Validation", "Category is required");
       return;
     }
     if (ticketsEnabled && passes.length === 0) {
-      Alert.alert('Validation', 'Please add at least one ticket with a price');
+      Alert.alert("Validation", "Please add at least one ticket with a price");
       return;
     }
-    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price < 0)) {
-      Alert.alert('Validation', 'All tickets must have a name and a valid price (0 or more)');
+    if (ticketsEnabled && passes.some((p) => !p.name.trim() || p.price < 0)) {
+      Alert.alert(
+        "Validation",
+        "All tickets must have a name and a valid price (0 or more)",
+      );
       return;
     }
     setShowPreview(true);
@@ -668,35 +835,41 @@ export default function CreateBusinessPostScreen() {
   const handleSubmit = async () => {
     // Check for authentication
     if (!user?.access_token || !user?.user_id) {
-      Alert.alert('Error', 'Please log in to create a business plan');
+      Alert.alert("Error", "Please log in to create a business plan");
       return;
     }
 
     // Check if user is business user
     if (!currentUser?.is_business) {
-      Alert.alert('Error', 'Only business users can create business plans. Please contact support to enable business account.');
+      Alert.alert(
+        "Error",
+        "Only business users can create business plans. Please contact support to enable business account.",
+      );
       return;
     }
 
     // Validate required fields: Title, Description, Category, and Ticket fee (if tickets enabled)
     if (!title.trim()) {
-      Alert.alert('Validation', 'Title is required');
+      Alert.alert("Validation", "Title is required");
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Validation', 'Plan Description is required');
+      Alert.alert("Validation", "Plan Description is required");
       return;
     }
     if (!selectedCategory) {
-      Alert.alert('Validation', 'Category is required');
+      Alert.alert("Validation", "Category is required");
       return;
     }
     if (ticketsEnabled && passes.length === 0) {
-      Alert.alert('Validation', 'Please add at least one ticket with a price');
+      Alert.alert("Validation", "Please add at least one ticket with a price");
       return;
     }
-    if (ticketsEnabled && passes.some(p => !p.name.trim() || p.price < 0)) {
-      Alert.alert('Validation', 'All tickets must have a name and a valid price (0 or more for free)');
+    if (ticketsEnabled && passes.some((p) => !p.name.trim() || p.price < 0)) {
+      Alert.alert(
+        "Validation",
+        "All tickets must have a name and a valid price (0 or more for free)",
+      );
       return;
     }
 
@@ -705,28 +878,39 @@ export default function CreateBusinessPostScreen() {
       // Create FormData for file uploads
       const formData = new FormData();
       let hasFiles = false;
-      
+
       // Add post media files if exists
       if (media.length > 0) {
         media.forEach((item, index) => {
-          formData.append('files', {
+          formData.append("files", {
             uri: item.uri,
-            type: item.type === 'video' ? 'video/mp4' : 'image/jpeg',
-            name: `media-${index}.${item.type === 'video' ? 'mp4' : 'jpg'}`,
+            type: item.type === "video" ? "video/mp4" : "image/jpeg",
+            name: `media-${index}.${item.type === "video" ? "mp4" : "jpg"}`,
           } as any);
           hasFiles = true;
         });
       }
 
       // Prepare add_details from additional settings
-      const addDetails = selectedAdditionalSettings.map(settingId => {
-        const isAdditionalInfo = settingId === 'additional_info';
-        const payload: { detail_type: string; title?: string; description?: string; heading?: string } = {
+      const addDetails = selectedAdditionalSettings.map((settingId) => {
+        const isAdditionalInfo = settingId === "additional_info";
+        const payload: {
+          detail_type: string;
+          title?: string;
+          description?: string;
+          heading?: string;
+        } = {
           detail_type: settingId,
-          title: additionalDetails[settingId]?.title ?? (isAdditionalInfo ? '' : (ADDITIONAL_SETTINGS.find(s => s.id === settingId)?.label ?? settingId)),
-          description: additionalDetails[settingId]?.description ?? '',
+          title:
+            additionalDetails[settingId]?.title ??
+            (isAdditionalInfo
+              ? ""
+              : (ADDITIONAL_SETTINGS.find((s) => s.id === settingId)?.label ??
+                settingId)),
+          description: additionalDetails[settingId]?.description ?? "",
         };
-        if (isAdditionalInfo) payload.heading = additionalDetails[settingId]?.title ?? '';
+        if (isAdditionalInfo)
+          payload.heading = additionalDetails[settingId]?.title ?? "";
         return payload;
       });
 
@@ -740,12 +924,17 @@ export default function CreateBusinessPostScreen() {
         title: title.trim(),
         description: description.trim(),
         category_main: selectedCategory.toLowerCase(),
-        category_sub: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
+        category_sub:
+          selectedSubcategories.length > 0
+            ? selectedSubcategories
+            : selectedCategory
+              ? [selectedCategory]
+              : [],
       };
 
       // Only set post_status when creating, not when editing
       if (!editMode) {
-        planData.post_status = 'published';
+        planData.post_status = "published";
       }
 
       // Optional fields - only include if they have values
@@ -762,14 +951,19 @@ export default function CreateBusinessPostScreen() {
         if (resolvedEnd) planData.end_time = formatTime(resolvedEnd);
       }
       if (ticketsEnabled && passes.length > 0) {
-        planData.passes = passes.filter(p => p.name && p.price >= 0).map(p => ({
-          pass_id: p.pass_id,
-          name: p.name,
-          price: p.price,
-          description: p.description || '',
-          capacity: p.capacity || 1,
-          media: p.media && p.media.length > 0 ? [{ url: p.media[0].uri, type: 'image' as const }] : undefined,
-        }));
+        planData.passes = passes
+          .filter((p) => p.name && p.price >= 0)
+          .map((p) => ({
+            pass_id: p.pass_id,
+            name: p.name,
+            price: p.price,
+            description: p.description || "",
+            capacity: p.capacity || 1,
+            media:
+              p.media && p.media.length > 0
+                ? [{ url: p.media[0].uri, type: "image" as const }]
+                : undefined,
+          }));
         planData.is_paid_plan = true;
         planData.registration_required = true;
       }
@@ -796,10 +990,10 @@ export default function CreateBusinessPostScreen() {
 
       // If we have files, append all plan data to FormData
       if (hasFiles) {
-        Object.keys(planData).forEach(key => {
+        Object.keys(planData).forEach((key) => {
           const value = planData[key];
           if (value !== undefined && value !== null) {
-            if (typeof value === 'object' && !Array.isArray(value)) {
+            if (typeof value === "object" && !Array.isArray(value)) {
               formData.append(key, JSON.stringify(value));
             } else if (Array.isArray(value)) {
               formData.append(key, JSON.stringify(value));
@@ -814,19 +1008,23 @@ export default function CreateBusinessPostScreen() {
       if (editMode && planId) {
         // Update existing business plan
         response = await apiService.updateBusinessPlan(
-          user.access_token, 
-          planId, 
+          user.access_token,
+          planId,
           hasFiles ? {} : planData,
-          hasFiles ? formData : undefined
+          hasFiles ? formData : undefined,
         );
         if (response.success) {
           if (shareToAnnouncementGroup) {
             try {
               const annRes = await apiService.getOrCreateAnnouncementGroup();
-              const groupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
+              const groupId =
+                (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
               if (groupId && user.user_id) {
-                const shareMedia = media.length > 0 ? media.map(m => ({ url: m.uri, type: m.type })) : [];
-                await apiService.sendMessage(groupId, user.user_id, 'plan', {
+                const shareMedia =
+                  media.length > 0
+                    ? media.map((m) => ({ url: m.uri, type: m.type }))
+                    : [];
+                await apiService.sendMessage(groupId, user.user_id, "plan", {
                   plan_id: planId,
                   title: planData.title,
                   description: planData.description,
@@ -838,20 +1036,20 @@ export default function CreateBusinessPostScreen() {
                 });
               }
             } catch (shareErr: any) {
-              console.warn('Failed to share to announcement group:', shareErr);
+              console.warn("Failed to share to announcement group:", shareErr);
             }
           }
           isEditFlowRef.current = false;
-          Alert.alert('Success', 'Business plan updated successfully!', [
-            { 
-              text: 'OK', 
+          Alert.alert("Success", "Business plan updated successfully!", [
+            {
+              text: "OK",
               onPress: () => {
                 setEditMode(false);
                 setPlanId(null);
                 if (openedFromMyPlansRef.current) {
-                  router.replace('/profile/your-plans');
+                  router.replace("/profile/your-plans");
                 } else {
-                  router.replace('/(tabs)');
+                  router.replace("/(tabs)");
                 }
               },
             },
@@ -860,75 +1058,110 @@ export default function CreateBusinessPostScreen() {
       } else {
         // Create new business plan
         if (!user?.access_token) {
-          Alert.alert('Error', 'Session expired. Please log in again.');
+          Alert.alert("Error", "Session expired. Please log in again.");
           setIsSubmitting(false);
           return;
         }
-        console.log('[CreateBusinessPost] Calling create API, hasFiles:', hasFiles);
+        console.log(
+          "[CreateBusinessPost] Calling create API, hasFiles:",
+          hasFiles,
+        );
         response = await apiService.createBusinessPlan(
           user.access_token,
           hasFiles ? {} : planData,
-          hasFiles ? formData : undefined
+          hasFiles ? formData : undefined,
         );
-        const createdPlanId = (response as any)?.data?.post_id ?? (response as any)?.post_id ?? null;
-        const ok = (response as any)?.success === true || (createdPlanId != null);
+        const createdPlanId =
+          (response as any)?.data?.post_id ??
+          (response as any)?.post_id ??
+          null;
+        const ok = (response as any)?.success === true || createdPlanId != null;
         if (!ok) {
-          const msg = (response as any)?.message || 'Server did not return a post ID. Please try again.';
-          Alert.alert('Error', msg);
+          const msg =
+            (response as any)?.message ||
+            "Server did not return a post ID. Please try again.";
+          Alert.alert("Error", msg);
           setIsSubmitting(false);
           return;
         }
         if (shareToAnnouncementGroup && createdPlanId) {
-            try {
-              const annRes = await apiService.getOrCreateAnnouncementGroup();
-              const groupId = (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
-              if (groupId && user.user_id) {
-                const shareMedia = media.length > 0 ? media.map(m => ({ url: m.uri, type: m.type })) : [];
-                await apiService.sendMessage(groupId, user.user_id, 'plan', {
-                  plan_id: createdPlanId,
-                  title: planData.title,
-                  description: planData.description,
-                  media: shareMedia,
-                  tags: planData.category_sub || [],
-                  category_sub: planData.category_sub || [],
-                  category_main: planData.category_main,
-                  is_business: true,
-                });
-              }
-            } catch (shareErr: any) {
-              console.warn('Failed to share to announcement group:', shareErr);
+          try {
+            const annRes = await apiService.getOrCreateAnnouncementGroup();
+            const groupId =
+              (annRes as any)?.data?.group_id ?? (annRes as any)?.group_id;
+            if (groupId && user.user_id) {
+              const shareMedia =
+                media.length > 0
+                  ? media.map((m) => ({ url: m.uri, type: m.type }))
+                  : [];
+              await apiService.sendMessage(groupId, user.user_id, "plan", {
+                plan_id: createdPlanId,
+                title: planData.title,
+                description: planData.description,
+                media: shareMedia,
+                tags: planData.category_sub || [],
+                category_sub: planData.category_sub || [],
+                category_main: planData.category_main,
+                is_business: true,
+              });
             }
+          } catch (shareErr: any) {
+            console.warn("Failed to share to announcement group:", shareErr);
           }
-          dispatch(setPostCreated({
+        }
+        dispatch(
+          setPostCreated({
             planId: createdPlanId,
             title: title.trim(),
             description: description.trim(),
-            media: media.map(m => ({ url: m.uri, type: m.type })),
-            tags: selectedSubcategories.length > 0 ? selectedSubcategories : (selectedCategory ? [selectedCategory] : []),
+            media: media.map((m) => ({ url: m.uri, type: m.type })),
+            tags:
+              selectedSubcategories.length > 0
+                ? selectedSubcategories
+                : selectedCategory
+                  ? [selectedCategory]
+                  : [],
             category_main: selectedCategory?.toLowerCase(),
-          }));
-          isEditFlowRef.current = false;
-          setCreatedPlanIdForSuccess(createdPlanId);
-          setShowPreview(false); // Close preview so main view (with success modal) is shown
-          setShowPostSuccessModal(true);
+          }),
+        );
+        isEditFlowRef.current = false;
+        setCreatedPlanIdForSuccess(createdPlanId);
+        setShowPreview(false); // Close preview so main view (with success modal) is shown
+        setShowPostSuccessModal(true);
       }
     } catch (error: any) {
       // Provide more detailed error messages
-      let errorMessage = error.message || 'Failed to create business plan';
-      
+      let errorMessage = error.message || "Failed to create business plan";
+
       // Check for common validation errors
-      if (errorMessage.includes('business_id') || errorMessage.includes('BusinessPlan validation failed')) {
-        errorMessage = 'Business ID is missing. Please ensure your account has business status enabled.';
-      } else if (errorMessage.includes('title') || errorMessage.includes('Title')) {
-        errorMessage = 'Title is required. Please enter a title for your business plan.';
-      } else if (errorMessage.includes('description') || errorMessage.includes('Description')) {
-        errorMessage = 'Plan Description is required. Please enter a description for your business plan.';
-      } else if (errorMessage.includes('category') || errorMessage.includes('Category')) {
-        errorMessage = 'Category is required. Please select a category for your business plan.';
+      if (
+        errorMessage.includes("business_id") ||
+        errorMessage.includes("BusinessPlan validation failed")
+      ) {
+        errorMessage =
+          "Business ID is missing. Please ensure your account has business status enabled.";
+      } else if (
+        errorMessage.includes("title") ||
+        errorMessage.includes("Title")
+      ) {
+        errorMessage =
+          "Title is required. Please enter a title for your business plan.";
+      } else if (
+        errorMessage.includes("description") ||
+        errorMessage.includes("Description")
+      ) {
+        errorMessage =
+          "Plan Description is required. Please enter a description for your business plan.";
+      } else if (
+        errorMessage.includes("category") ||
+        errorMessage.includes("Category")
+      ) {
+        errorMessage =
+          "Category is required. Please select a category for your business plan.";
       }
-      
-      Alert.alert('Error', errorMessage);
-      console.error('Business plan creation error:', error);
+
+      Alert.alert("Error", errorMessage);
+      console.error("Business plan creation error:", error);
     } finally {
       setIsSubmitting(false);
     }
@@ -947,55 +1180,58 @@ export default function CreateBusinessPostScreen() {
 
   if (showPreview) {
     const previewData = formatPreviewData();
-    const isBusinessUser = currentUser?.is_business === true;
+    // preview should display the business card style just like it will appear in lists
     return (
-      <Modal visible={true} animationType="slide" statusBarTranslucent>
-        <SafeAreaView style={styles.previewFullScreen} edges={['top', 'bottom']}>
-          <View style={styles.previewScroll}>
-            {isBusinessUser ? (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <Modal visible={true} animationType="slide" statusBarTranslucent>
+          <SafeAreaView
+            style={styles.previewFullScreen}
+            edges={["top", "bottom"]}
+          >
+            <View style={styles.previewScroll}>
               <View style={styles.businessPreviewWrap}>
-                <BusinessPlanDetailPreview
+                <BusinessCard
                   plan={previewData}
-                  organizerName={currentUser?.name || 'Organizer'}
-                  organizerAvatar={currentUser?.profile_image ?? null}
-                  showOrganizer={true}
-                  withStickyBar={true}
-                />
-              </View>
-            ) : (
-              <View style={styles.eventPreviewWrap}>
-                <EventCard
                   user={{
-                    id: currentUser?.user_id ?? 'preview',
-                    name: currentUser?.name || 'You',
-                    avatar: currentUser?.profile_image ?? '',
-                    time: 'Preview',
+                    id: currentUser?.user_id ?? "preview",
+                    name: currentUser?.name || "You",
+                    avatar: currentUser?.profile_image ?? "",
+                    time: "Preview",
                   }}
-                  event={{
-                    title: previewData.title,
-                    description: previewData.description,
-                    image: previewData.media?.[0]?.url ?? '',
-                    tags: previewData.category_sub ?? [],
-                    category_sub: previewData.category_sub ?? [],
-                  }}
-                  onUserPress={() => {}}
-                  onJoinPress={() => {}}
+                  hideActions={false}
+                  registerButtonGreyed={true}
+                  onRegisterPress={() => {}}
                   onSharePress={() => {}}
-                  hideFooterActions={true}
                 />
               </View>
-            )}
-          </View>
-          <View style={[styles.previewStickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <TouchableOpacity style={[styles.actionButton, styles.previewEditButton]} onPress={() => setShowPreview(false)}>
-              <Text style={styles.previewEditButtonText}>Back to edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.actionButton, styles.postButton]} onPress={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.postButtonText}>Post</Text>}
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
+            </View>
+            <View
+              style={[
+                styles.previewStickyBar,
+                { paddingBottom: Math.max(insets.bottom, 16) },
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.actionButton, styles.previewEditButton]}
+                onPress={() => setShowPreview(false)}
+              >
+                <Text style={styles.previewEditButtonText}>Back to edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.postButton]}
+                onPress={handleSubmit}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.postButtonText}>Post</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </SafeAreaView>
+        </Modal>
+      </GestureHandlerRootView>
     );
   }
 
@@ -1005,7 +1241,7 @@ export default function CreateBusinessPostScreen() {
         <TouchableOpacity
           onPress={() => {
             if (editMode || openedFromMyPlansRef.current) {
-              router.replace('/profile/your-plans');
+              router.replace("/profile/your-plans");
             } else {
               router.back();
             }
@@ -1015,14 +1251,19 @@ export default function CreateBusinessPostScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
-        <Text style={styles.createPostHeaderTitle}>{editMode ? 'Editing post' : 'Create Post'}</Text>
+        <Text style={styles.createPostHeaderTitle}>
+          {editMode ? "Editing post" : "Create Post"}
+        </Text>
         <View style={styles.backButtonHeader} />
       </View>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+        >
           {/* Title – with label */}
           <View style={styles.sectionCard}>
             <TextInput
@@ -1036,26 +1277,35 @@ export default function CreateBusinessPostScreen() {
 
           {/* Event Description – label + expands as text increases */}
           <View style={styles.sectionCard}>
-            
             <TextInput
-              style={[styles.descriptionInput, { minHeight: Math.max(100, descriptionHeight) }]}
+              style={[
+                styles.descriptionInput,
+                { minHeight: Math.max(100, descriptionHeight) },
+              ]}
               placeholder="Plan Description"
               value={description}
               onChangeText={setDescription}
               multiline
-              onContentSizeChange={(e) => setDescriptionHeight(e.nativeEvent.contentSize.height + 24)}
+              onContentSizeChange={(e) =>
+                setDescriptionHeight(e.nativeEvent.contentSize.height + 24)
+              }
               placeholderTextColor="#999"
             />
           </View>
 
           {/* Media - with section label; Add Media as smaller button */}
           <View style={[styles.sectionCard, styles.mediaSection]}>
-            
             {media.length > 0 ? (
               <View style={styles.mediaList}>
                 {media.map((item, index) => (
-                  <View key={`${item.uri}-${index}`} style={styles.mediaPreviewWrap}>
-                    <Image source={{ uri: item.uri }} style={styles.mediaThumb} />
+                  <View
+                    key={`${item.uri}-${index}`}
+                    style={styles.mediaPreviewWrap}
+                  >
+                    <Image
+                      source={{ uri: item.uri }}
+                      style={styles.mediaThumb}
+                    />
                     <TouchableOpacity
                       style={styles.removeMediaButton}
                       onPress={() => removeMedia(index)}
@@ -1065,14 +1315,22 @@ export default function CreateBusinessPostScreen() {
                   </View>
                 ))}
                 {media.length < MAX_MEDIA && (
-                  <TouchableOpacity style={styles.addMediaThumb} onPress={handleAddMedia}>
+                  <TouchableOpacity
+                    style={styles.addMediaThumb}
+                    onPress={handleAddMedia}
+                  >
                     <Ionicons name="add" size={28} color="#666" />
-                    <Text style={styles.addMediaThumbText}>{media.length}/{MAX_MEDIA}</Text>
+                    <Text style={styles.addMediaThumbText}>
+                      {media.length}/{MAX_MEDIA}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
             ) : (
-              <TouchableOpacity style={styles.addMediaButtonSmall} onPress={handleAddMedia}>
+              <TouchableOpacity
+                style={styles.addMediaButtonSmall}
+                onPress={handleAddMedia}
+              >
                 <Ionicons name="add" size={20} color="#666" />
                 <Text style={styles.addMediaTextSmall}>Add Media</Text>
               </TouchableOpacity>
@@ -1081,7 +1339,6 @@ export default function CreateBusinessPostScreen() {
 
           {/* Location */}
           <View style={styles.sectionCard}>
-            
             <TextInput
               style={styles.locationInputPill}
               placeholder="Location"
@@ -1093,20 +1350,33 @@ export default function CreateBusinessPostScreen() {
 
           {/* Date */}
           <View style={styles.sectionCard}>
-          <TouchableOpacity
-            style={styles.dateRow}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={selectedDate ? styles.inputText : styles.inputPlaceholder}>
-              {selectedDate ? (() => {
-                const d = selectedDate;
-                const day = d.getDate();
-                const suffix = day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th';
-                return `${day}${suffix} ${d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`;
-              })() : 'Date of Event'}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dateRow}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text
+                style={
+                  selectedDate ? styles.inputText : styles.inputPlaceholder
+                }
+              >
+                {selectedDate
+                  ? (() => {
+                      const d = selectedDate;
+                      const day = d.getDate();
+                      const suffix =
+                        day === 1 || day === 21 || day === 31
+                          ? "st"
+                          : day === 2 || day === 22
+                            ? "nd"
+                            : day === 3 || day === 23
+                              ? "rd"
+                              : "th";
+                      return `${day}${suffix} ${d.toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+                    })()
+                  : "Date of Event"}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#666" />
+            </TouchableOpacity>
           </View>
 
           <CalendarPicker
@@ -1122,80 +1392,158 @@ export default function CreateBusinessPostScreen() {
 
           {/* Time of Event */}
           <View style={[styles.sectionCard, styles.sectionCardCompact]}>
-          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
-            <Text style={styles.toggleLabel}>Time of Event</Text>
-            <Switch
-              value={timeEnabled}
-              onValueChange={setTimeEnabled}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
+            <View style={[styles.toggleRow, styles.toggleRowCompact]}>
+              <Text style={styles.toggleLabel}>Time of Event</Text>
+              <Switch
+                value={timeEnabled}
+                onValueChange={setTimeEnabled}
+                trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                thumbColor="#FFF"
+              />
+            </View>
 
-          {timeEnabled && (
-            <>
-              <View style={[styles.timeRow, styles.timeRowCompact]}>
-                <TextInput
-                  style={[styles.input, styles.timeInput]}
-                  placeholder="8:00"
-                  value={startTimeText.replace(/\s*AM|PM/i, '').trim()}
-                  onChangeText={(text) => {
-                    const cleaned = text.replace(/[^0-9:]/g, '');
-                    setStartTimeText(cleaned ? `${cleaned} ${startAmPm}` : '');
-                    const parsed = parseTimeText(cleaned ? `${cleaned} ${startAmPm}` : '');
-                    if (parsed) setStartTime(parsed);
-                  }}
-                  placeholderTextColor="#999"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                />
-                <View style={styles.amPmBox}>
-                  <TouchableOpacity
-                    style={[styles.amPmOption, startAmPm === 'AM' && styles.amPmOptionSelected]}
-                    onPress={() => { setStartAmPm('AM'); const t = startTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setStartTimeText(`${t} AM`); const p = parseTimeText(`${t} AM`); if (p) setStartTime(p); } }}
-                  >
-                    <Text style={[styles.amPmOptionText, startAmPm === 'AM' && styles.amPmOptionTextSelected]}>AM</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.amPmOption, startAmPm === 'PM' && styles.amPmOptionSelected]}
-                    onPress={() => { setStartAmPm('PM'); const t = startTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setStartTimeText(`${t} PM`); const p = parseTimeText(`${t} PM`); if (p) setStartTime(p); } }}
-                  >
-                    <Text style={[styles.amPmOptionText, startAmPm === 'PM' && styles.amPmOptionTextSelected]}>PM</Text>
-                  </TouchableOpacity>
+            {timeEnabled && (
+              <>
+                <View style={[styles.timeRow, styles.timeRowCompact]}>
+                  <TextInput
+                    style={[styles.input, styles.timeInput]}
+                    placeholder="8:00"
+                    value={startTimeText.replace(/\s*AM|PM/i, "").trim()}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/[^0-9:]/g, "");
+                      setStartTimeText(
+                        cleaned ? `${cleaned} ${startAmPm}` : "",
+                      );
+                      const parsed = parseTimeText(
+                        cleaned ? `${cleaned} ${startAmPm}` : "",
+                      );
+                      if (parsed) setStartTime(parsed);
+                    }}
+                    placeholderTextColor="#999"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+                  <View style={styles.amPmBox}>
+                    <TouchableOpacity
+                      style={[
+                        styles.amPmOption,
+                        startAmPm === "AM" && styles.amPmOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setStartAmPm("AM");
+                        const t = startTimeText.replace(/\s*AM|PM/i, "").trim();
+                        if (t) {
+                          setStartTimeText(`${t} AM`);
+                          const p = parseTimeText(`${t} AM`);
+                          if (p) setStartTime(p);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.amPmOptionText,
+                          startAmPm === "AM" && styles.amPmOptionTextSelected,
+                        ]}
+                      >
+                        AM
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.amPmOption,
+                        startAmPm === "PM" && styles.amPmOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setStartAmPm("PM");
+                        const t = startTimeText.replace(/\s*AM|PM/i, "").trim();
+                        if (t) {
+                          setStartTimeText(`${t} PM`);
+                          const p = parseTimeText(`${t} PM`);
+                          if (p) setStartTime(p);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.amPmOptionText,
+                          startAmPm === "PM" && styles.amPmOptionTextSelected,
+                        ]}
+                      >
+                        PM
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-              <View style={[styles.timeRow, styles.timeRowCompact]}>
-                <TextInput
-                  style={[styles.input, styles.timeInput]}
-                  placeholder="End time (optional)"
-                  value={endTimeText.replace(/\s*AM|PM/i, '').trim()}
-                  onChangeText={(text) => {
-                    const cleaned = text.replace(/[^0-9:]/g, '');
-                    setEndTimeText(cleaned ? `${cleaned} ${endAmPm}` : '');
-                    const parsed = parseTimeText(cleaned ? `${cleaned} ${endAmPm}` : '');
-                    if (parsed) setEndTime(parsed);
-                  }}
-                  placeholderTextColor="#999"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                />
-                <View style={styles.amPmBox}>
-                  <TouchableOpacity
-                    style={[styles.amPmOption, endAmPm === 'AM' && styles.amPmOptionSelected]}
-                    onPress={() => { setEndAmPm('AM'); const t = endTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setEndTimeText(`${t} AM`); const p = parseTimeText(`${t} AM`); if (p) setEndTime(p); } }}
-                  >
-                    <Text style={[styles.amPmOptionText, endAmPm === 'AM' && styles.amPmOptionTextSelected]}>AM</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.amPmOption, endAmPm === 'PM' && styles.amPmOptionSelected]}
-                    onPress={() => { setEndAmPm('PM'); const t = endTimeText.replace(/\s*AM|PM/i, '').trim(); if (t) { setEndTimeText(`${t} PM`); const p = parseTimeText(`${t} PM`); if (p) setEndTime(p); } }}
-                  >
-                    <Text style={[styles.amPmOptionText, endAmPm === 'PM' && styles.amPmOptionTextSelected]}>PM</Text>
-                  </TouchableOpacity>
+                <View style={[styles.timeRow, styles.timeRowCompact]}>
+                  <TextInput
+                    style={[styles.input, styles.timeInput]}
+                    placeholder="End time (optional)"
+                    value={endTimeText.replace(/\s*AM|PM/i, "").trim()}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/[^0-9:]/g, "");
+                      setEndTimeText(cleaned ? `${cleaned} ${endAmPm}` : "");
+                      const parsed = parseTimeText(
+                        cleaned ? `${cleaned} ${endAmPm}` : "",
+                      );
+                      if (parsed) setEndTime(parsed);
+                    }}
+                    placeholderTextColor="#999"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+                  <View style={styles.amPmBox}>
+                    <TouchableOpacity
+                      style={[
+                        styles.amPmOption,
+                        endAmPm === "AM" && styles.amPmOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setEndAmPm("AM");
+                        const t = endTimeText.replace(/\s*AM|PM/i, "").trim();
+                        if (t) {
+                          setEndTimeText(`${t} AM`);
+                          const p = parseTimeText(`${t} AM`);
+                          if (p) setEndTime(p);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.amPmOptionText,
+                          endAmPm === "AM" && styles.amPmOptionTextSelected,
+                        ]}
+                      >
+                        AM
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.amPmOption,
+                        endAmPm === "PM" && styles.amPmOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setEndAmPm("PM");
+                        const t = endTimeText.replace(/\s*AM|PM/i, "").trim();
+                        if (t) {
+                          setEndTimeText(`${t} PM`);
+                          const p = parseTimeText(`${t} PM`);
+                          if (p) setEndTime(p);
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.amPmOptionText,
+                          endAmPm === "PM" && styles.amPmOptionTextSelected,
+                        ]}
+                      >
+                        PM
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </>
-          )}
+              </>
+            )}
           </View>
 
           {/* Category – icons in pills; pills white when unselected */}
@@ -1208,25 +1556,31 @@ export default function CreateBusinessPostScreen() {
                     key={category}
                     style={[
                       styles.categoryChip,
-                      selectedCategory === category && styles.categoryChipSelected,
+                      selectedCategory === category &&
+                        styles.categoryChipSelected,
                     ]}
                     onPress={() => {
                       setSelectedCategory(category);
                       setSelectedSubcategories((prev) =>
-                        prev.filter((s) => (CATEGORY_SUBCATEGORIES[category] || []).includes(s))
+                        prev.filter((s) =>
+                          (CATEGORY_SUBCATEGORIES[category] || []).includes(s),
+                        ),
                       );
                     }}
                   >
                     <Ionicons
-                      name={(CATEGORY_ICONS[category] || 'pricetag-outline') as any}
+                      name={
+                        (CATEGORY_ICONS[category] || "pricetag-outline") as any
+                      }
                       size={18}
-                      color={selectedCategory === category ? '#FFF' : '#1C1C1E'}
+                      color={selectedCategory === category ? "#FFF" : "#1C1C1E"}
                       style={styles.categoryChipIcon}
                     />
                     <Text
                       style={[
                         styles.categoryChipText,
-                        selectedCategory === category && styles.categoryChipTextSelected,
+                        selectedCategory === category &&
+                          styles.categoryChipTextSelected,
                       ]}
                     >
                       {category}
@@ -1235,157 +1589,214 @@ export default function CreateBusinessPostScreen() {
                 ))}
               </View>
             </ScrollView>
-            {selectedCategory && (CATEGORY_SUBCATEGORIES[selectedCategory]?.length ?? 0) > 0 && (
-              <View style={styles.subcategorySection}>
-                <Text style={styles.subcategoryLabel}>Subcategories (optional)</Text>
-                <View style={styles.subcategoryChips}>
-                  {(CATEGORY_SUBCATEGORIES[selectedCategory] || []).map((sub) => {
-                    const isSelected = selectedSubcategories.includes(sub);
-                    return (
+            {selectedCategory &&
+              (CATEGORY_SUBCATEGORIES[selectedCategory]?.length ?? 0) > 0 && (
+                <View style={styles.subcategorySection}>
+                  <Text style={styles.subcategoryLabel}>
+                    Subcategories (optional)
+                  </Text>
+                  <View style={styles.subcategoryChips}>
+                    {(CATEGORY_SUBCATEGORIES[selectedCategory] || []).map(
+                      (sub) => {
+                        const isSelected = selectedSubcategories.includes(sub);
+                        return (
+                          <TouchableOpacity
+                            key={sub}
+                            style={[
+                              styles.subcategoryChip,
+                              isSelected && styles.subcategoryChipSelected,
+                            ]}
+                            onPress={() => {
+                              if (isSelected) {
+                                setSelectedSubcategories((prev) =>
+                                  prev.filter((s) => s !== sub),
+                                );
+                              } else {
+                                // Only one subcategory per category: replace any sub for this category with the selected one
+                                const subsForCategory =
+                                  CATEGORY_SUBCATEGORIES[selectedCategory] ||
+                                  [];
+                                setSelectedSubcategories((prev) => [
+                                  ...prev.filter(
+                                    (s) => !subsForCategory.includes(s),
+                                  ),
+                                  sub,
+                                ]);
+                              }
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.subcategoryChipText,
+                                isSelected &&
+                                  styles.subcategoryChipTextSelected,
+                              ]}
+                            >
+                              {sub}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      },
+                    )}
+                  </View>
+                </View>
+              )}
+          </View>
+
+          {/* Tickets */}
+          <View
+            style={[
+              styles.sectionCard,
+              styles.sectionCardCompact,
+              ticketsEnabled && styles.ticketsSectionWhenOn,
+            ]}
+          >
+            <View style={[styles.toggleRow, styles.toggleRowCompact]}>
+              <Text style={styles.toggleLabel}>Tickets</Text>
+              <Switch
+                value={ticketsEnabled}
+                onValueChange={(value) => {
+                  setTicketsEnabled(value);
+                  if (value && passes.length === 0) addPass();
+                }}
+                trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                thumbColor="#FFF"
+              />
+            </View>
+
+            {ticketsEnabled && (
+              <View style={styles.passesSection}>
+                {/* Add media – just below ticket title; gray bg */}
+                <TouchableOpacity
+                  style={styles.ticketAddMediaButton}
+                  onPress={() =>
+                    passes[0] && !(editMode && passes[0].isExisting)
+                      ? handleAddPassImage(0)
+                      : undefined
+                  }
+                  disabled={editMode && passes[0]?.isExisting}
+                >
+                  <Ionicons name="image-outline" size={18} color="#1C1C1E" />
+                  <Text style={styles.ticketAddMediaButtonText}>Add media</Text>
+                </TouchableOpacity>
+                {/* Small preview of uploaded ticket image below Add media */}
+                {(passes[0]?.media?.length ?? 0) > 0 && (
+                  <View style={styles.ticketImagePreviewWrap}>
+                    <Image
+                      source={{ uri: passes[0].media![0].uri }}
+                      style={styles.ticketImagePreviewThumb}
+                    />
+                    {!(editMode && passes[0]?.isExisting) && (
                       <TouchableOpacity
-                        key={sub}
-                        style={[
-                          styles.subcategoryChip,
-                          isSelected && styles.subcategoryChipSelected,
-                        ]}
-                        onPress={() => {
-                          if (isSelected) {
-                            setSelectedSubcategories((prev) => prev.filter((s) => s !== sub));
-                          } else {
-                            // Only one subcategory per category: replace any sub for this category with the selected one
-                            const subsForCategory = CATEGORY_SUBCATEGORIES[selectedCategory] || [];
-                            setSelectedSubcategories((prev) => [...prev.filter((s) => !subsForCategory.includes(s)), sub]);
-                          }
-                        }}
+                        style={styles.ticketImagePreviewRemove}
+                        onPress={() => removePassImage(0)}
                       >
-                        <Text
-                          style={[
-                            styles.subcategoryChipText,
-                            isSelected && styles.subcategoryChipTextSelected,
-                          ]}
-                        >
-                          {sub}
-                        </Text>
+                        <Ionicons name="close" size={14} color="#FFF" />
                       </TouchableOpacity>
-                    );
-                  })}
+                    )}
+                  </View>
+                )}
+                {passes.map((pass, index) => {
+                  const isExistingTicket = editMode && pass.isExisting;
+                  return (
+                    <View key={pass.pass_id} style={styles.passCard}>
+                      <View style={styles.passNamePriceRow}>
+                        <TextInput
+                          style={[styles.passInput, styles.passNameInRow]}
+                          placeholder="Ticket Name"
+                          value={pass.name}
+                          onChangeText={(text) =>
+                            !isExistingTicket && updatePass(index, "name", text)
+                          }
+                          placeholderTextColor="#8E8E93"
+                          editable={!isExistingTicket}
+                        />
+                        <TextInput
+                          style={[styles.passInput, styles.passPriceInRow]}
+                          placeholder="Price"
+                          value={pass.price >= 0 ? pass.price.toString() : ""}
+                          onChangeText={(text) => {
+                            if (isExistingTicket) return;
+                            const digitsOnly = text.replace(/[^0-9]/g, "");
+                            const num =
+                              digitsOnly === "" ? -1 : parseInt(digitsOnly, 10);
+                            updatePass(index, "price", num < 0 ? -1 : num);
+                          }}
+                          keyboardType="number-pad"
+                          placeholderTextColor="#8E8E93"
+                          editable={!isExistingTicket}
+                        />
+                        {passes.length > 1 &&
+                          (!editMode || !pass.isExisting) && (
+                            <TouchableOpacity
+                              onPress={() => removePass(index)}
+                              style={styles.passRemoveButton}
+                            >
+                              <Ionicons
+                                name="trash-outline"
+                                size={20}
+                                color="#666"
+                              />
+                            </TouchableOpacity>
+                          )}
+                      </View>
+                      <TextInput
+                        style={[styles.passInput, styles.passDescription]}
+                        placeholder="Description (Optional)"
+                        value={pass.description}
+                        onChangeText={(text) =>
+                          !isExistingTicket &&
+                          updatePass(index, "description", text)
+                        }
+                        multiline
+                        numberOfLines={3}
+                        placeholderTextColor="#8E8E93"
+                        editable={!isExistingTicket}
+                      />
+                    </View>
+                  );
+                })}
+                {/* Bottom row: Add type (gray, left) | Preview ticket (black, right) */}
+                <View style={styles.ticketsBottomRow}>
+                  <TouchableOpacity
+                    style={styles.ticketAddTypeButton}
+                    onPress={addPass}
+                  >
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={18}
+                      color="#1C1C1E"
+                    />
+                    <Text style={styles.ticketAddTypeButtonText}>Add type</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.previewTicketButtonBottom}
+                    onPress={() => {
+                      setPreviewPassIndex(0);
+                      setShowTicketPreview(true);
+                    }}
+                  >
+                    <Ionicons name="eye-outline" size={18} color="#FFF" />
+                    <Text style={styles.previewTicketButtonBottomText}>
+                      Preview ticket
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
           </View>
 
-          {/* Tickets */}
-          <View style={[styles.sectionCard, styles.sectionCardCompact, ticketsEnabled && styles.ticketsSectionWhenOn]}>
-          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
-            <Text style={styles.toggleLabel}>Tickets</Text>
-            <Switch
-              value={ticketsEnabled}
-              onValueChange={(value) => {
-                setTicketsEnabled(value);
-                if (value && passes.length === 0) addPass();
-              }}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
-
-          {ticketsEnabled && (
-            <View style={styles.passesSection}>
-              {/* Add media – just below ticket title; gray bg */}
-              <TouchableOpacity
-                style={styles.ticketAddMediaButton}
-                onPress={() => passes[0] && !(editMode && passes[0].isExisting) ? handleAddPassImage(0) : undefined}
-                disabled={editMode && passes[0]?.isExisting}
-              >
-                <Ionicons name="image-outline" size={18} color="#1C1C1E" />
-                <Text style={styles.ticketAddMediaButtonText}>Add media</Text>
-              </TouchableOpacity>
-              {/* Small preview of uploaded ticket image below Add media */}
-              {(passes[0]?.media?.length ?? 0) > 0 && (
-                <View style={styles.ticketImagePreviewWrap}>
-                  <Image source={{ uri: passes[0].media![0].uri }} style={styles.ticketImagePreviewThumb} />
-                  {!(editMode && passes[0]?.isExisting) && (
-                    <TouchableOpacity style={styles.ticketImagePreviewRemove} onPress={() => removePassImage(0)}>
-                      <Ionicons name="close" size={14} color="#FFF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-              {passes.map((pass, index) => {
-                const isExistingTicket = editMode && pass.isExisting;
-                return (
-                  <View key={pass.pass_id} style={styles.passCard}>
-                    <View style={styles.passNamePriceRow}>
-                      <TextInput
-                        style={[styles.passInput, styles.passNameInRow]}
-                        placeholder="Ticket Name"
-                        value={pass.name}
-                        onChangeText={(text) => !isExistingTicket && updatePass(index, 'name', text)}
-                        placeholderTextColor="#8E8E93"
-                        editable={!isExistingTicket}
-                      />
-                      <TextInput
-                        style={[styles.passInput, styles.passPriceInRow]}
-                        placeholder="Price"
-                        value={pass.price >= 0 ? pass.price.toString() : ''}
-                        onChangeText={(text) => {
-                          if (isExistingTicket) return;
-                          const digitsOnly = text.replace(/[^0-9]/g, '');
-                          const num = digitsOnly === '' ? -1 : parseInt(digitsOnly, 10);
-                          updatePass(index, 'price', num < 0 ? -1 : num);
-                        }}
-                        keyboardType="number-pad"
-                        placeholderTextColor="#8E8E93"
-                        editable={!isExistingTicket}
-                      />
-                      {(passes.length > 1) && (!editMode || !pass.isExisting) && (
-                        <TouchableOpacity onPress={() => removePass(index)} style={styles.passRemoveButton}>
-                          <Ionicons name="trash-outline" size={20} color="#666" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    <TextInput
-                      style={[styles.passInput, styles.passDescription]}
-                      placeholder="Description (Optional)"
-                      value={pass.description}
-                      onChangeText={(text) => !isExistingTicket && updatePass(index, 'description', text)}
-                      multiline
-                      numberOfLines={3}
-                      placeholderTextColor="#8E8E93"
-                      editable={!isExistingTicket}
-                    />
-                  </View>
-                );
-              })}
-              {/* Bottom row: Add type (gray, left) | Preview ticket (black, right) */}
-              <View style={styles.ticketsBottomRow}>
-                <TouchableOpacity style={styles.ticketAddTypeButton} onPress={addPass}>
-                  <Ionicons name="add-circle-outline" size={18} color="#1C1C1E" />
-                  <Text style={styles.ticketAddTypeButtonText}>Add type</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.previewTicketButtonBottom}
-                  onPress={() => { setPreviewPassIndex(0); setShowTicketPreview(true); }}
-                >
-                  <Ionicons name="eye-outline" size={18} color="#FFF" />
-                  <Text style={styles.previewTicketButtonBottomText}>Preview ticket</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-          </View>
-
           {/* Share to community */}
           <View style={[styles.sectionCard, styles.sectionCardCompact]}>
-          <View style={[styles.toggleRow, styles.toggleRowCompact]}>
-            <Text style={styles.toggleLabel}>Share to community</Text>
-            <Switch
-              value={shareToAnnouncementGroup}
-              onValueChange={setShareToAnnouncementGroup}
-              trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-              thumbColor="#FFF"
-            />
-          </View>
+            <View style={[styles.toggleRow, styles.toggleRowCompact]}>
+              <Text style={styles.toggleLabel}>Share to community</Text>
+              <Switch
+                value={shareToAnnouncementGroup}
+                onValueChange={setShareToAnnouncementGroup}
+                trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                thumbColor="#FFF"
+              />
+            </View>
           </View>
 
           {/* Additional Settings – collapsible, collapsed by default */}
@@ -1397,223 +1808,300 @@ export default function CreateBusinessPostScreen() {
             >
               <Text style={styles.sectionTitle}>Additional Settings</Text>
               <Ionicons
-                name={additionalSettingsExpanded ? 'chevron-up' : 'chevron-down'}
+                name={
+                  additionalSettingsExpanded ? "chevron-up" : "chevron-down"
+                }
                 size={22}
                 color="#666"
               />
             </TouchableOpacity>
             {additionalSettingsExpanded && (
-            <>
-            <View style={styles.settingsGrid}>
-              {ADDITIONAL_SETTINGS.filter(s => s.id !== 'strava_link' || selectedCategory === 'Running').map((setting) => (
-                <TouchableOpacity
-                  key={setting.id}
-                  style={[
-                    styles.settingChip,
-                    selectedAdditionalSettings.includes(setting.id) && styles.settingChipSelected,
-                  ]}
-                  onPress={() => toggleAdditionalSetting(setting.id)}
-                >
-                  <Ionicons
-                    name={setting.icon as any}
-                    size={16}
-                    color={selectedAdditionalSettings.includes(setting.id) ? '#FFF' : '#666'}
-                  />
-                  <Text
-                    style={[
-                      styles.settingChipText,
-                      selectedAdditionalSettings.includes(setting.id) && styles.settingChipTextSelected,
-                    ]}
-                  >
-                    {setting.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+              <>
+                <View style={styles.settingsGrid}>
+                  {ADDITIONAL_SETTINGS.filter(
+                    (s) =>
+                      s.id !== "strava_link" || selectedCategory === "Running",
+                  ).map((setting) => (
+                    <TouchableOpacity
+                      key={setting.id}
+                      style={[
+                        styles.settingChip,
+                        selectedAdditionalSettings.includes(setting.id) &&
+                          styles.settingChipSelected,
+                      ]}
+                      onPress={() => toggleAdditionalSetting(setting.id)}
+                    >
+                      <Ionicons
+                        name={setting.icon as any}
+                        size={16}
+                        color={
+                          selectedAdditionalSettings.includes(setting.id)
+                            ? "#FFF"
+                            : "#666"
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.settingChipText,
+                          selectedAdditionalSettings.includes(setting.id) &&
+                            styles.settingChipTextSelected,
+                        ]}
+                      >
+                        {setting.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-            {selectedAdditionalSettings.map((settingId) => {
-              const setting = ADDITIONAL_SETTINGS.find(s => s.id === settingId);
-              const isAdditionalInfo = settingId === 'additional_info';
-              return (
-                <View key={settingId} style={styles.additionalDetailCard}>
-                  <Text style={styles.additionalDetailLabel}>{setting?.label}</Text>
-                  {isAdditionalInfo ? (
-                    <>
-                      <TextInput
-                        style={styles.additionalDetailInput}
-                        placeholder="Heading"
-                        value={additionalDetails[settingId]?.title || ''}
-                        onChangeText={(text) =>
-                          setAdditionalDetails({
-                            ...additionalDetails,
-                            [settingId]: { ...additionalDetails[settingId], title: text },
-                          })
-                        }
-                        placeholderTextColor="#999"
-                      />
-                      <TextInput
-                        style={[styles.additionalDetailInput, styles.additionalDetailDescription]}
-                        placeholder="Description"
-                        value={additionalDetails[settingId]?.description || ''}
-                        onChangeText={(text) =>
-                          setAdditionalDetails({
-                            ...additionalDetails,
-                            [settingId]: { ...additionalDetails[settingId], description: text },
-                          })
-                        }
-                        placeholderTextColor="#999"
-                        multiline
-                        numberOfLines={2}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <TextInput
-                        style={styles.additionalDetailInput}
-                        placeholder={(setting as any)?.placeholder ?? (setting?.label ? `Enter ${setting.label}` : 'Value')}
-                        value={additionalDetails[settingId]?.description ?? additionalDetails[settingId]?.title ?? ''}
-                        onChangeText={(text) =>
-                          setAdditionalDetails({
-                            ...additionalDetails,
-                            [settingId]: {
-                              title: setting?.label ?? settingId,
-                              description: text,
-                            },
-                          })
-                        }
-                        placeholderTextColor="#999"
-                      />
-                      {settingId === 'google_drive_link' && (
-                        <Text style={styles.photosLinkHint}>Only registered users will be able to access</Text>
+                {selectedAdditionalSettings.map((settingId) => {
+                  const setting = ADDITIONAL_SETTINGS.find(
+                    (s) => s.id === settingId,
+                  );
+                  const isAdditionalInfo = settingId === "additional_info";
+                  return (
+                    <View key={settingId} style={styles.additionalDetailCard}>
+                      <Text style={styles.additionalDetailLabel}>
+                        {setting?.label}
+                      </Text>
+                      {isAdditionalInfo ? (
+                        <>
+                          <TextInput
+                            style={styles.additionalDetailInput}
+                            placeholder="Heading"
+                            value={additionalDetails[settingId]?.title || ""}
+                            onChangeText={(text) =>
+                              setAdditionalDetails({
+                                ...additionalDetails,
+                                [settingId]: {
+                                  ...additionalDetails[settingId],
+                                  title: text,
+                                },
+                              })
+                            }
+                            placeholderTextColor="#999"
+                          />
+                          <TextInput
+                            style={[
+                              styles.additionalDetailInput,
+                              styles.additionalDetailDescription,
+                            ]}
+                            placeholder="Description"
+                            value={
+                              additionalDetails[settingId]?.description || ""
+                            }
+                            onChangeText={(text) =>
+                              setAdditionalDetails({
+                                ...additionalDetails,
+                                [settingId]: {
+                                  ...additionalDetails[settingId],
+                                  description: text,
+                                },
+                              })
+                            }
+                            placeholderTextColor="#999"
+                            multiline
+                            numberOfLines={2}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <TextInput
+                            style={styles.additionalDetailInput}
+                            placeholder={
+                              (setting as any)?.placeholder ??
+                              (setting?.label
+                                ? `Enter ${setting.label}`
+                                : "Value")
+                            }
+                            value={
+                              additionalDetails[settingId]?.description ??
+                              additionalDetails[settingId]?.title ??
+                              ""
+                            }
+                            keyboardType={
+                              settingId === "strava_link" ? "url" : "default"
+                            }
+                            onChangeText={(text) => {
+                              if (settingId === "strava_link") {
+                                // only update when the value is a valid URL or empty
+                                if (text === "" || isValidUrl(text)) {
+                                  setAdditionalDetails({
+                                    ...additionalDetails,
+                                    [settingId]: {
+                                      title: setting?.label ?? settingId,
+                                      description: text,
+                                    },
+                                  });
+                                }
+                              } else {
+                                setAdditionalDetails({
+                                  ...additionalDetails,
+                                  [settingId]: {
+                                    title: setting?.label ?? settingId,
+                                    description: text,
+                                  },
+                                });
+                              }
+                            }}
+                            placeholderTextColor="#999"
+                          />
+                          {settingId === "google_drive_link" && (
+                            <Text style={styles.photosLinkHint}>
+                              Only registered users will be able to access
+                            </Text>
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* Women's Only & Allow Viewing Guest List – inside Additional Settings */}
-            <View style={styles.additionalTogglesBlock}>
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Women&apos;s Only</Text>
-                <Switch
-                  value={womenOnly}
-                  onValueChange={setWomenOnly}
-                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-                  thumbColor="#FFF"
-                />
-              </View>
-              {womenOnly && (
-                <Text style={styles.womenOnlyInfo}>
-                  Your event will be visible to everyone but only women will be able to register.
-                </Text>
-              )}
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Allow Viewing Guest List</Text>
-                <Switch
-                  value={!hideGuestListFromViewers}
-                  onValueChange={(v) => setHideGuestListFromViewers(!v)}
-                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-                  thumbColor="#FFF"
-                />
-              </View>
-
-              {/* Attach Form */}
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Attach Form</Text>
-                <Switch
-                  value={attachFormEnabled}
-                  onValueChange={(v) => {
-                    setAttachFormEnabled(v);
-                    if (!v) {
-                      setFormId(null);
-                      setMostRecentFormFields([]);
-                    } else {
-                      // auto-attach most recently created form
-                      attachMostRecentForm();
-                    }
-                  }}
-                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-                  thumbColor="#FFF"
-                />
-              </View>
-
-              {attachFormEnabled && (
-                <View style={styles.formSection}>
-                  {formId ? (
-                    <View style={styles.formSelectedContainer}>
-                      <View style={styles.formSelectedContent}>
-                        <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                        <View style={styles.formSelectedInfo}>
-                          <Text style={styles.formSelectedLabel}>Form Attached</Text>
-                          <Text style={styles.formSelectedId}>{formId}</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => setFormId(null)}
-                        style={styles.formRemoveButton}
-                      >
-                        <Ionicons name="close" size={20} color="#FF3B30" />
-                      </TouchableOpacity>
                     </View>
-                  ) : (
-                    <View style={styles.formActionButtons}>
-                      <TouchableOpacity
-                        style={styles.formSelectButton}
-                        onPress={() => setShowFormSelector(true)}
-                      >
-                        <Ionicons name="document" size={18} color="#007AFF" />
-                        <Text style={styles.formSelectButtonText}>Select Existing Form</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.formCreateButton}
-                        onPress={() => setShowFormBuilder(true)}
-                      >
-                        <Ionicons name="add-circle" size={18} color="#FFF" />
-                        <Text style={styles.formCreateButtonText}>Create New Form</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              )}
+                  );
+                })}
 
-              {/* Limit Registration */}
-              <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Limit Registration</Text>
-                <Switch
-                  value={limitRegistrationEnabled}
-                  onValueChange={(v) => {
-                    setLimitRegistrationEnabled(v);
-                    if (!v) setRegistrationLimit('');
-                  }}
-                  trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
-                  thumbColor="#FFF"
-                />
-              </View>
-
-              {limitRegistrationEnabled && (
-                <View style={styles.registrationLimitContainer}>
-                  <TextInput
-                    style={styles.registrationLimitInput}
-                    placeholder="Maximum number of attendees"
-                    placeholderTextColor="#9CA3AF"
-                    value={registrationLimit}
-                    onChangeText={(text) => {
-                      // Only allow numeric input
-                      const numText = text.replace(/[^0-9]/g, '');
-                      setRegistrationLimit(numText);
-                    }}
-                    keyboardType="number-pad"
-                  />
-                  {registrationLimit && (
-                    <Text style={styles.registrationLimitHint}>
-                      Maximum {registrationLimit} attendee{registrationLimit !== '1' ? 's' : ''}
+                {/* Women's Only & Allow Viewing Guest List – inside Additional Settings */}
+                <View style={styles.additionalTogglesBlock}>
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Women&apos;s Only</Text>
+                    <Switch
+                      value={womenOnly}
+                      onValueChange={setWomenOnly}
+                      trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                      thumbColor="#FFF"
+                    />
+                  </View>
+                  {womenOnly && (
+                    <Text style={styles.womenOnlyInfo}>
+                      Your event will be visible to everyone but only women will
+                      be able to register.
                     </Text>
                   )}
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>
+                      Allow Viewing Guest List
+                    </Text>
+                    <Switch
+                      value={!hideGuestListFromViewers}
+                      onValueChange={(v) => setHideGuestListFromViewers(!v)}
+                      trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                      thumbColor="#FFF"
+                    />
+                  </View>
+
+                  {/* Attach Form */}
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Attach Form</Text>
+                    <Switch
+                      value={attachFormEnabled}
+                      onValueChange={(v) => {
+                        setAttachFormEnabled(v);
+                        if (!v) {
+                          setFormId(null);
+                          setMostRecentFormFields([]);
+                        } else {
+                          // auto-attach most recently created form
+                          attachMostRecentForm();
+                        }
+                      }}
+                      trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                      thumbColor="#FFF"
+                    />
+                  </View>
+
+                  {attachFormEnabled && (
+                    <View style={styles.formSection}>
+                      {formId ? (
+                        <View style={styles.formSelectedContainer}>
+                          <View style={styles.formSelectedContent}>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={24}
+                              color="#34C759"
+                            />
+                            <View style={styles.formSelectedInfo}>
+                              <Text style={styles.formSelectedLabel}>
+                                Form Attached
+                              </Text>
+                              <Text style={styles.formSelectedId}>
+                                {formId}
+                              </Text>
+                            </View>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => setFormId(null)}
+                            style={styles.formRemoveButton}
+                          >
+                            <Ionicons name="close" size={20} color="#FF3B30" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.formActionButtons}>
+                          <TouchableOpacity
+                            style={styles.formSelectButton}
+                            onPress={() => setShowFormSelector(true)}
+                          >
+                            <Ionicons
+                              name="document"
+                              size={18}
+                              color="#007AFF"
+                            />
+                            <Text style={styles.formSelectButtonText}>
+                              Select Existing Form
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.formCreateButton}
+                            onPress={() => setShowFormBuilder(true)}
+                          >
+                            <Ionicons
+                              name="add-circle"
+                              size={18}
+                              color="#FFF"
+                            />
+                            <Text style={styles.formCreateButtonText}>
+                              Create New Form
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Limit Registration */}
+                  <View style={styles.toggleRow}>
+                    <Text style={styles.toggleLabel}>Limit Registration</Text>
+                    <Switch
+                      value={limitRegistrationEnabled}
+                      onValueChange={(v) => {
+                        setLimitRegistrationEnabled(v);
+                        if (!v) setRegistrationLimit("");
+                      }}
+                      trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
+                      thumbColor="#FFF"
+                    />
+                  </View>
+
+                  {limitRegistrationEnabled && (
+                    <View style={styles.registrationLimitContainer}>
+                      <TextInput
+                        style={styles.registrationLimitInput}
+                        placeholder="Maximum number of attendees"
+                        placeholderTextColor="#9CA3AF"
+                        value={registrationLimit}
+                        onChangeText={(text) => {
+                          // Only allow numeric input
+                          const numText = text.replace(/[^0-9]/g, "");
+                          setRegistrationLimit(numText);
+                        }}
+                        keyboardType="number-pad"
+                      />
+                      {registrationLimit && (
+                        <Text style={styles.registrationLimitHint}>
+                          Maximum {registrationLimit} attendee
+                          {registrationLimit !== "1" ? "s" : ""}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            </>
+              </>
             )}
           </View>
 
@@ -1623,113 +2111,251 @@ export default function CreateBusinessPostScreen() {
             animationType="slide"
             onRequestClose={() => setShowTicketPreview(false)}
           >
-            <SafeAreaView style={styles.ticketPreviewModal} edges={['top']}>
-              <LinearGradient colors={['#8B7AB8', '#C9A0B8', '#F5E6E8', '#FFFFFF']} locations={[0, 0.35, 0.7, 1]} style={StyleSheet.absoluteFill} />
+            <SafeAreaView style={styles.ticketPreviewModal} edges={["top"]}>
+              <LinearGradient
+                colors={["#8B7AB8", "#C9A0B8", "#F5E6E8", "#FFFFFF"]}
+                locations={[0, 0.35, 0.7, 1]}
+                style={StyleSheet.absoluteFill}
+              />
               <View style={styles.ticketPreviewHeader}>
                 <View style={{ width: 24 }} />
                 <Text style={styles.ticketPreviewTitle}>Ticket Preview</Text>
                 <View style={{ width: 24 }} />
               </View>
-              <ScrollView style={styles.ticketPreviewScroll} contentContainerStyle={styles.ticketPreviewContent} showsVerticalScrollIndicator={false}>
-                {passes[previewPassIndex] && (() => {
-                  const pass = passes[previewPassIndex];
-                  const mainImage = pass.media?.[0]?.uri ?? media[0]?.uri;
-                  const eventDate = selectedDate ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
-                  const eventTime = (startTime ? formatTime(startTime) : startTimeText) || 'TBD';
-                  const hasValue = (v?: string) => !!v && v.trim() !== '' && v.trim() !== '—';
-                  const getVal = (d: { title?: string; description?: string }) => (d?.description ?? d?.title ?? '').trim();
-                  type PillType = 'category' | 'distance' | 'starting_point' | 'dress_code' | 'music_type' | 'f&b' | 'other';
-                  const details = selectedAdditionalSettings.map((id) => ({
-                    detail_type: id,
-                    title: ADDITIONAL_SETTINGS.find((s) => s.id === id)?.label ?? id,
-                    description: additionalDetails[id]?.description ?? '',
-                  }));
-                  const find = (t: string) => details.find((d) => d.detail_type === t);
-                  const previewPills: { type: PillType; label: string }[] = [];
-                  const cat = selectedCategory || (selectedSubcategories && selectedSubcategories[0]) || '';
-                  if (hasValue(cat)) previewPills.push({ type: 'category', label: cat });
-                  const priority: PillType[] = ['distance', 'starting_point', 'dress_code', 'music_type', 'f&b'];
-                  for (const type of priority) {
-                    const value = getVal(find(type) ?? {});
-                    if (hasValue(value)) previewPills.push({ type, label: value });
-                    if (previewPills.length >= 4) break;
-                  }
-                  const skip = new Set(['distance', 'starting_point', 'dress_code', 'music_type', 'f&b', 'google_drive_link', 'link', 'url']);
-                  for (const d of details) {
-                    if (skip.has(d.detail_type) || previewPills.length >= 4) continue;
-                    const value = getVal(d);
-                    if (hasValue(value)) previewPills.push({ type: 'other', label: value });
-                  }
-                  const renderPillIcon = (type: PillType, label: string) => {
-                    const p = { size: 18 as const, color: '#1C1C1E' };
-                    if (type === 'category') {
-                      const l = label.toLowerCase();
-                      if (l.includes('sport')) return <FontAwesome5 name="basketball-ball" {...p} />;
-                      if (l.includes('fitness') || l.includes('training') || l.includes('gym')) return <FontAwesome5 name="dumbbell" {...p} />;
-                      if (l.includes('social') || l.includes('community')) return <FontAwesome5 name="glass-cheers" {...p} />;
-                      if (l.includes('running') || l.includes('run')) return <FontAwesome5 name="running" {...p} />;
-                      return <FontAwesome5 name="tag" {...p} />;
+              <ScrollView
+                style={styles.ticketPreviewScroll}
+                contentContainerStyle={styles.ticketPreviewContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {passes[previewPassIndex] &&
+                  (() => {
+                    const pass = passes[previewPassIndex];
+                    const mainImage = pass.media?.[0]?.uri ?? media[0]?.uri;
+                    const eventDate = selectedDate
+                      ? selectedDate.toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "TBD";
+                    const eventTime =
+                      (startTime ? formatTime(startTime) : startTimeText) ||
+                      "TBD";
+                    const hasValue = (v?: string) =>
+                      !!v && v.trim() !== "" && v.trim() !== "—";
+                    const getVal = (d: {
+                      title?: string;
+                      description?: string;
+                    }) => (d?.description ?? d?.title ?? "").trim();
+                    type PillType =
+                      | "category"
+                      | "distance"
+                      | "starting_point"
+                      | "dress_code"
+                      | "music_type"
+                      | "f&b"
+                      | "other";
+                    const details = selectedAdditionalSettings.map((id) => ({
+                      detail_type: id,
+                      title:
+                        ADDITIONAL_SETTINGS.find((s) => s.id === id)?.label ??
+                        id,
+                      description: additionalDetails[id]?.description ?? "",
+                    }));
+                    const find = (t: string) =>
+                      details.find((d) => d.detail_type === t);
+                    const previewPills: { type: PillType; label: string }[] =
+                      [];
+                    const cat =
+                      selectedCategory ||
+                      (selectedSubcategories && selectedSubcategories[0]) ||
+                      "";
+                    if (hasValue(cat))
+                      previewPills.push({ type: "category", label: cat });
+                    const priority: PillType[] = [
+                      "distance",
+                      "starting_point",
+                      "dress_code",
+                      "music_type",
+                      "f&b",
+                    ];
+                    for (const type of priority) {
+                      const value = getVal(find(type) ?? {});
+                      if (hasValue(value))
+                        previewPills.push({ type, label: value });
+                      if (previewPills.length >= 4) break;
                     }
-                    if (type === 'starting_point') return <FontAwesome5 name="flag-checkered" {...p} />;
-                    if (type === 'distance') return <FontAwesome5 name="running" {...p} />;
-                    if (type === 'dress_code') return <Ionicons name="shirt-outline" {...p} />;
-                    if (type === 'music_type') return <FontAwesome5 name="music" {...p} />;
-                    if (type === 'f&b') return <MaterialIcons name="fastfood" {...p} />;
-                    return <FontAwesome5 name="circle" {...p} />;
-                  };
-                  const imgH = 280;
-                  const overlap = 56;
-                  return (
-                    <View style={styles.ticketPreviewCentered}>
+                    const skip = new Set([
+                      "distance",
+                      "starting_point",
+                      "dress_code",
+                      "music_type",
+                      "f&b",
+                      "google_drive_link",
+                      "link",
+                      "url",
+                    ]);
+                    for (const d of details) {
+                      if (skip.has(d.detail_type) || previewPills.length >= 4)
+                        continue;
+                      const value = getVal(d);
+                      if (hasValue(value))
+                        previewPills.push({ type: "other", label: value });
+                    }
+                    const renderPillIcon = (type: PillType, label: string) => {
+                      const p = { size: 18 as const, color: "#1C1C1E" };
+                      if (type === "category") {
+                        const l = label.toLowerCase();
+                        if (l.includes("sport"))
+                          return <FontAwesome5 name="basketball-ball" {...p} />;
+                        if (
+                          l.includes("fitness") ||
+                          l.includes("training") ||
+                          l.includes("gym")
+                        )
+                          return <FontAwesome5 name="dumbbell" {...p} />;
+                        if (l.includes("social") || l.includes("community"))
+                          return <FontAwesome5 name="glass-cheers" {...p} />;
+                        if (l.includes("running") || l.includes("run"))
+                          return <FontAwesome5 name="running" {...p} />;
+                        return <FontAwesome5 name="tag" {...p} />;
+                      }
+                      if (type === "starting_point")
+                        return <FontAwesome5 name="flag-checkered" {...p} />;
+                      if (type === "distance")
+                        return <FontAwesome5 name="running" {...p} />;
+                      if (type === "dress_code")
+                        return <Ionicons name="shirt-outline" {...p} />;
+                      if (type === "music_type")
+                        return <FontAwesome5 name="music" {...p} />;
+                      if (type === "f&b")
+                        return <MaterialIcons name="fastfood" {...p} />;
+                      return <FontAwesome5 name="circle" {...p} />;
+                    };
+                    const imgH = 280;
+                    const overlap = 56;
+                    return (
+                      <View style={styles.ticketPreviewCentered}>
                         <View style={styles.ticketPreviewCardWrap}>
                           <View style={styles.ticketPreviewCard}>
                             {mainImage ? (
-                              <Image source={{ uri: mainImage }} style={[styles.ticketPreviewImage, { height: imgH }]} resizeMode="cover" />
+                              <Image
+                                source={{ uri: mainImage }}
+                                style={[
+                                  styles.ticketPreviewImage,
+                                  { height: imgH },
+                                ]}
+                                resizeMode="cover"
+                              />
                             ) : (
-                              <View style={[styles.ticketPreviewImage, styles.ticketPreviewImagePlaceholder, { height: imgH }]}>
-                                <Ionicons name="image-outline" size={64} color="rgba(255,255,255,0.6)" />
+                              <View
+                                style={[
+                                  styles.ticketPreviewImage,
+                                  styles.ticketPreviewImagePlaceholder,
+                                  { height: imgH },
+                                ]}
+                              >
+                                <Ionicons
+                                  name="image-outline"
+                                  size={64}
+                                  color="rgba(255,255,255,0.6)"
+                                />
                               </View>
                             )}
-                            <View style={[styles.ticketPreviewBlurStrip, { height: imgH * 0.2 }]}>
-                              <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View
+                              style={[
+                                styles.ticketPreviewBlurStrip,
+                                { height: imgH * 0.2 },
+                              ]}
+                            >
+                              <BlurView
+                                intensity={40}
+                                tint="dark"
+                                style={StyleSheet.absoluteFill}
+                              />
                             </View>
-                            <LinearGradient colors={['transparent', 'rgba(0,0,0,0.75)']} style={styles.ticketPreviewOverlay}>
-                              <Text style={styles.ticketPreviewBannerTitle} numberOfLines={2}>{title || 'Event Title'}</Text>
+                            <LinearGradient
+                              colors={["transparent", "rgba(0,0,0,0.75)"]}
+                              style={styles.ticketPreviewOverlay}
+                            >
+                              <Text
+                                style={styles.ticketPreviewBannerTitle}
+                                numberOfLines={2}
+                              >
+                                {title || "Event Title"}
+                              </Text>
                               <View style={styles.ticketPreviewBannerMetaRow}>
-                                <Text style={styles.ticketPreviewBannerDate}>{eventDate}</Text>
-                                <Text style={styles.ticketPreviewBannerTime}>{eventTime}</Text>
+                                <Text style={styles.ticketPreviewBannerDate}>
+                                  {eventDate}
+                                </Text>
+                                <Text style={styles.ticketPreviewBannerTime}>
+                                  {eventTime}
+                                </Text>
                               </View>
-                              {location ? <Text style={styles.ticketPreviewBannerLocation} numberOfLines={1}>{location}</Text> : null}
+                              {location ? (
+                                <Text
+                                  style={styles.ticketPreviewBannerLocation}
+                                  numberOfLines={1}
+                                >
+                                  {location}
+                                </Text>
+                              ) : null}
                             </LinearGradient>
                           </View>
-                          <View style={[styles.ticketPreviewInfoSection, { marginTop: -overlap, paddingTop: overlap + 16 }]}>
+                          <View
+                            style={[
+                              styles.ticketPreviewInfoSection,
+                              { marginTop: -overlap, paddingTop: overlap + 16 },
+                            ]}
+                          >
                             <View style={styles.ticketPreviewInfoLeft}>
                               {previewPills.slice(0, 4).map((item, idx) => (
-                                <View key={idx} style={styles.ticketPreviewPill}>
+                                <View
+                                  key={idx}
+                                  style={styles.ticketPreviewPill}
+                                >
                                   {renderPillIcon(item.type, item.label)}
-                                  <Text style={styles.ticketPreviewPillLabel} numberOfLines={1}>{item.label}</Text>
+                                  <Text
+                                    style={styles.ticketPreviewPillLabel}
+                                    numberOfLines={1}
+                                  >
+                                    {item.label}
+                                  </Text>
                                 </View>
                               ))}
                             </View>
                             <View style={styles.ticketPreviewInfoRight}>
                               <View style={styles.ticketPreviewQrWrap}>
                                 <View style={styles.ticketPreviewQrPlaceholder}>
-                                  <Ionicons name="qr-code-outline" size={56} color="#8E8E93" />
-                                  <Text style={styles.ticketPreviewQrText}>Preview</Text>
+                                  <Ionicons
+                                    name="qr-code-outline"
+                                    size={56}
+                                    color="#8E8E93"
+                                  />
+                                  <Text style={styles.ticketPreviewQrText}>
+                                    Preview
+                                  </Text>
                                 </View>
                               </View>
-                              <Text style={styles.ticketPreviewPassName}>{pass.name || 'Ticket'}</Text>
+                              <Text style={styles.ticketPreviewPassName}>
+                                {pass.name || "Ticket"}
+                              </Text>
                             </View>
                           </View>
                         </View>
                       </View>
-                  );
-                })()}
+                    );
+                  })()}
               </ScrollView>
               <View style={styles.ticketPreviewBottomBar}>
-                <TouchableOpacity style={styles.ticketPreviewBackButton} onPress={() => setShowTicketPreview(false)}>
+                <TouchableOpacity
+                  style={styles.ticketPreviewBackButton}
+                  onPress={() => setShowTicketPreview(false)}
+                >
                   <Ionicons name="create-outline" size={20} color="#FFF" />
-                  <Text style={styles.ticketPreviewBackButtonText}>Edit plan</Text>
+                  <Text style={styles.ticketPreviewBackButtonText}>
+                    Edit plan
+                  </Text>
                 </TouchableOpacity>
               </View>
             </SafeAreaView>
@@ -1751,30 +2377,44 @@ export default function CreateBusinessPostScreen() {
             {isSubmitting ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.postButtonText}>{editMode ? 'Update' : 'Post'}</Text>
+              <Text style={styles.postButtonText}>
+                {editMode ? "Update" : "Post"}
+              </Text>
             )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
       {/* Post success modal: same layout as preview (BusinessPlanDetailPreview) + Edit & Share buttons */}
-      <Modal visible={showPostSuccessModal} animationType="slide" statusBarTranslucent>
-        <SafeAreaView style={styles.successModalFullScreen} edges={['top', 'bottom']}>
+      <Modal
+        visible={showPostSuccessModal}
+        animationType="slide"
+        statusBarTranslucent
+      >
+        <SafeAreaView
+          style={styles.successModalFullScreen}
+          edges={["top", "bottom"]}
+        >
           <View style={styles.successModalScroll}>
             <View style={styles.businessPreviewWrap}>
               <BusinessPlanDetailPreview
                 plan={{
                   ...formatPreviewData(),
-                  plan_id: createdPlanIdForSuccess ?? 'preview',
+                  plan_id: createdPlanIdForSuccess ?? "preview",
                 }}
-                organizerName={currentUser?.name || 'Organizer'}
+                organizerName={currentUser?.name || "Organizer"}
                 organizerAvatar={currentUser?.profile_image ?? null}
                 showOrganizer={true}
                 withStickyBar={true}
               />
             </View>
           </View>
-          <View style={[styles.previewStickyBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View
+            style={[
+              styles.previewStickyBar,
+              { paddingBottom: Math.max(insets.bottom, 16) },
+            ]}
+          >
             <TouchableOpacity
               style={[styles.actionButton, styles.previewEditButton]}
               onPress={() => {
@@ -1782,7 +2422,10 @@ export default function CreateBusinessPostScreen() {
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
                 resetForm();
-                router.push({ pathname: '/business-plan/[planId]', params: { planId: createdPlanIdForSuccess } } as any);
+                router.push({
+                  pathname: "/business-plan/[planId]",
+                  params: { planId: createdPlanIdForSuccess },
+                } as any);
               }}
             >
               <Text style={styles.previewEditButtonText}>Edit</Text>
@@ -1805,9 +2448,9 @@ export default function CreateBusinessPostScreen() {
               setCreatedPlanIdForSuccess(null);
               resetForm();
               if (openedFromMyPlansRef.current) {
-                router.replace('/profile/your-plans');
+                router.replace("/profile/your-plans");
               } else {
-                router.replace('/(tabs)');
+                router.replace("/(tabs)");
               }
             }}
           >
@@ -1819,22 +2462,28 @@ export default function CreateBusinessPostScreen() {
       <ShareToChatModal
         visible={showShareToChatModal}
         onClose={() => setShowShareToChatModal(false)}
-        postId={createdPlanIdForSuccess ?? ''}
+        postId={createdPlanIdForSuccess ?? ""}
         postTitle={title}
         postDescription={description}
-        postMedia={media.map(m => ({ url: m.uri, type: m.type }))}
-        postTags={selectedSubcategories.length ? selectedSubcategories : (selectedCategory ? [selectedCategory] : [])}
+        postMedia={media.map((m) => ({ url: m.uri, type: m.type }))}
+        postTags={
+          selectedSubcategories.length
+            ? selectedSubcategories
+            : selectedCategory
+              ? [selectedCategory]
+              : []
+        }
         postCategorySub={selectedSubcategories}
         postCategoryMain={selectedCategory}
         postIsBusiness={true}
-        userId={user?.user_id ?? ''}
+        userId={user?.user_id ?? ""}
         currentUserAvatar={currentUser?.profile_image ?? undefined}
       />
 
       {/* Form Selector Modal */}
       <FormSelector
         visible={showFormSelector}
-        userId={user?.user_id ?? ''}
+        userId={user?.user_id ?? ""}
         onSelect={handleFormSelectorSelect}
         onCreateNew={() => {
           setShowFormSelector(false);
@@ -1859,47 +2508,47 @@ export default function CreateBusinessPostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   sectionCard: {
-    backgroundColor: '#EBEBED',
+    backgroundColor: "#EBEBED",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
   },
   /** Shorter sections with white bg: Time of Event, Tickets, Share to community */
   sectionCardCompact: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
   },
   locationInputPill: {
     fontSize: 15,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     paddingVertical: 14,
     paddingHorizontal: 18,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 24,
   },
   dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 12,
   },
   createPostHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: "#E5E5EA",
   },
   cancelButton: {
     minWidth: 70,
@@ -1909,12 +2558,12 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     fontSize: 16,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   createPostHeaderTitle: {
     fontSize: 17,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   keyboardView: {
     flex: 1,
@@ -1927,164 +2576,164 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   stickyActionBar: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   titleInput: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     marginBottom: 0,
     padding: 12,
     paddingVertical: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 12,
   },
   descriptionInput: {
     fontSize: 14,
-    color: '#000',
+    color: "#000",
     padding: 12,
     paddingVertical: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 12,
     minHeight: 100,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
     marginBottom: 4,
   },
   mediaSection: {
     marginBottom: 16,
   },
   mediaList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
   mediaPreviewWrap: {
-    position: 'relative',
+    position: "relative",
     width: 88,
     height: 88,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   mediaThumb: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
     borderRadius: 12,
   },
   removeMediaButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 12,
     width: 24,
     height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   addMediaThumb: {
     width: 88,
     height: 88,
     borderWidth: 2,
-    borderColor: '#E5E5E5',
-    borderStyle: 'dashed',
+    borderColor: "#E5E5E5",
+    borderStyle: "dashed",
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   addMediaThumbText: {
     fontSize: 11,
-    color: '#666',
+    color: "#666",
     marginTop: 4,
   },
   mediaPreview: {
-    position: 'relative',
-    width: '100%',
+    position: "relative",
+    width: "100%",
     height: 200,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   mediaImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   addMediaButton: {
-    width: '100%',
+    width: "100%",
     height: 100,
     borderWidth: 2,
-    borderColor: '#E5E5E5',
-    borderStyle: 'dashed',
+    borderColor: "#E5E5E5",
+    borderStyle: "dashed",
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
   },
   addMediaButtonSmall: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: '#E5E5E5',
-    borderStyle: 'dashed',
+    borderColor: "#E5E5E5",
+    borderStyle: "dashed",
     borderRadius: 20,
   },
   addMediaTextSmall: {
     marginLeft: 6,
     fontSize: 13,
-    color: '#666',
-    fontWeight: '600',
+    color: "#666",
+    fontWeight: "600",
   },
   addMediaText: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   fieldLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginBottom: 8,
   },
   input: {
     fontSize: 14,
-    color: '#000',
+    color: "#000",
     padding: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 12,
     marginBottom: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   inputText: {
     fontSize: 14,
-    color: '#000',
+    color: "#000",
   },
   inputPlaceholder: {
     fontSize: 14,
-    color: '#999',
+    color: "#999",
   },
   timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginBottom: 16,
   },
@@ -2096,32 +2745,32 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   amPmBox: {
-    flexDirection: 'row',
-    backgroundColor: 'transparent',
+    flexDirection: "row",
+    backgroundColor: "transparent",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
-    overflow: 'hidden',
+    borderColor: "rgba(0,0,0,0.1)",
+    overflow: "hidden",
   },
   amPmOption: {
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
   amPmOptionSelected: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
   },
   amPmOptionText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   amPmOptionTextSelected: {
-    color: '#FFF',
+    color: "#FFF",
   },
   toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 12,
     marginBottom: 16,
   },
@@ -2131,18 +2780,18 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
   },
   additionalTogglesBlock: {
     marginTop: 20,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
   },
   womenOnlyInfo: {
     fontSize: 13,
-    color: '#6B7280',
+    color: "#6B7280",
     marginBottom: 16,
     paddingHorizontal: 4,
     lineHeight: 18,
@@ -2151,119 +2800,119 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#666',
+    fontWeight: "700",
+    color: "#666",
     marginBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   additionalSettingsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 12,
-    color: '#999',
+    color: "#999",
     marginBottom: 12,
   },
   categoryContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   categoryChipSelected: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
+    borderColor: "#1C1C1E",
   },
   categoryChipIcon: {
     marginRight: 8,
   },
   categoryChipText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   categoryChipTextSelected: {
-    color: '#FFF',
+    color: "#FFF",
   },
   subcategorySection: {
     marginTop: 12,
   },
   subcategoryLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
     marginBottom: 8,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   subcategoryChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   subcategoryChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   subcategoryChipSelected: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
+    borderColor: "#1C1C1E",
   },
   subcategoryChipText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   subcategoryChipTextSelected: {
-    color: '#FFF',
+    color: "#FFF",
   },
   ticketsSectionWhenOn: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   passesSection: {
     marginTop: 8,
     marginBottom: 0,
   },
   ticketAddMediaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
     borderRadius: 10,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginBottom: 10,
   },
   ticketAddMediaButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   ticketImagePreviewWrap: {
-    position: 'relative',
-    alignSelf: 'flex-start',
+    position: "relative",
+    alignSelf: "flex-start",
     marginBottom: 12,
   },
   ticketImagePreviewThumb: {
@@ -2272,73 +2921,73 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   ticketImagePreviewRemove: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 10,
     width: 20,
     height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   ticketsBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginTop: 12,
     gap: 12,
   },
   ticketAddTypeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
     borderRadius: 10,
   },
   ticketAddTypeButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   passCard: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
   },
   passInput: {
     fontSize: 14,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     padding: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 8,
     marginBottom: 12,
     borderWidth: 0,
   },
   passRemoveButton: {
     padding: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   passDescription: {
     minHeight: 80,
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   passImageRow: {
     marginTop: 8,
   },
   passImageLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
     marginBottom: 8,
   },
   passMediaPreview: {
-    position: 'relative',
-    alignSelf: 'flex-start',
+    position: "relative",
+    alignSelf: "flex-start",
   },
   passMediaThumb: {
     width: 80,
@@ -2346,43 +2995,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   removePassMediaBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 12,
     padding: 4,
   },
   addPassImageBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderRadius: 8,
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
   },
   addPassImageText: {
     fontSize: 13,
-    color: '#666',
+    color: "#666",
   },
   addMediaOptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderRadius: 8,
     marginBottom: 12,
   },
   addMediaOptionText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   passNamePriceRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 12,
   },
@@ -2395,63 +3044,63 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   ticketActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
     gap: 10,
     marginBottom: 12,
   },
   ticketActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   ticketActionButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   addTypePreviewRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginTop: 8,
   },
   previewTicketButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
     borderRadius: 8,
   },
   previewTicketButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   ticketPreviewModal: {
     flex: 1,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
   },
   ticketPreviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     paddingTop: 8,
   },
   ticketPreviewTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   ticketPreviewScroll: {
     flex: 1,
@@ -2459,45 +3108,45 @@ const styles = StyleSheet.create({
   ticketPreviewContent: {
     padding: 20,
     paddingBottom: 100,
-    alignItems: 'center',
+    alignItems: "center",
   },
   ticketPreviewCentered: {
-    width: '100%',
+    width: "100%",
     maxWidth: 420,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
   ticketPreviewCardWrap: {
     marginBottom: 0,
   },
   ticketPreviewCard: {
     borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: '#FFF',
-    shadowColor: '#000',
+    overflow: "hidden",
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
     elevation: 8,
-    position: 'relative',
+    position: "relative",
   },
   ticketPreviewImage: {
-    width: '100%',
+    width: "100%",
   },
   ticketPreviewImagePlaceholder: {
-    backgroundColor: '#94A3B8',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#94A3B8",
+    justifyContent: "center",
+    alignItems: "center",
   },
   ticketPreviewBlurStrip: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    overflow: 'hidden',
+    overflow: "hidden",
     zIndex: 1,
   },
   ticketPreviewOverlay: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
@@ -2508,36 +3157,36 @@ const styles = StyleSheet.create({
   },
   ticketPreviewBannerTitle: {
     fontSize: 26,
-    fontWeight: '800',
-    color: '#FFF',
+    fontWeight: "800",
+    color: "#FFF",
     marginBottom: 8,
   },
   ticketPreviewBannerMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 4,
   },
   ticketPreviewBannerDate: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.95)',
-    fontWeight: '600',
+    color: "rgba(255,255,255,0.95)",
+    fontWeight: "600",
   },
   ticketPreviewBannerTime: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.95)',
-    fontWeight: '600',
+    color: "rgba(255,255,255,0.95)",
+    fontWeight: "600",
   },
   ticketPreviewBannerLocation: {
     fontSize: 13,
-    color: 'rgba(255,255,255,0.85)',
+    color: "rgba(255,255,255,0.85)",
   },
   ticketPreviewInfoSection: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
+    flexDirection: "row",
+    backgroundColor: "#FFF",
     borderRadius: 20,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -2546,159 +3195,159 @@ const styles = StyleSheet.create({
   },
   ticketPreviewInfoLeft: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: "space-between",
     gap: 12,
   },
   ticketPreviewPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFF',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#FFF",
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
     gap: 8,
   },
   ticketPreviewPillLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#1C1C1E',
+    fontWeight: "500",
+    color: "#1C1C1E",
     maxWidth: 140,
   },
   ticketPreviewInfoRight: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     minWidth: 130,
   },
   ticketPreviewQrWrap: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: "#E5E7EB",
     marginBottom: 10,
   },
   ticketPreviewQrPlaceholder: {
     width: 112,
     height: 112,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   ticketPreviewQrText: {
     marginTop: 4,
     fontSize: 12,
-    color: '#8E8E93',
+    color: "#8E8E93",
   },
   ticketPreviewPassName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1C1C1E',
+    fontWeight: "700",
+    color: "#1C1C1E",
     marginBottom: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
   ticketPreviewBottomBar: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 24,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   ticketPreviewBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
   },
   ticketPreviewBackButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   previewTicketButtonBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
     borderRadius: 12,
   },
   previewTicketButtonBottomText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFF',
+    fontWeight: "700",
+    color: "#FFF",
   },
   addPassButton: {
     padding: 12,
     borderWidth: 2,
-    borderColor: '#E5E5E5',
-    borderStyle: 'dashed',
+    borderColor: "#E5E5E5",
+    borderStyle: "dashed",
     borderRadius: 12,
-    alignItems: 'center',
+    alignItems: "center",
   },
   addPassText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   settingsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 16,
   },
   settingChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
     gap: 6,
   },
   settingChipSelected: {
-    backgroundColor: '#1C1C1E',
-    borderColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
+    borderColor: "#1C1C1E",
   },
   settingChipText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   settingChipTextSelected: {
-    color: '#FFF',
+    color: "#FFF",
   },
   additionalDetailCard: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
   },
   additionalDetailLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
     marginBottom: 8,
   },
   additionalDetailInput: {
     fontSize: 14,
-    color: '#000',
+    color: "#000",
     padding: 12,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     borderRadius: 8,
   },
   additionalDetailDescription: {
@@ -2706,30 +3355,30 @@ const styles = StyleSheet.create({
   },
   photosLinkHint: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginTop: 6,
   },
   productionTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   productionTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#E5E5E5',
+    backgroundColor: "#E5E5E5",
     gap: 6,
   },
   productionTagText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 24,
   },
@@ -2737,78 +3386,84 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   previewButton: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
   },
   previewButtonText: {
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   postButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
   },
   postButtonText: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   successModalFullScreen: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   successModalScroll: {
     flex: 1,
   },
   successModalClose: {
-    position: 'absolute',
+    position: "absolute",
     top: 12,
     right: 16,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#E5E5EA',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
     zIndex: 10,
   },
   previewFullScreen: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
   },
   previewCloseButton: {
-    position: 'absolute',
+    position: "absolute",
     top: 56,
     right: 16,
     zIndex: 10,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255,255,255,0.9)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: "#E5E5E5",
   },
   previewScroll: { flex: 1 },
-  previewScrollContent: { paddingBottom: 24, paddingTop: 16, paddingHorizontal: 16 },
+  previewScrollContent: {
+    paddingBottom: 24,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
   businessPreviewWrap: {
     flex: 1,
     marginHorizontal: 4,
+    paddingTop: 70,
+    paddingHorizontal: 8,
     borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#FFF',
-    shadowColor: '#000',
+    overflow: "hidden",
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
@@ -2819,89 +3474,89 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 24,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 16,
     marginHorizontal: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 8,
   },
   previewStickyBar: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E5E5',
+    borderTopColor: "#E5E5E5",
   },
   previewEditButton: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: "#E5E5EA",
   },
   previewEditButtonText: {
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   previewTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
   },
   datePickerContainer: {
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
   datePickerTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
+    fontWeight: "700",
+    color: "#000",
     marginBottom: 12,
   },
   dateInput: {
     fontSize: 14,
-    color: '#000',
+    color: "#000",
     padding: 12,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
     borderRadius: 8,
     marginBottom: 12,
   },
   datePickerButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    alignItems: "center",
   },
   datePickerButtonText: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   formSection: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
   },
   formSelectedContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F0FDF4',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#F0FDF4",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: "#86EFAC",
   },
   formSelectedContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
     gap: 10,
   },
@@ -2910,12 +3565,12 @@ const styles = StyleSheet.create({
   },
   formSelectedLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#16A34A',
+    fontWeight: "600",
+    color: "#16A34A",
   },
   formSelectedId: {
     fontSize: 12,
-    color: '#6B7280',
+    color: "#6B7280",
     marginTop: 2,
   },
   formRemoveButton: {
@@ -2925,58 +3580,57 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   formSelectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#007AFF',
-    backgroundColor: '#FFF',
+    borderColor: "#007AFF",
+    backgroundColor: "#FFF",
   },
   formSelectButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   formCreateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   formCreateButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFF',
+    fontWeight: "600",
+    color: "#FFF",
   },
   registrationLimitContainer: {
     marginTop: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: "#F3F4F6",
     borderRadius: 10,
   },
   registrationLimitInput: {
     fontSize: 14,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
     padding: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
     marginBottom: 8,
   },
   registrationLimitHint: {
     fontSize: 12,
-    color: '#6B7280',
-    fontStyle: 'italic',
+    color: "#6B7280",
+    fontStyle: "italic",
   },
 });
-
