@@ -1256,16 +1256,13 @@ export default function CreateBusinessPostScreen() {
 
   if (showPreview) {
     const previewData = formatPreviewData();
-    // preview should display the business card style just like it will appear in lists
+
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <Modal visible={true} animationType="slide" statusBarTranslucent>
-          <SafeAreaView
-            style={styles.previewFullScreen}
-            edges={["top", "bottom"]}
-          >
-            <View style={styles.previewScroll}>
-              <View style={styles.businessCardWrap}>
+        <Modal visible animationType="fade" statusBarTranslucent>
+          <SafeAreaView style={styles.modalScreen}>
+            <View style={styles.modalContentCenter}>
+              <View style={styles.previewCardContainer}>
                 <BusinessCard
                   plan={previewData}
                   user={{
@@ -1278,9 +1275,11 @@ export default function CreateBusinessPostScreen() {
                   registerButtonGreyed={true}
                   onRegisterPress={() => {}}
                   onSharePress={() => {}}
+                  isSwipeable={false}
                 />
               </View>
             </View>
+
             <View
               style={[
                 styles.previewStickyBar,
@@ -1293,6 +1292,7 @@ export default function CreateBusinessPostScreen() {
               >
                 <Text style={styles.previewEditButtonText}>Back to edit</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.actionButton, styles.postButton]}
                 onPress={handleSubmit}
@@ -2552,99 +2552,86 @@ export default function CreateBusinessPostScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-
-      {/* Post success modal: same layout as preview (BusinessPlanDetailPreview) + Edit & Share buttons */}
       <Modal
         visible={showPostSuccessModal}
-        animationType="slide"
+        animationType="fade"
+        transparent
         statusBarTranslucent
       >
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaView
-            style={styles.successModalFullScreen}
-            edges={["top", "bottom"]}
-          >
-            <View style={styles.successModalScroll}>
-              <View style={styles.businessCardWrap}>
-                <BusinessCard
-                  plan={{
-                    plan_id: createdPlanIdForSuccess ?? "preview",
-                    title: title,
-                    description: description,
-                    media: media.map((m) => ({ url: m.uri, type: m.type })),
-                    location_text: location,
-                    date: selectedDate || undefined,
-                    time: selectedDate ? formatTime(selectedDate) : undefined,
-                    category_main: selectedCategory,
-                    category_sub: selectedSubcategories,
-                    user: {
-                      user_id: currentUser?.user_id || "",
-                      name: currentUser?.name || "Organizer",
-                      profile_image: currentUser?.profile_image || undefined,
-                    },
-                  }}
-                  hideActions={true}
-                  hideRegisterButton={true}
-                  fillHeight={false}
-                  compactVerticalPadding={true}
-                  descriptionNumberOfLines={3}
-                  hideCardShadow={false}
-                />
-              </View>
-              <Text style={styles.liveStatusText}>{title} is Live</Text>
-            </View>
-            <View
-              style={[
-                styles.previewStickyBar,
-                { paddingBottom: Math.max(insets.bottom, 16) },
-              ]}
-            >
-              <TouchableOpacity
-                style={[styles.actionButton, styles.successEditButton]}
-                onPress={() => {
-                  if (!createdPlanIdForSuccess) return;
-                  setShowPostSuccessModal(false);
-                  setCreatedPlanIdForSuccess(null);
-                  resetForm();
-                  router.push({
-                    pathname: "/business-plan/[planId]",
-                    params: { planId: createdPlanIdForSuccess },
-                  } as any);
-                }}
-              >
-                <Text style={styles.successEditButtonText}>Edit Event</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.successShareButton]}
-                onPress={() => {
-                  setShowPostSuccessModal(false);
-                  setShowShareToChatModal(true);
-                  resetForm();
-                }}
-              >
-                <Ionicons name="share-social" size={20} color="#FFF" />
-                <Text style={styles.successShareButtonText}>Share</Text>
-              </TouchableOpacity>
-            </View>
+          <SafeAreaView style={styles.successOverlay}>
+            {/* Close Button */}
             <TouchableOpacity
-              style={styles.successModalClose}
+              style={styles.successCloseButton}
               onPress={() => {
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
                 resetForm();
-                if (openedFromMyPlansRef.current) {
-                  router.replace("/profile/your-plans");
-                } else {
-                  router.replace("/(tabs)");
-                }
+                router.replace("/(tabs)");
               }}
             >
               <Ionicons name="close" size={24} color="#1C1C1E" />
             </TouchableOpacity>
+
+            {/* Card */}
+            <View style={styles.successCardContainer}>
+              <BusinessCard
+                plan={{
+                  plan_id: createdPlanIdForSuccess ?? "preview",
+                  title,
+                  description,
+                  media: media.map((m) => ({ url: m.uri, type: m.type })),
+                  location_text: location,
+                  date: selectedDate || undefined,
+                  time: selectedDate ? formatTime(selectedDate) : undefined,
+                  category_main: selectedCategory,
+                  category_sub: selectedSubcategories,
+                  user: {
+                    user_id: currentUser?.user_id || "",
+                    name: currentUser?.name || "Organizer",
+                    profile_image: currentUser?.profile_image || undefined,
+                  },
+                }}
+                hideActions={true}
+                hideRegisterButton={true}
+                isSwipeable={false}
+              />
+            </View>
+
+            {/* Bottom Panel */}
+            <View style={styles.successBottomPanel}>
+              <Text style={styles.successTitle}>{title} is Live</Text>
+
+              <View style={styles.successButtonsRow}>
+                <TouchableOpacity
+                  style={styles.successEditButton}
+                  onPress={() => {
+                    if (!createdPlanIdForSuccess) return;
+                    setShowPostSuccessModal(false);
+                    router.push({
+                      pathname: "/business-plan/[planId]",
+                      params: { planId: createdPlanIdForSuccess },
+                    } as any);
+                  }}
+                >
+                  <Text style={styles.successEditButtonText}>Edit Event</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.successShareButton}
+                  onPress={() => {
+                    setShowPostSuccessModal(false);
+                    setShowShareToChatModal(true);
+                  }}
+                >
+                  <Ionicons name="paper-plane-outline" size={18} color="#FFF" />
+                  <Text style={styles.successShareButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </SafeAreaView>
         </GestureHandlerRootView>
       </Modal>
-
       <ShareToChatModal
         visible={showShareToChatModal}
         onClose={() => setShowShareToChatModal(false)}
@@ -3733,26 +3720,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
     borderTopWidth: 0,
   },
-  successEditButton: {
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#1C1C1E",
-  },
-  successEditButtonText: {
-    color: "#1C1C1E",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  successShareButton: {
-    backgroundColor: "#1C1C1E",
-    flexDirection: "row",
-    gap: 8,
-  },
-  successShareButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
   previewEditButton: {
     backgroundColor: "#E5E5EA",
   },
@@ -3916,5 +3883,138 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#6B7280",
     fontStyle: "italic",
+  },
+  modalScreen: {
+    flex: 1,
+    backgroundColor: "#F4F4F6",
+  },
+
+  modalContentCenter: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  previewCardContainer: {
+    width: "100%",
+    height: Dimensions.get("window").height * 0.5,
+    justifyContent: "center",
+  },
+  successOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-start",
+  },
+
+  /* Card container */
+  successCardContainer: {
+    marginTop: 60, // space for close button + notch
+    paddingHorizontal: 20,
+    height: Dimensions.get("window").height * 0.3, // smaller so it doesn't overlap bottom panel
+  },
+
+  /* Bottom action panel */
+  successBottomPanel: {
+    position: "absolute",
+    bottom: 30,
+    left: 20,
+    right: 20,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 26,
+    paddingVertical: 24,
+    paddingHorizontal: 22,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+
+  successTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1C1C1E",
+    marginBottom: 18,
+    textAlign: "center",
+  },
+
+  successButtonsRow: {
+    flexDirection: "row",
+    width: "100%",
+    gap: 12,
+  },
+
+  /* Edit Button */
+  successEditButton: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 22,
+    height: 46,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  successEditButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1C1C1E",
+  },
+
+  /* Share Button */
+  successShareButton: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#1C1C1E",
+    borderRadius: 22,
+    height: 46,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  successShareButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+
+  /* Close button below notch */
+  successCloseButton: {
+    position: "absolute",
+    top: 70,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 20,
+  },
+
+  // Additional styles from first set that don't exist in second set
+  successCenterWrap: {
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+
+  successCardWrap: {
+    width: "100%",
+    height: Dimensions.get("window").height * 0.48,
+  },
+
+  successActionPanel: {
+    marginTop: 20,
+    width: "100%",
+    backgroundColor: "#F2F2F2",
+    borderRadius: 24,
+    paddingVertical: 22,
+    paddingHorizontal: 20,
+    alignItems: "center",
   },
 });
