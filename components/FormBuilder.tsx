@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 
 export interface FormField {
   field_id: string;
@@ -43,17 +44,28 @@ interface FormBuilderProps {
   loading?: boolean;
 }
 
-const FIELD_TYPES: FormField["type"][] = [
-  "text",
-  "email",
-  "phone",
-  "number",
-  "select",
-  "textarea",
-  "checkbox",
-  "radio",
-  "date",
-];
+type UiFieldType = "short" | "long" | "single" | "multiple";
+
+const UI_FIELD_TYPE_LABEL: Record<UiFieldType, string> = {
+  short: "Short Answer",
+  long: "Long Answer",
+  single: "Single Choice",
+  multiple: "Multiple Choice",
+};
+
+const uiTypeFromInternal = (type: FormField["type"]): UiFieldType => {
+  if (type === "textarea") return "long";
+  if (type === "radio") return "single";
+  if (type === "checkbox") return "multiple";
+  return "short";
+};
+
+const internalTypeFromUi = (type: UiFieldType): FormField["type"] => {
+  if (type === "long") return "textarea";
+  if (type === "single") return "radio";
+  if (type === "multiple") return "checkbox";
+  return "text";
+};
 
 export default function FormBuilder({
   visible,
@@ -225,35 +237,33 @@ export default function FormBuilder({
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Field Type *</Text>
-                  <View style={styles.typePickerContainer}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.typePicker}
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={uiTypeFromInternal(field.type)}
+                      onValueChange={(value) => {
+                        const ui = value as UiFieldType;
+                        const internal = internalTypeFromUi(ui);
+                        updateField(index, {
+                          type: internal,
+                          options:
+                            internal === "radio" || internal === "checkbox"
+                              ? (field.options && field.options.length > 0
+                                  ? field.options
+                                  : [""])
+                              : [],
+                        });
+                      }}
                     >
-                      {FIELD_TYPES.map((type) => (
-                        <Pressable
-                          key={type}
-                          onPress={() =>
-                            updateField(index, { type, options: [] })
-                          }
-                          style={[
-                            styles.typeOption,
-                            field.type === type && styles.typeOptionSelected,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.typeOptionText,
-                              field.type === type &&
-                                styles.typeOptionTextSelected,
-                            ]}
-                          >
-                            {type.charAt(0).toUpperCase() + type.slice(1)}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </ScrollView>
+                      {(Object.keys(UI_FIELD_TYPE_LABEL) as UiFieldType[]).map(
+                        (t) => (
+                          <Picker.Item
+                            key={t}
+                            label={UI_FIELD_TYPE_LABEL[t]}
+                            value={t}
+                          />
+                        ),
+                      )}
+                    </Picker>
                   </View>
                 </View>
 
@@ -270,22 +280,22 @@ export default function FormBuilder({
                   />
                 </View>
 
-                {["select", "radio", "checkbox"].includes(field.type) && (
+                {(field.type === "checkbox" || field.type === "radio") && (
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Options</Text>
-                    {(field.options || []).map((opt, oidx) => (
-                      <View key={oidx} style={styles.optionRow}>
+                    {(field.options || []).map((opt, optionIndex) => (
+                      <View key={optionIndex} style={styles.optionRow}>
                         <TextInput
                           style={[styles.input, { flex: 1 }]}
-                          placeholder={`Option ${oidx + 1}`}
+                          placeholder={`Option ${optionIndex + 1}`}
                           value={opt}
                           onChangeText={(text) =>
-                            updateOption(index, oidx, text)
+                            updateOption(index, optionIndex, text)
                           }
                           placeholderTextColor="#999"
                         />
                         <Pressable
-                          onPress={() => removeOption(index, oidx)}
+                          onPress={() => removeOption(index, optionIndex)}
                           style={styles.optionRemove}
                         >
                           <Ionicons name="trash" size={20} color="#FF3B30" />
@@ -478,6 +488,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     color: "#000",
+    backgroundColor: "#f9f9f9",
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    overflow: "hidden",
     backgroundColor: "#f9f9f9",
   },
   typePickerContainer: {

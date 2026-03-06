@@ -153,8 +153,11 @@ function BusinessCardBase({
   const organizerName = user?.name || plan.user?.name || "Organizer";
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const organizerUserId = plan.user?.user_id;
-  const timeText =
-    user?.time || (plan.date ? new Date(plan.date).toLocaleDateString() : "");
+  const timeText = plan.time
+    ? `${plan.time} onwards`
+    : plan.date
+      ? new Date(plan.date).toLocaleDateString()
+      : "";
   const passes = plan.passes || [];
   const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
   const firstTicketPrice = prices.length > 0 ? Math.min(...prices) : null;

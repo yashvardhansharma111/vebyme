@@ -209,44 +209,7 @@ export default function EventAnalyticsScreen() {
         {/* Audience Feedback */}
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Audience Feedback</Text>
-          <Text style={styles.feedbackTagline}>Your runners are loving your experience</Text>
-          <Text style={styles.feedbackVotes}>74 votes</Text>
-          <View style={styles.feedbackRow}>
-            <View style={[styles.feedbackPill, styles.feedbackPillDark]}>
-              <Text style={styles.feedbackEmoji}>😊</Text>
-              <Text style={styles.feedbackPillLabel}>Amazing</Text>
-            </View>
-            <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>64%</Text>
-            </View>
-          </View>
-          <View style={styles.feedbackRow}>
-            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
-              <Text style={styles.feedbackEmoji}>🙂</Text>
-              <Text style={styles.feedbackPillLabel}>Good</Text>
-            </View>
-            <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>29%</Text>
-            </View>
-          </View>
-          <View style={styles.feedbackRow}>
-            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
-              <Text style={styles.feedbackEmoji}>😐</Text>
-              <Text style={styles.feedbackPillLabel}>Average</Text>
-            </View>
-            <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>7%</Text>
-            </View>
-          </View>
-          <View style={styles.feedbackRow}>
-            <View style={[styles.feedbackPill, styles.feedbackPillLight]}>
-              <Text style={styles.feedbackEmoji}>😞</Text>
-              <Text style={styles.feedbackPillLabel}>Bad</Text>
-            </View>
-            <View style={styles.feedbackAvatars}>
-              <Text style={styles.feedbackPercent}>0%</Text>
-            </View>
-          </View>
+          <Text style={styles.feedbackVotes}>No feedback data yet</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

@@ -74,6 +74,7 @@ export default function TicketScreen() {
   const ticketCardRef = useRef<View>(null);
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
+  const [resolvedPassImage, setResolvedPassImage] = useState<string | null>(null);
 
   const planIdFromTicket = ticket?.plan?.plan_id;
   const eventDate = ticket?.plan?.date ? new Date(ticket.plan.date) : null;
@@ -93,6 +94,35 @@ export default function TicketScreen() {
   useEffect(() => {
     loadTicket();
   }, [ticketId, planId]);
+
+  useEffect(() => {
+    const passId = (ticket as TicketData & { pass_id?: string })?.pass_id;
+    const effectivePlanId = ticket?.plan?.plan_id || planId;
+    if (!ticket || !passId || !effectivePlanId) {
+      setResolvedPassImage(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiService.getBusinessPlan(effectivePlanId);
+        const plan = (res as any)?.data ?? (res as any);
+        const passes = plan?.passes ?? [];
+        const pass = Array.isArray(passes) ? passes.find((p: any) => String(p?.pass_id) === String(passId)) : null;
+        const passImage = pass?.media && Array.isArray(pass.media) && pass.media.length > 0
+          ? (pass.media[0]?.url ?? pass.media[0])
+          : null;
+        if (!cancelled) setResolvedPassImage(typeof passImage === 'string' ? passImage : null);
+      } catch {
+        if (!cancelled) setResolvedPassImage(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ticket, planId]);
 
   const loadTicket = async () => {
     try {
@@ -186,7 +216,6 @@ export default function TicketScreen() {
       await Share.share({
         url: uri,
         title: 'Save ticket',
-        type: 'image/png',
       });
     }
   };
@@ -371,11 +400,13 @@ export default function TicketScreen() {
   }
 
   // Use this ticket's plan image (ticket_image first, then first media, then placeholder)
-  const mainImage = ticket.plan?.ticket_image
-    ? ticket.plan.ticket_image
-    : (ticket.plan?.media && ticket.plan.media.length > 0 && ticket.plan.media[0]?.url)
-      ? ticket.plan.media[0].url
-      : undefined;
+  const mainImage = resolvedPassImage
+    ? resolvedPassImage
+    : ticket.plan?.ticket_image
+      ? ticket.plan.ticket_image
+      : (ticket.plan?.media && ticket.plan.media.length > 0 && ticket.plan.media[0]?.url)
+        ? ticket.plan.media[0].url
+        : undefined;
 
   // Pass name from ticket.pass_id + plan.passes
   const passName = (() => {

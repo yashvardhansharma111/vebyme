@@ -68,7 +68,7 @@ export default function FormSelector({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <Pressable onPress={onCancel} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>Cancel</Text>
@@ -175,6 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#333",
+    minHeight: 56,
   },
   headerTitle: {
     fontSize: 18,

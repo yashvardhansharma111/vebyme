@@ -117,6 +117,23 @@ export default function BusinessPlanDetailScreen() {
   const [showFormFiller, setShowFormFiller] = useState(false);
   const [formLoadingError, setFormLoadingError] = useState<string | null>(null);
 
+  const filteredFormFields = useMemo(() => {
+    const fields = form?.fields;
+    if (!Array.isArray(fields)) return [];
+    return fields.filter((f: any) => {
+      const id = String(f?.field_id ?? "").toLowerCase();
+      const label = String(f?.label ?? "").toLowerCase();
+      const isAgeOrGender =
+        id === "age" ||
+        id === "gender" ||
+        label === "age" ||
+        label === "gender" ||
+        label.includes("age") ||
+        label.includes("gender");
+      return !isAgeOrGender;
+    });
+  }, [form?.fields]);
+
   // Web checkout (paid) state
   const [showWebCheckout, setShowWebCheckout] = useState(false);
   const [webCheckoutUrl, setWebCheckoutUrl] = useState<string | null>(null);
@@ -681,15 +698,15 @@ export default function BusinessPlanDetailScreen() {
 
           {/* Select Passes – ticket bg images; unselected blurred 50% white */}
           {plan.passes && plan.passes.length > 0 && (() => {
-            const eventImageUri = plan.media && plan.media.length > 0 && plan.media[0]?.url
-              ? plan.media[0].url
-              : null;
-            const bgSource = eventImageUri ? { uri: eventImageUri } : require('@/assets/images/ticket1 bg.png');
             return (
             <View style={styles.ticketsSection}>
               <Text style={styles.ticketsTitle}>Select Passes</Text>
               {plan.passes.map((pass) => {
                 const isSelected = selectedPass === pass.pass_id;
+                const passImageUri = pass.media && pass.media.length > 0 && pass.media[0]?.url
+                  ? pass.media[0].url
+                  : (plan.media && plan.media.length > 0 && plan.media[0]?.url ? plan.media[0].url : null);
+                const bgSource = passImageUri ? { uri: passImageUri } : require('@/assets/images/ticket1 bg.png');
                 return (
                   <TouchableOpacity
                     key={pass.pass_id}
@@ -973,9 +990,9 @@ export default function BusinessPlanDetailScreen() {
       </Modal>
 
       {/* Form Filler Modal */}
-      {form && form.fields && (
+      {form && filteredFormFields.length > 0 && (
         <FormFiller
-          fields={form.fields}
+          fields={filteredFormFields}
           visible={showFormFiller}
           onSubmit={async (responses) => {
             await completeRegistration(responses);

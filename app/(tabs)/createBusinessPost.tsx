@@ -229,6 +229,8 @@ export default function CreateBusinessPostScreen() {
   const [mostRecentFormFields, setMostRecentFormFields] = useState<FormField[]>(
     [],
   );
+  const [draftFormFields, setDraftFormFields] = useState<FormField[]>([]);
+  const [showFormEditor, setShowFormEditor] = useState(false);
   const [selectedForm, setSelectedForm] = useState<{
     form_id: string;
     name: string;
@@ -328,8 +330,13 @@ export default function CreateBusinessPostScreen() {
           if (planData.title) setTitle(planData.title);
           if (planData.description) setDescription(planData.description);
           if (planData.location_text) setLocation(planData.location_text);
-          if (planData.category_main)
-            setSelectedCategory(planData.category_main);
+          if (planData.category_main) {
+            const raw = String(planData.category_main || "").trim();
+            const normalized = raw
+              ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+              : "";
+            setSelectedCategory(normalized);
+          }
           if (planData.category_sub && Array.isArray(planData.category_sub)) {
             setSelectedSubcategories(planData.category_sub);
           }
@@ -495,12 +502,16 @@ export default function CreateBusinessPostScreen() {
           const response = await apiService.getForm(formId);
           if (response.success && response.data) {
             setSelectedForm(response.data);
+            if (Array.isArray(response.data?.fields)) {
+              setDraftFormFields(response.data.fields);
+            }
           }
         } catch (error) {
           console.error("Error fetching form:", error);
         }
       } else {
         setSelectedForm(null);
+        setDraftFormFields([]);
       }
     };
     fetchForm();
@@ -570,6 +581,44 @@ export default function CreateBusinessPostScreen() {
     } catch (error) {
       console.error("Error picking media:", error);
       Alert.alert("Error", "Failed to pick media");
+    }
+  };
+
+  const handleFormEditorSave = async (fields: FormField[]) => {
+    if (!user?.user_id) {
+      Alert.alert("Error", "User ID not available");
+      return;
+    }
+
+    setSavingForm(true);
+    try {
+      const response = await apiService.createForm({
+        user_id: user.user_id,
+        name: selectedForm?.name ? `${selectedForm.name} (Edited)` : `Form ${new Date().toLocaleDateString()}`,
+        description: "Custom registration form",
+        fields,
+      });
+
+      if (response.success && response.data?.form_id) {
+        setFormId(response.data.form_id);
+        setDraftFormFields(fields);
+        setSelectedForm({
+          form_id: response.data.form_id,
+          name: selectedForm?.name ? `${selectedForm.name} (Edited)` : `Form ${new Date().toLocaleDateString()}`,
+          fields,
+        });
+        setShowFormEditor(false);
+        Alert.alert("Success", "Form updated");
+      } else {
+        Alert.alert("Error", "Failed to update form");
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to update form",
+      );
+    } finally {
+      setSavingForm(false);
     }
   };
 
@@ -788,6 +837,29 @@ export default function CreateBusinessPostScreen() {
     const date = new Date();
     date.setHours(hours, minutes, 0, 0);
     return date;
+  };
+
+  const normalizeTimeInput = (raw: string): string => {
+    const cleaned = raw.replace(/[^0-9:]/g, "");
+    if (!cleaned) return "";
+    if (cleaned.includes(":")) {
+      const parts = cleaned.split(":");
+      const h = parts[0] ?? "";
+      const m = (parts[1] ?? "").slice(0, 2);
+      if (!h) return "";
+      const hh = h.slice(0, 2);
+      const mm = m.padEnd(2, "0");
+      return `${hh}:${mm}`;
+    }
+    if (/^\d{1,2}$/.test(cleaned)) {
+      return `${cleaned}:00`;
+    }
+    if (/^\d{3,4}$/.test(cleaned)) {
+      const h = cleaned.slice(0, cleaned.length - 2);
+      const m = cleaned.slice(-2);
+      return `${h}:${m}`;
+    }
+    return cleaned.slice(0, 5);
   };
 
   // utility to validate URLs (used by the Strava field)
@@ -1271,10 +1343,9 @@ export default function CreateBusinessPostScreen() {
                     avatar: currentUser?.profile_image ?? "",
                     time: "Preview",
                   }}
-                  hideActions={false}
+                  hideActions={true}
                   registerButtonGreyed={true}
                   onRegisterPress={() => {}}
-                  onSharePress={() => {}}
                   isSwipeable={false}
                 />
               </View>
@@ -1486,7 +1557,7 @@ export default function CreateBusinessPostScreen() {
                     placeholder="8:00"
                     value={startTimeText.replace(/\s*AM|PM/i, "").trim()}
                     onChangeText={(text) => {
-                      const cleaned = text.replace(/[^0-9:]/g, "");
+                      const cleaned = normalizeTimeInput(text);
                       setStartTimeText(
                         cleaned ? `${cleaned} ${startAmPm}` : "",
                       );
@@ -1556,7 +1627,7 @@ export default function CreateBusinessPostScreen() {
                     placeholder="End time (optional)"
                     value={endTimeText.replace(/\s*AM|PM/i, "").trim()}
                     onChangeText={(text) => {
-                      const cleaned = text.replace(/[^0-9:]/g, "");
+                      const cleaned = normalizeTimeInput(text);
                       setEndTimeText(cleaned ? `${cleaned} ${endAmPm}` : "");
                       const parsed = parseTimeText(
                         cleaned ? `${cleaned} ${endAmPm}` : "",
@@ -2144,9 +2215,11 @@ export default function CreateBusinessPostScreen() {
                         if (!v) {
                           setFormId(null);
                           setMostRecentFormFields([]);
+                          setDraftFormFields([]);
                         } else {
-                          // auto-attach most recently created form
-                          attachMostRecentForm();
+                          setFormId(null);
+                          setMostRecentFormFields([]);
+                          setDraftFormFields([]);
                         }
                       }}
                       trackColor={{ false: "#E5E5E5", true: "#8B5CF6" }}
@@ -2165,9 +2238,6 @@ export default function CreateBusinessPostScreen() {
                               color="#34C759"
                             />
                             <View style={styles.formSelectedInfo}>
-                              <Text style={styles.formSelectedLabel}>
-                                {selectedForm.name}
-                              </Text>
                               <ScrollView
                                 style={styles.formQuestionsList}
                                 showsVerticalScrollIndicator={false}
@@ -2185,12 +2255,22 @@ export default function CreateBusinessPostScreen() {
                               </ScrollView>
                             </View>
                           </View>
-                          <TouchableOpacity
-                            onPress={() => setFormId(null)}
-                            style={styles.formRemoveButton}
-                          >
-                            <Ionicons name="close" size={20} color="#FF3B30" />
-                          </TouchableOpacity>
+                          <View style={styles.formSelectedActionsRow}>
+                            <TouchableOpacity
+                              onPress={() => setShowFormEditor(true)}
+                              style={styles.formEditButton}
+                              disabled={savingForm}
+                            >
+                              <Ionicons name="create-outline" size={18} color="#000" />
+                              <Text style={styles.formEditButtonText}>Edit Form</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => setFormId(null)}
+                              style={styles.formRemoveButton}
+                            >
+                              <Ionicons name="close" size={20} color="#FF3B30" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       ) : formId ? (
                         <View style={styles.formLoading}>
@@ -2583,7 +2663,10 @@ export default function CreateBusinessPostScreen() {
                   media: media.map((m) => ({ url: m.uri, type: m.type })),
                   location_text: location,
                   date: selectedDate || undefined,
-                  time: selectedDate ? formatTime(selectedDate) : undefined,
+                  time: (() => {
+                    const s = startTime || parseTimeText(startTimeText);
+                    return timeEnabled && s ? formatTime(s) : undefined;
+                  })(),
                   category_main: selectedCategory,
                   category_sub: selectedSubcategories,
                   user: {
@@ -2666,6 +2749,14 @@ export default function CreateBusinessPostScreen() {
           setShowFormBuilder(true);
         }}
         onCancel={() => setShowFormSelector(false)}
+        loading={savingForm}
+      />
+
+      <FormBuilder
+        visible={showFormEditor}
+        onSave={handleFormEditorSave}
+        onCancel={() => setShowFormEditor(false)}
+        initialFields={draftFormFields}
         loading={savingForm}
       />
 
@@ -3806,6 +3897,28 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 2,
   },
+  formSelectedActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  formEditButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#000000",
+    backgroundColor: "#FFF",
+  },
+  formEditButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#000000",
+  },
   formRemoveButton: {
     padding: 6,
   },
@@ -3850,7 +3963,7 @@ const styles = StyleSheet.create({
   },
   formQuestionItem: {
     fontSize: 12,
-    color: "#FFF",
+    color: "#1C1C1E",
     marginBottom: 4,
     lineHeight: 16,
   },
