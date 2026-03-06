@@ -198,7 +198,7 @@ export default function FormBuilder({
                       <Ionicons
                         name="arrow-up"
                         size={20}
-                        color={index === 0 ? "#ccc" : "#007AFF"}
+                        color={index === 0 ? "#ccc" : "#000000"}
                       />
                     </Pressable>
                     <Pressable
@@ -212,7 +212,7 @@ export default function FormBuilder({
                       <Ionicons
                         name="arrow-down"
                         size={20}
-                        color={index === fields.length - 1 ? "#ccc" : "#007AFF"}
+                        color={index === fields.length - 1 ? "#ccc" : "#000000"}
                       />
                     </Pressable>
                     <Pressable
@@ -247,9 +247,9 @@ export default function FormBuilder({
                           type: internal,
                           options:
                             internal === "radio" || internal === "checkbox"
-                              ? (field.options && field.options.length > 0
-                                  ? field.options
-                                  : [""])
+                              ? field.options && field.options.length > 0
+                                ? field.options
+                                : [""]
                               : [],
                         });
                       }}
@@ -306,7 +306,7 @@ export default function FormBuilder({
                       onPress={() => addOption(index)}
                       style={styles.addOptionButton}
                     >
-                      <Ionicons name="add-circle" size={20} color="#007AFF" />
+                      <Ionicons name="add-circle" size={20} color="#000000" />
                       <Text style={styles.addOptionText}>Add Option</Text>
                     </Pressable>
                     <Text style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
@@ -331,7 +331,7 @@ export default function FormBuilder({
             ))}
 
             <Pressable onPress={addField} style={styles.addFieldButton}>
-              <Ionicons name="add-circle" size={24} color="#007AFF" />
+              <Ionicons name="add-circle" size={24} color="#000000" />
               <Text style={styles.addFieldButtonText}>Add Field</Text>
             </Pressable>
 
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   saveButton: {
-    color: "#007AFF",
+    color: "#000000",
     fontWeight: "600",
   },
   disabledButton: {
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   saveButtonContainer: {
-    backgroundColor: "#007AFF",
+    backgroundColor: "#000000",
   },
   saveButtonText: {
     fontSize: 16,
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
   fieldIndex: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#007AFF",
+    color: "#000000",
   },
   fieldHeaderActions: {
     flexDirection: "row",
@@ -514,8 +514,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9f9f9",
   },
   typeOptionSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
+    backgroundColor: "#000000",
+    borderColor: "#000000",
   },
   typeOptionText: {
     fontSize: 13,
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: "#007AFF",
+    borderColor: "#000000",
     borderRadius: 8,
     borderStyle: "dashed",
     marginBottom: 16,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   addFieldButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#007AFF",
+    color: "#000000",
   },
   optionRow: {
     flexDirection: "row",
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   addOptionText: {
     marginLeft: 4,
-    color: "#007AFF",
+    color: "#000000",
     fontSize: 14,
     fontWeight: "600",
   },

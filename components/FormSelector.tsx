@@ -86,7 +86,7 @@ export default function FormSelector({
 
         {loadingForms ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
+            <ActivityIndicator size="large" color="#000000" />
             <Text style={styles.loadingText}>Loading forms...</Text>
           </View>
         ) : forms.length === 0 ? (
