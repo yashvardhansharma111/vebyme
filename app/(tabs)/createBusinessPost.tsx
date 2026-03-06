@@ -158,6 +158,7 @@ export default function CreateBusinessPostScreen() {
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [savingForm, setSavingForm] = useState(false);
   const [attachFormEnabled, setAttachFormEnabled] = useState(false);
+  const [mostRecentFormFields, setMostRecentFormFields] = useState<FormField[]>([]);
 
   // Registration limit state
   const [limitRegistrationEnabled, setLimitRegistrationEnabled] = useState(false);
@@ -506,6 +507,45 @@ export default function CreateBusinessPostScreen() {
     setFormId(selectedFormId);
     setShowFormSelector(false);
   };
+
+  const attachMostRecentForm = useCallback(async () => {
+    if (!user?.user_id) return;
+    try {
+      const res = await apiService.getUserForms(user.user_id);
+      const forms = (res as any)?.data?.forms ?? [];
+      if (!Array.isArray(forms) || forms.length === 0) return;
+
+      const sorted = [...forms].sort((a: any, b: any) => {
+        const ad = a?.created_at ? new Date(a.created_at).getTime() : 0;
+        const bd = b?.created_at ? new Date(b.created_at).getTime() : 0;
+        return bd - ad;
+      });
+
+      const mostRecent = sorted[0] ?? forms[forms.length - 1];
+      if (mostRecent?.form_id) {
+        setFormId(mostRecent.form_id);
+      }
+
+      if (Array.isArray(mostRecent?.fields) && mostRecent.fields.length > 0) {
+        setMostRecentFormFields(mostRecent.fields);
+      } else {
+        // fallback: fetch full form if fields are not included in list response
+        try {
+          if (mostRecent?.form_id) {
+            const formRes = await apiService.getForm(mostRecent.form_id);
+            const full = (formRes as any)?.data;
+            if (Array.isArray(full?.fields)) {
+              setMostRecentFormFields(full.fields);
+            }
+          }
+        } catch {
+          setMostRecentFormFields([]);
+        }
+      }
+    } catch {
+      // silent: attaching form is optional
+    }
+  }, [user?.user_id]);
 
   const handleFormBuilderSave = async (fields: FormField[]) => {
     if (!user?.user_id) {
@@ -1485,7 +1525,13 @@ export default function CreateBusinessPostScreen() {
                   value={attachFormEnabled}
                   onValueChange={(v) => {
                     setAttachFormEnabled(v);
-                    if (!v) setFormId(null);
+                    if (!v) {
+                      setFormId(null);
+                      setMostRecentFormFields([]);
+                    } else {
+                      // auto-attach most recently created form
+                      attachMostRecentForm();
+                    }
                   }}
                   trackColor={{ false: '#E5E5E5', true: '#8B5CF6' }}
                   thumbColor="#FFF"
@@ -1803,6 +1849,7 @@ export default function CreateBusinessPostScreen() {
         visible={showFormBuilder}
         onSave={handleFormBuilderSave}
         onCancel={() => setShowFormBuilder(false)}
+        initialFields={mostRecentFormFields}
         loading={savingForm}
       />
     </SafeAreaView>

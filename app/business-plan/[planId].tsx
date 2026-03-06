@@ -4,7 +4,7 @@ import { fetchCurrentUser } from '@/store/slices/profileSlice';
 import { useSnackbar } from '@/context/SnackbarContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
 import Avatar from '@/components/Avatar';
 import ShareToChatModal from '@/components/ShareToChatModal';
 import { fontTitle, fontBody } from '@/constants/theme';
@@ -111,6 +112,10 @@ export default function BusinessPlanDetailScreen() {
   const [form, setForm] = useState<any>(null);
   const [showFormFiller, setShowFormFiller] = useState(false);
   const [formLoadingError, setFormLoadingError] = useState<string | null>(null);
+
+  // Web checkout (paid) state
+  const [showWebCheckout, setShowWebCheckout] = useState(false);
+  const [webCheckoutUrl, setWebCheckoutUrl] = useState<string | null>(null);
 
   // Registration limit state
   const [eventFull, setEventFull] = useState(false);
@@ -235,6 +240,28 @@ export default function BusinessPlanDetailScreen() {
   const { currentUser } = useAppSelector((state) => state.profile);
   const { showSnackbar } = useSnackbar();
 
+  const selectedPassObj = useMemo(() => {
+    if (!plan?.passes || !selectedPass) return null;
+    return plan.passes.find((p) => p.pass_id === selectedPass) ?? null;
+  }, [plan?.passes, selectedPass]);
+
+  const isPaidPass = (selectedPassObj?.price ?? 0) > 0;
+
+  const webAuthInjectedJs = useMemo(() => {
+    if (!user?.user_id || !user?.session_id || !user?.access_token || !user?.refresh_token) return 'true;';
+    const payload = {
+      user: {
+        user_id: user.user_id,
+        session_id: user.session_id,
+        access_token: user.access_token,
+        refresh_token: user.refresh_token,
+      },
+      expires_at: Date.now() + 10 * 24 * 60 * 60 * 1000,
+    };
+    const stored = JSON.stringify(payload);
+    return `try{localStorage.setItem('vybeme_web_user', ${JSON.stringify(stored)});}catch(e){};true;`;
+  }, [user?.user_id, user?.session_id, user?.access_token, user?.refresh_token]);
+
   useEffect(() => {
     if (user?.session_id && !currentUser) {
       dispatch(fetchCurrentUser(user.session_id));
@@ -292,6 +319,19 @@ export default function BusinessPlanDetailScreen() {
 
     if (!selectedPass && plan?.passes && plan.passes.length > 0) {
       Alert.alert('Select Ticket', 'Please select a ticket type first');
+      return;
+    }
+
+    if (eventFull) {
+      Alert.alert('Event Full', 'This event has reached its maximum capacity and registrations are now closed.');
+      return;
+    }
+
+    // Paid pass: open web checkout (handles form + payment)
+    if (isPaidPass) {
+      const url = `${getWebBaseUrl()}/post/${planId}?app=1`;
+      setWebCheckoutUrl(url);
+      setShowWebCheckout(true);
       return;
     }
 
@@ -790,6 +830,69 @@ export default function BusinessPlanDetailScreen() {
               <Ionicons name="close-circle" size={36} color="#FFF" />
             </TouchableOpacity>
           </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Paid checkout (web) */}
+      <Modal
+        visible={showWebCheckout}
+        animationType="slide"
+        onRequestClose={() => setShowWebCheckout(false)}
+      >
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 }}>
+            <TouchableOpacity onPress={() => setShowWebCheckout(false)} style={{ padding: 6 }}>
+              <Ionicons name="close" size={26} color="#1C1C1E" />
+            </TouchableOpacity>
+            <Text style={{ flex: 1, textAlign: 'center', fontFamily: fontTitle, fontSize: 16, color: '#1C1C1E' }}>
+              Complete Payment
+            </Text>
+            <View style={{ width: 38 }} />
+          </View>
+          {webCheckoutUrl ? (
+            <WebView
+              source={{ uri: webCheckoutUrl }}
+              injectedJavaScriptBeforeContentLoaded={webAuthInjectedJs}
+              javaScriptEnabled
+              domStorageEnabled
+              startInLoadingState
+              sharedCookiesEnabled
+              onShouldStartLoadWithRequest={(req) => {
+                const u = req?.url || '';
+                if (u.startsWith('vybeme://')) {
+                  try {
+                    const parsed = new URL(u);
+                    const path = parsed.pathname || '/';
+                    if (path.startsWith('/business-plan/')) {
+                      const targetPlanId = path.split('/business-plan/')[1]?.split('/')?.[0] || String(planId);
+                      setShowWebCheckout(false);
+                      router.push({ pathname: '/business-plan/[planId]', params: { planId: targetPlanId } } as any);
+                      return false;
+                    }
+                  } catch {
+                    // ignore
+                  }
+                  setShowWebCheckout(false);
+                  return false;
+                }
+                return true;
+              }}
+              onNavigationStateChange={(nav) => {
+                const u = nav?.url || '';
+                const successTicketPath = `/post/${planId}/ticket`;
+                const successConfirmationPath = `/post/${planId}/confirmation`;
+                if (u.includes(successTicketPath) || u.includes(successConfirmationPath)) {
+                  apiService
+                    .hasTicketForPlan(planId, user?.user_id ?? '')
+                    .then((has) => {
+                      setUserHasTicket(has);
+                      if (has) setShowWebCheckout(false);
+                    })
+                    .catch(() => null);
+                }
+              }}
+            />
+          ) : null}
         </SafeAreaView>
       </Modal>
 
