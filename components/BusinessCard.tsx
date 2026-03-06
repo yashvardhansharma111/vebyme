@@ -6,9 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 
 const SCREEN = Dimensions.get('window');
-const CARD_FIXED_HEIGHT = Math.round(SCREEN.height * 0.35); // ~30-40% of viewport height
-const CARD_IMAGE_PERCENT = 0.7;
-const CARD_WHITE_PERCENT = 0.3;
+const CARD_FIXED_HEIGHT = Math.round(SCREEN.height * 0.725); // ~30-40% of viewport height
+const CARD_IMAGE_PERCENT = 0.85;
+const CARD_WHITE_PERCENT = 0.15;
 const FLOATING_BUTTON_SIZE = 48;
 const TEXT_INSET = 7;
 import Swipeable from 'react-native-gesture-handler/Swipeable';
