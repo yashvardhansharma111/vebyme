@@ -140,6 +140,12 @@ function BusinessCardBase({
   const [showImageGallery, setShowImageGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const galleryScrollRef = useRef<ScrollView>(null);
+  const cardImageScrollRef = useRef<ScrollView>(null);
+  const [cardImageIndex, setCardImageIndex] = useState(0);
+  const [cardImageWidth, setCardImageWidth] = useState(0);
+  const autoScrollPausedRef = useRef(false);
+  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { width: screenWidth } = Dimensions.get("window");
   const galleryPaddingH = 24;
   const gallerySlideWidth = screenWidth - galleryPaddingH * 2;
@@ -159,6 +165,51 @@ function BusinessCardBase({
   const fbLabel =
     detailByType("f&b")?.title || detailByType("f&b")?.description;
   const locationLabel = plan.location_text?.trim();
+
+  const pauseAutoScroll = () => {
+    autoScrollPausedRef.current = true;
+    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+    resumeTimerRef.current = setTimeout(() => {
+      autoScrollPausedRef.current = false;
+    }, 2500);
+  };
+
+  React.useEffect(() => {
+    if (autoScrollTimerRef.current) {
+      clearInterval(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
+    }
+
+    if (showImageGallery) return;
+    if (planMedia.length <= 1) return;
+    if (!cardImageScrollRef.current) return;
+    if (!cardImageWidth) return;
+
+    autoScrollTimerRef.current = setInterval(() => {
+      if (autoScrollPausedRef.current) return;
+      setCardImageIndex((prev: number) => {
+        const next = prev + 1 >= planMedia.length ? 0 : prev + 1;
+        try {
+          cardImageScrollRef.current?.scrollTo({ x: next * cardImageWidth, animated: true });
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }, 1500);
+
+    return () => {
+      if (autoScrollTimerRef.current) clearInterval(autoScrollTimerRef.current);
+      autoScrollTimerRef.current = null;
+    };
+  }, [planMedia.length, cardImageWidth, showImageGallery]);
+
+  React.useEffect(() => {
+    return () => {
+      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      if (autoScrollTimerRef.current) clearInterval(autoScrollTimerRef.current);
+    };
+  }, []);
   // Tags order: Only category
   const cardTags: {
     type:
@@ -213,7 +264,7 @@ function BusinessCardBase({
   const tagsToShow = cardTags.slice(0, 10);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
-  const handleShare = async () => {
+  const handleShare = () => {
     if (onSharePress) {
       onSharePress();
       return;
@@ -288,21 +339,60 @@ function BusinessCardBase({
         >
           <View style={styles.imageSection}>
             {mainImage ? (
-              <TouchableOpacity
+              <View
                 style={StyleSheet.absoluteFill}
-                activeOpacity={1}
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  setGalleryIndex(0);
-                  setShowImageGallery(true);
+                onLayout={(e) => {
+                  const w = Math.round(e.nativeEvent.layout.width);
+                  if (w > 0 && w !== cardImageWidth) setCardImageWidth(w);
                 }}
               >
-                <Image
-                  source={{ uri: mainImage }}
-                  style={styles.imageNatural}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
+                {planMedia.length > 1 ? (
+                  <ScrollView
+                    ref={cardImageScrollRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    scrollEventThrottle={16}
+                    onTouchStart={() => pauseAutoScroll()}
+                    onScrollBeginDrag={() => pauseAutoScroll()}
+                    onMomentumScrollEnd={(e) => {
+                      pauseAutoScroll();
+                      const w = cardImageWidth || e.nativeEvent.layoutMeasurement.width;
+                      const idx = w > 0 ? Math.round(e.nativeEvent.contentOffset.x / w) : 0;
+                      if (!Number.isNaN(idx)) setCardImageIndex(idx);
+                    }}
+                    style={StyleSheet.absoluteFill}
+                  >
+                    {planMedia.map((item, idx) => (
+                      <TouchableOpacity
+                        key={`${item.url}-${idx}`}
+                        activeOpacity={1}
+                        style={{ width: cardImageWidth || "100%", height: "100%" }}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          pauseAutoScroll();
+                          setGalleryIndex(cardImageIndex);
+                          setShowImageGallery(true);
+                        }}
+                      >
+                        <Image source={{ uri: item.url }} style={styles.imageNatural} resizeMode="cover" />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    activeOpacity={1}
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      setGalleryIndex(0);
+                      setShowImageGallery(true);
+                    }}
+                  >
+                    <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
+                  </TouchableOpacity>
+                )}
+              </View>
             ) : (
               <View style={[styles.imageNatural, styles.imagePlaceholder]}>
                 <Ionicons name="image-outline" size={48} color="#8E8E93" />
@@ -619,7 +709,7 @@ export default function BusinessCard({
   hideCardShadow = false,
 }: BusinessCardProps) {
   const { isAuthenticated, user: authUser } = useAppSelector(
-    (state) => state.auth,
+    (state: any) => state.auth,
   );
   const [saving, setSaving] = useState(false);
   const [showGuestListModal, setShowGuestListModal] = useState(false);

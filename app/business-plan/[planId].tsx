@@ -103,6 +103,9 @@ export default function BusinessPlanDetailScreen() {
   const [registering, setRegistering] = useState(false);
   const galleryScrollRef = useRef<ScrollView>(null);
   const heroScrollRef = useRef<ScrollView>(null);
+  const heroAutoScrollPausedRef = useRef(false);
+  const heroAutoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heroAutoScrollResumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const screenWidth = Dimensions.get('window').width;
   const galleryPaddingH = 24;
   const galleryPaddingV = 20;
@@ -121,6 +124,12 @@ export default function BusinessPlanDetailScreen() {
   const [eventFull, setEventFull] = useState(false);
   const [registrationCount, setRegistrationCount] = useState(0);
 
+  const planMedia = useMemo(
+    () => (plan?.media && plan.media.length > 0 ? plan.media.slice(0, 5) : [{ url: 'https://picsum.photos/id/1011/200/300', type: 'image' }]),
+    [plan?.media],
+  );
+  const mediaCount = planMedia.length;
+
   useEffect(() => {
     loadPlan();
   }, [planId]);
@@ -133,6 +142,50 @@ export default function BusinessPlanDetailScreen() {
       return () => clearTimeout(t);
     }
   }, [showImageGallery, galleryIndex, gallerySlideWidth]);
+
+  const pauseHeroAutoScroll = () => {
+    heroAutoScrollPausedRef.current = true;
+    if (heroAutoScrollResumeRef.current) clearTimeout(heroAutoScrollResumeRef.current);
+    heroAutoScrollResumeRef.current = setTimeout(() => {
+      heroAutoScrollPausedRef.current = false;
+    }, 2500);
+  };
+
+  useEffect(() => {
+    if (heroAutoScrollTimerRef.current) {
+      clearInterval(heroAutoScrollTimerRef.current);
+      heroAutoScrollTimerRef.current = null;
+    }
+
+    if (showImageGallery) return;
+    if (!plan) return;
+    if (mediaCount <= 1) return;
+
+    heroAutoScrollTimerRef.current = setInterval(() => {
+      if (heroAutoScrollPausedRef.current) return;
+      setHeroImageIndex((prev) => {
+        const next = prev + 1 >= mediaCount ? 0 : prev + 1;
+        try {
+          heroScrollRef.current?.scrollTo({ x: next * SCREEN_WIDTH, animated: true });
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+    }, 2000);
+
+    return () => {
+      if (heroAutoScrollTimerRef.current) clearInterval(heroAutoScrollTimerRef.current);
+      heroAutoScrollTimerRef.current = null;
+    };
+  }, [mediaCount, plan, showImageGallery]);
+
+  useEffect(() => {
+    return () => {
+      if (heroAutoScrollResumeRef.current) clearTimeout(heroAutoScrollResumeRef.current);
+      if (heroAutoScrollTimerRef.current) clearInterval(heroAutoScrollTimerRef.current);
+    };
+  }, []);
 
   const loadPlan = async () => {
     try {
@@ -236,8 +289,8 @@ export default function BusinessPlanDetailScreen() {
 
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
-  const { user } = useAppSelector((state) => state.auth);
-  const { currentUser } = useAppSelector((state) => state.profile);
+  const { user } = useAppSelector((state: any) => state.auth);
+  const { currentUser } = useAppSelector((state: any) => state.profile);
   const { showSnackbar } = useSnackbar();
 
   const selectedPassObj = useMemo(() => {
@@ -437,9 +490,6 @@ export default function BusinessPlanDetailScreen() {
       </SafeAreaView>
     );
   }
-
-  const planMedia = plan.media && plan.media.length > 0 ? plan.media.slice(0, 5) : [{ url: 'https://picsum.photos/id/1011/200/300', type: 'image' }];
-  const mediaCount = planMedia.length;
   const organizerName = organizer?.name ?? organizer?.username ?? 'Organizer';
   const organizerAvatar = organizer?.profile_image ?? organizer?.avatar;
 
@@ -463,7 +513,7 @@ export default function BusinessPlanDetailScreen() {
   return (
     <View style={styles.container}>
       {/* Full-screen blur white background (replaces solid black) */}
-      <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} pointerEvents="none" />
       {/* HERO – fixed to screen */}
       <View
         style={[
@@ -482,8 +532,13 @@ export default function BusinessPlanDetailScreen() {
               ref={heroScrollRef}
               horizontal
               pagingEnabled
+              nestedScrollEnabled
+              directionalLockEnabled
               showsHorizontalScrollIndicator={false}
+              onTouchStart={() => pauseHeroAutoScroll()}
+              onScrollBeginDrag={() => pauseHeroAutoScroll()}
               onMomentumScrollEnd={(e) => {
+                pauseHeroAutoScroll();
                 const i = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
                 setHeroImageIndex(i);
               }}
