@@ -278,14 +278,25 @@ export default function OtherUserProfileScreen() {
         .slice(0, 9)
     : [];
 
-  // Social card: Instagram and X rows with handle or "Not added"
+  // Social card: X only (Instagram removed for business profiles)
   const socialCardEntries: {
     key: string;
     icon: string;
     handle: string;
     url: string | null;
     isX: boolean;
-  }[] = [
+  }[] = isBusinessProfile ? [
+    {
+      key: "x",
+      icon: "x",
+      handle: socialMedia.x || socialMedia.twitter || "Not added",
+      url:
+        socialMedia.x || socialMedia.twitter
+          ? `https://x.com/${String(socialMedia.x || socialMedia.twitter).replace(/^@/, "")}`
+          : null,
+      isX: true,
+    },
+  ] : [
     {
       key: "instagram",
       icon: "logo-instagram",
@@ -307,7 +318,7 @@ export default function OtherUserProfileScreen() {
     },
   ];
 
-  // Business profile: link section entries – show all socials (Instagram, X, Snapchat, Google Drive) when added
+  // Business profile: link section entries – show only socials that are actually added
   const businessLinkEntries: {
     key: string;
     icon: string;
@@ -315,20 +326,7 @@ export default function OtherUserProfileScreen() {
     url: string | null;
     color: string;
   }[] = [
-    ...(instagramUrl || instagramId
-      ? [
-          {
-            key: "instagram",
-            icon: "logo-instagram",
-            label: "Instagram",
-            url:
-              instagramUrl ||
-              (instagramId ? `https://instagram.com/${instagramId}` : null),
-            color: "#E4405F",
-          },
-        ]
-      : []),
-    ...(socialMedia.google_drive
+    ...(socialMedia.google_drive && socialMedia.google_drive.trim()
       ? [
           {
             key: "google_drive",
@@ -352,7 +350,7 @@ export default function OtherUserProfileScreen() {
           },
         ]
       : []),
-    ...(socialMedia.snapchat
+    ...(socialMedia.snapchat && socialMedia.snapchat.trim()
       ? [
           {
             key: "snapchat",

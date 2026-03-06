@@ -40,6 +40,7 @@ import CalendarPicker from "@/components/CalendarPicker";
 import ShareToChatModal from "@/components/ShareToChatModal";
 import FormBuilder, { FormField } from "@/components/FormBuilder";
 import FormSelector from "@/components/FormSelector";
+import FormEditor from "@/components/FormEditor";
 
 const CATEGORY_TAGS = [
   "Running",
@@ -548,22 +549,21 @@ export default function CreateBusinessPostScreen() {
     }
   };
 
-  const handleFormEditorSave = async (fields: FormField[]) => {
+  const handleFormEditorSave = async (form: any) => {
     try {
       setSavingForm(true);
-      const baseName = selectedForm?.name || "Edited Form";
       const payload = {
         user_id: user?.user_id,
-        name: baseName,
-        fields,
+        name: form.name,
+        fields: form.fields,
       };
-      const resp = await apiService.createForm(payload as any);
-      const createdId = (resp as any)?.data?.form_id;
-      if (createdId) {
-        setFormId(createdId);
-        setSelectedForm({ form_id: createdId, name: payload.name, fields });
+      const resp = await apiService.updateForm(selectedForm?.form_id || "", payload);
+      const updatedId = (resp as any)?.data?.form_id;
+      if (updatedId) {
+        setFormId(updatedId);
+        setSelectedForm({ form_id: updatedId, name: form.name, fields: form.fields });
       }
-      setDraftFormFields(fields);
+      setDraftFormFields(form.fields);
       setShowFormEditor(false);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Failed to save form");
@@ -822,7 +822,7 @@ export default function CreateBusinessPostScreen() {
         planData.form_id = formId;
       }
       if (limitRegistrationEnabled && registrationLimit) {
-        planData.registration_limit = parseInt(registrationLimit, 10);
+        planData.registration_limit = parseInt(registrationLimit, 10) + 1;
       } else if (editMode) {
         planData.registration_limit = null;
       }
@@ -1043,8 +1043,9 @@ export default function CreateBusinessPostScreen() {
                     avatar: currentUser?.profile_image ?? "",
                     time: "Preview",
                   }}
-                  hideActions={true}
+                  hideActions={false}
                   registerButtonGreyed={true}
+                  shareButtonGreyed={true}
                   onRegisterPress={() => {}}
                   isSwipeable={false}
                 />
@@ -2523,19 +2524,17 @@ export default function CreateBusinessPostScreen() {
       />
 
       <FormBuilder
-        visible={showFormEditor}
-        onSave={handleFormEditorSave}
-        onCancel={() => setShowFormEditor(false)}
-        initialFields={draftFormFields}
-        loading={savingForm}
-      />
-
-      {/* Form Builder Modal */}
-      <FormBuilder
         visible={showFormBuilder}
         onSave={handleFormBuilderSave}
         onCancel={() => setShowFormBuilder(false)}
-        initialFields={mostRecentFormFields}
+        loading={savingForm}
+      />
+
+      <FormEditor
+        visible={showFormEditor}
+        form={selectedForm}
+        onSave={handleFormEditorSave}
+        onCancel={() => setShowFormEditor(false)}
         loading={savingForm}
       />
     </SafeAreaView>
@@ -3682,7 +3681,7 @@ const styles = StyleSheet.create({
   },
   formSection: {
     marginTop: 12,
-    paddingTop: 12,
+    paddingTop: 40,
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
     backgroundColor: "#ffffff",
@@ -3920,7 +3919,7 @@ const styles = StyleSheet.create({
   /* Close button below notch */
   successCloseButton: {
     position: "absolute",
-    top: 70,
+    top: 60,
     right: 20,
     width: 44,
     height: 44,

@@ -7,11 +7,13 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { apiService } from "@/services/api";
+import FormEditor, { FormField } from "./FormEditor";
 
 interface Form {
   form_id: string;
@@ -41,6 +43,9 @@ export default function FormSelector({
   const [forms, setForms] = useState<Form[]>([]);
   const [loadingForms, setLoadingForms] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedForm, setSelectedForm] = useState<Form | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -64,6 +69,53 @@ export default function FormSelector({
     } finally {
       setLoadingForms(false);
     }
+  };
+
+  const handleEditForm = (form: Form) => {
+    setSelectedForm(form);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveForm = async (updatedForm: Form) => {
+    try {
+      setEditLoading(true);
+      
+      // Convert FormField[] to the format expected by the API
+      const fields = updatedForm.fields?.map((field: FormField, index: number) => ({
+        field_id: field.field_id,
+        label: field.label,
+        type: field.type,
+        placeholder: field.placeholder,
+        options: field.options,
+        required: field.required,
+        order: index,
+      }));
+
+      const response = await apiService.updateForm(updatedForm.form_id, {
+        name: updatedForm.name,
+        description: updatedForm.description,
+        fields: fields,
+      });
+
+      if (response.success) {
+        Alert.alert("Success", "Form updated successfully!");
+        setEditModalVisible(false);
+        setSelectedForm(null);
+        // Reload forms to show updated data
+        await loadForms();
+      } else {
+        Alert.alert("Error", response.message || "Failed to update form");
+      }
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update form");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditModalVisible(false);
+    setSelectedForm(null);
   };
 
   return (
@@ -100,42 +152,50 @@ export default function FormSelector({
         ) : (
           <ScrollView style={styles.formsList}>
             {forms.map((form) => (
-              <Pressable
-                key={form.form_id}
-                onPress={() => onSelect(form.form_id)}
-                style={styles.formItem}
-              >
-                <View style={styles.formInfo}>
-                  <Text style={styles.formName}>{form.name}</Text>
-                  {form.description && (
-                    <Text style={styles.formDescription}>
-                      {form.description}
-                    </Text>
-                  )}
-                  {form.fields && form.fields.length > 0 && (
-                    <View style={styles.formQuestions}>
-                      {form.fields
-                        .slice(0, 3)
-                        .map((field: any, index: number) => (
-                          <Text
-                            key={index}
-                            style={styles.formQuestion}
-                            numberOfLines={1}
-                          >
-                            {index + 1}.{" "}
-                            {field.question || field.label || "Question"}
+              <View key={form.form_id} style={styles.formItemContainer}>
+                <Pressable
+                  onPress={() => onSelect(form.form_id)}
+                  style={styles.formItem}
+                >
+                  <View style={styles.formInfo}>
+                    <Text style={styles.formName}>{form.name}</Text>
+                    {form.description && (
+                      <Text style={styles.formDescription}>
+                        {form.description}
+                      </Text>
+                    )}
+                    {form.fields && form.fields.length > 0 && (
+                      <View style={styles.formQuestions}>
+                        {form.fields
+                          .slice(0, 3)
+                          .map((field: any, index: number) => (
+                            <Text
+                              key={index}
+                              style={styles.formQuestion}
+                              numberOfLines={1}
+                            >
+                              {index + 1}.{" "}
+                              {field.question || field.label || "Question"}
+                            </Text>
+                          ))}
+                        {form.fields.length > 3 && (
+                          <Text style={styles.formMoreQuestions}>
+                            +{form.fields.length - 3} more questions
                           </Text>
-                        ))}
-                      {form.fields.length > 3 && (
-                        <Text style={styles.formMoreQuestions}>
-                          +{form.fields.length - 3} more questions
-                        </Text>
-                      )}
-                    </View>
-                  )}
-                </View>
-                <Ionicons name="chevron-forward" size={24} color="#ccc" />
-              </Pressable>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="#ccc" />
+                </Pressable>
+                <Pressable
+                  onPress={() => handleEditForm(form)}
+                  style={styles.editButton}
+                >
+                  <Ionicons name="create" size={20} color="#000000" />
+                  <Text style={styles.editButtonText}>Edit</Text>
+                </Pressable>
+              </View>
             ))}
           </ScrollView>
         )}
@@ -157,6 +217,14 @@ export default function FormSelector({
           </Pressable>
         </View>
       </SafeAreaView>
+      
+      <FormEditor
+        visible={editModalVisible}
+        form={selectedForm}
+        onSave={handleSaveForm}
+        onCancel={handleCancelEdit}
+        loading={editLoading}
+      />
     </Modal>
   );
 }
@@ -303,5 +371,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#fff",
+  },
+  formItemContainer: {
+    marginBottom: 8,
+  },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#f0f0f0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    gap: 6,
+    alignSelf: "flex-start",
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#000000",
   },
 });

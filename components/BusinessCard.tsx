@@ -87,6 +87,8 @@ interface BusinessCardProps {
   hideRegisterButton?: boolean;
   /** When true, show Register button but greyed/disabled (e.g. user's own plan) */
   registerButtonGreyed?: boolean;
+  /** When true, show Share button but greyed/disabled (e.g. preview mode) */
+  shareButtonGreyed?: boolean;
   /** When true, pills stick above the card (same hack as event card) for list layouts */
   pillsAboveCard?: boolean;
   /** When true, card fills parent height (e.g. hero 75% viewport on homepage) */
@@ -116,6 +118,7 @@ function BusinessCardBase({
   onArrowPress,
   hideRegisterButton = false,
   registerButtonGreyed = false,
+  shareButtonGreyed = false,
   pillsAboveCard = false,
   fillHeight = false,
   compactVerticalPadding = false,
@@ -128,6 +131,7 @@ function BusinessCardBase({
   hideActions?: boolean;
   hideRegisterButton?: boolean;
   registerButtonGreyed?: boolean;
+  shareButtonGreyed?: boolean;
   pillsAboveCard?: boolean;
   fillHeight?: boolean;
   compactVerticalPadding?: boolean;
@@ -146,7 +150,9 @@ function BusinessCardBase({
   const [cardImageWidth, setCardImageWidth] = useState(0);
   const autoScrollPausedRef = useRef(false);
   const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoScrollTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const { width: screenWidth } = Dimensions.get("window");
   const galleryPaddingH = 24;
   const gallerySlideWidth = screenWidth - galleryPaddingH * 2;
@@ -194,7 +200,10 @@ function BusinessCardBase({
       setCardImageIndex((prev: number) => {
         const next = prev + 1 >= planMedia.length ? 0 : prev + 1;
         try {
-          cardImageScrollRef.current?.scrollTo({ x: next * cardImageWidth, animated: true });
+          cardImageScrollRef.current?.scrollTo({
+            x: next * cardImageWidth,
+            animated: true,
+          });
         } catch {
           // ignore
         }
@@ -361,8 +370,12 @@ function BusinessCardBase({
                     onScrollBeginDrag={() => pauseAutoScroll()}
                     onMomentumScrollEnd={(e) => {
                       pauseAutoScroll();
-                      const w = cardImageWidth || e.nativeEvent.layoutMeasurement.width;
-                      const idx = w > 0 ? Math.round(e.nativeEvent.contentOffset.x / w) : 0;
+                      const w =
+                        cardImageWidth || e.nativeEvent.layoutMeasurement.width;
+                      const idx =
+                        w > 0
+                          ? Math.round(e.nativeEvent.contentOffset.x / w)
+                          : 0;
                       if (!Number.isNaN(idx)) setCardImageIndex(idx);
                     }}
                     style={StyleSheet.absoluteFill}
@@ -371,7 +384,10 @@ function BusinessCardBase({
                       <TouchableOpacity
                         key={`${item.url}-${idx}`}
                         activeOpacity={1}
-                        style={{ width: cardImageWidth || "100%", height: "100%" }}
+                        style={{
+                          width: cardImageWidth || "100%",
+                          height: "100%",
+                        }}
                         onPress={(e) => {
                           e?.stopPropagation?.();
                           pauseAutoScroll();
@@ -379,7 +395,11 @@ function BusinessCardBase({
                           setShowImageGallery(true);
                         }}
                       >
-                        <Image source={{ uri: item.url }} style={styles.imageNatural} resizeMode="cover" />
+                        <Image
+                          source={{ uri: item.url }}
+                          style={styles.imageNatural}
+                          resizeMode="cover"
+                        />
                       </TouchableOpacity>
                     ))}
                   </ScrollView>
@@ -393,7 +413,11 @@ function BusinessCardBase({
                       setShowImageGallery(true);
                     }}
                   >
-                    <Image source={{ uri: mainImage }} style={styles.imageNatural} resizeMode="cover" />
+                    <Image
+                      source={{ uri: mainImage }}
+                      style={styles.imageNatural}
+                      resizeMode="cover"
+                    />
                   </TouchableOpacity>
                 )}
               </View>
@@ -499,13 +523,17 @@ function BusinessCardBase({
                   )}
                   <View style={styles.footerIconRow}>
                     <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={handleShare}
+                      style={[
+                        styles.iconButton,
+                        shareButtonGreyed && styles.iconButtonGreyed,
+                      ]}
+                      onPress={shareButtonGreyed ? undefined : handleShare}
+                      disabled={shareButtonGreyed}
                     >
                       <Ionicons
                         name="paper-plane-outline"
                         size={22}
-                        color="#1C1C1E"
+                        color={shareButtonGreyed ? "#8E8E93" : "#1C1C1E"}
                       />
                     </TouchableOpacity>
                   </View>
@@ -714,6 +742,7 @@ export default function BusinessCard({
   hideActions = false,
   hideRegisterButton = false,
   registerButtonGreyed = false,
+  shareButtonGreyed = false,
   containerStyle,
   onPress,
   onRegisterPress,
@@ -826,6 +855,7 @@ export default function BusinessCard({
           hideActions={hideActions}
           hideRegisterButton={hideRegisterButton}
           registerButtonGreyed={registerButtonGreyed}
+          shareButtonGreyed={shareButtonGreyed}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
@@ -874,6 +904,7 @@ export default function BusinessCard({
           hideActions={hideActions}
           hideRegisterButton={hideRegisterButton}
           registerButtonGreyed={registerButtonGreyed}
+          shareButtonGreyed={shareButtonGreyed}
           showArrowButton={showArrowButton}
           onArrowPress={onArrowPress}
           pillsAboveCard={pillsAboveCard}
@@ -1159,7 +1190,11 @@ const styles = StyleSheet.create({
   registerButtonTextGreyed: {
     color: "#8E8E93",
   },
+  iconButtonGreyed: {
+    backgroundColor: "#C5C5D0",
+  },
   iconButton: {
+    marginTop: 4,
     width: 44,
     height: 44,
     borderRadius: 22,

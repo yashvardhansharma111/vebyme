@@ -632,7 +632,8 @@ const styles = StyleSheet.create({
   businessCardWrapper: {
     width: Dimensions.get("window").width - 40, // full width minus container padding
     marginHorizontal: 20,
-    marginBottom: 0,
+    marginTop: -27,
+    marginBottom: -10,
     alignSelf: "center",
     zIndex: 10,
   },
