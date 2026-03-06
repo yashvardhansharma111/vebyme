@@ -1,16 +1,29 @@
-import BusinessCard from '@/components/BusinessCard';
-import { apiService } from '@/services/api';
-import { fontTitle, fontBody } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Platform, RefreshControl, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useAppSelector } from '@/store/hooks';
-import { useSnackbar } from '@/context/SnackbarContext';
-import LoginModal from '@/components/LoginModal';
-import ShareToChatModal from '@/components/ShareToChatModal';
+import BusinessCard from "@/components/BusinessCard";
+import { apiService } from "@/services/api";
+import { fontTitle, fontBody } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Platform,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useAppSelector } from "@/store/hooks";
+import { useSnackbar } from "@/context/SnackbarContext";
+import LoginModal from "@/components/LoginModal";
+import ShareToChatModal from "@/components/ShareToChatModal";
 
 interface FeedPost {
   post_id: string;
@@ -27,21 +40,48 @@ interface FeedPost {
 }
 
 // Align with home feed so filters and pre-population work consistently
-const FILTERS = ['Running', 'Social', 'Fitness', 'Sports', 'Today', 'Tomorrow', 'Weekend'];
-const CATEGORY_FILTERS = ['Running', 'Social', 'Fitness', 'Sports'];
-const TEMPORAL_FILTERS = ['Today', 'Tomorrow', 'Weekend'];
+const FILTERS = [
+  "Running",
+  "Social",
+  "Fitness",
+  "Sports",
+  "Today",
+  "Tomorrow",
+  "Weekend",
+];
+const CATEGORY_FILTERS = ["Running", "Social", "Fitness", "Sports"];
+const TEMPORAL_FILTERS = ["Today", "Tomorrow", "Weekend"];
 
-function isEventDateInRange(eventDate: string | Date | undefined, filter: string): boolean {
+function isEventDateInRange(
+  eventDate: string | Date | undefined,
+  filter: string,
+): boolean {
   if (!eventDate) return false;
-  const d = typeof eventDate === 'string' ? new Date(eventDate) : new Date(eventDate.getTime());
+  const d =
+    typeof eventDate === "string"
+      ? new Date(eventDate)
+      : new Date(eventDate.getTime());
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
   const tomorrowStart = todayStart + 24 * 60 * 60 * 1000;
-  const eventDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const eventDayStart = new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate(),
+  ).getTime();
   const dayOfWeek = d.getDay();
-  if (filter === 'Today') return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
-  if (filter === 'Tomorrow') return eventDayStart >= tomorrowStart && eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000;
-  if (filter === 'Weekend') return dayOfWeek === 0 || dayOfWeek === 6;
+  if (filter === "Today")
+    return eventDayStart >= todayStart && eventDayStart < tomorrowStart;
+  if (filter === "Tomorrow")
+    return (
+      eventDayStart >= tomorrowStart &&
+      eventDayStart < tomorrowStart + 24 * 60 * 60 * 1000
+    );
+  if (filter === "Weekend") return dayOfWeek === 0 || dayOfWeek === 6;
   return false;
 }
 
@@ -87,7 +127,9 @@ export default function BusinessPostsScreen() {
     tags?: string[];
     category_main?: string;
   } | null>(null);
-  const [plansUserHasTicket, setPlansUserHasTicket] = useState<Record<string, boolean>>({});
+  const [plansUserHasTicket, setPlansUserHasTicket] = useState<
+    Record<string, boolean>
+  >({});
   const router = useRouter();
   const params = useLocalSearchParams<{ filter?: string }>();
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
@@ -95,184 +137,224 @@ export default function BusinessPostsScreen() {
   const { showSnackbar } = useSnackbar();
 
   // User profile cache
-  const [userCache, setUserCache] = useState<{ [key: string]: { name: string; profile_image: string | null } }>({});
+  const [userCache, setUserCache] = useState<{
+    [key: string]: { name: string; profile_image: string | null };
+  }>({});
 
-  const fetchUserProfile = useCallback(async (user_id: string) => {
-    if (userCache[user_id]) {
-      return userCache[user_id];
-    }
+  const fetchUserProfile = useCallback(
+    async (user_id: string) => {
+      if (userCache[user_id]) {
+        return userCache[user_id];
+      }
 
-    const fetchingKey = `fetching_${user_id}`;
-    if ((userCache as any)[fetchingKey]) {
-      return {
-        name: 'Unknown User',
-        profile_image: 'https://via.placeholder.com/44',
+      const fetchingKey = `fetching_${user_id}`;
+      if ((userCache as any)[fetchingKey]) {
+        return {
+          name: "Unknown User",
+          profile_image: "https://via.placeholder.com/44",
+        };
+      }
+
+      (userCache as any)[fetchingKey] = true;
+
+      try {
+        const response = await apiService.getUserProfile(user_id);
+        if (response.data) {
+          const userData = {
+            name: response.data.name || "Unknown User",
+            profile_image:
+              response.data.profile_image || "https://via.placeholder.com/44",
+          };
+          setUserCache((prev) => {
+            const newCache = { ...prev, [user_id]: userData };
+            delete (newCache as any)[fetchingKey];
+            return newCache;
+          });
+          return userData;
+        }
+      } catch (error: any) {
+        if (
+          error.message?.includes("User not found") ||
+          error.message?.includes("404")
+        ) {
+          const defaultData = {
+            name: "Unknown User",
+            profile_image: "https://via.placeholder.com/44",
+          };
+          setUserCache((prev) => {
+            const newCache = { ...prev, [user_id]: defaultData };
+            delete (newCache as any)[fetchingKey];
+            return newCache;
+          });
+          return defaultData;
+        }
+      } finally {
+        setUserCache((prev) => {
+          const newCache = { ...prev };
+          delete (newCache as any)[fetchingKey];
+          return newCache;
+        });
+      }
+
+      const defaultData = {
+        name: "Unknown User",
+        profile_image: "https://via.placeholder.com/44",
       };
-    }
-
-    (userCache as any)[fetchingKey] = true;
-
-    try {
-      const response = await apiService.getUserProfile(user_id);
-      if (response.data) {
-        const userData = {
-          name: response.data.name || 'Unknown User',
-          profile_image: response.data.profile_image || 'https://via.placeholder.com/44',
-        };
-        setUserCache((prev) => {
-          const newCache = { ...prev, [user_id]: userData };
-          delete (newCache as any)[fetchingKey];
-          return newCache;
-        });
-        return userData;
-      }
-    } catch (error: any) {
-      if (error.message?.includes('User not found') || error.message?.includes('404')) {
-        const defaultData = {
-          name: 'Unknown User',
-          profile_image: 'https://via.placeholder.com/44',
-        };
-        setUserCache((prev) => {
-          const newCache = { ...prev, [user_id]: defaultData };
-          delete (newCache as any)[fetchingKey];
-          return newCache;
-        });
-        return defaultData;
-      }
-    } finally {
       setUserCache((prev) => {
-        const newCache = { ...prev };
+        const newCache = { ...prev, [user_id]: defaultData };
         delete (newCache as any)[fetchingKey];
         return newCache;
       });
-    }
-
-    const defaultData = {
-      name: 'Unknown User',
-      profile_image: 'https://via.placeholder.com/44',
-    };
-    setUserCache((prev) => {
-      const newCache = { ...prev, [user_id]: defaultData };
-      delete (newCache as any)[fetchingKey];
-      return newCache;
-    });
-    return defaultData;
-  }, [userCache]);
+      return defaultData;
+    },
+    [userCache],
+  );
 
   const formatTimestamp = (timestamp: string | Date): string => {
     try {
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      const date =
+        typeof timestamp === "string" ? new Date(timestamp) : timestamp;
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMs / 3600000);
       const diffDays = Math.floor(diffMs / 86400000);
 
-      if (diffMins < 1) return 'Just now';
+      if (diffMins < 1) return "Just now";
       if (diffMins < 60) return `${diffMins}m ago`;
       if (diffHours < 24) return `${diffHours}h ago`;
       if (diffDays < 7) return `${diffDays}d ago`;
 
-      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     } catch {
-      return 'Recently';
+      return "Recently";
     }
   };
 
-  const formatFeedData = useCallback(async (posts: FeedPost[]): Promise<FormattedEvent[]> => {
-    const formattedEvents = await Promise.all(
-      posts.map(async (post: any) => {
-        const userData = await fetchUserProfile(post.user_id);
-        const imageUrl = post.media && post.media.length > 0 ? post.media[0].url : 'https://picsum.photos/id/1011/200/300';
-        const rawInteracted = post.interacted_users || post.recent_interactors || [];
-        const interactedUsers = rawInteracted.slice(0, 3).map((u: any) => ({
-          id: u.user_id || u.id,
-          avatar: u.profile_image || u.avatar || null,
-        }));
+  const formatFeedData = useCallback(
+    async (posts: FeedPost[]): Promise<FormattedEvent[]> => {
+      const formattedEvents = await Promise.all(
+        posts.map(async (post: any) => {
+          const userData = await fetchUserProfile(post.user_id);
+          const imageUrl =
+            post.media && post.media.length > 0
+              ? post.media[0].url
+              : "https://picsum.photos/id/1011/200/300";
+          const rawInteracted =
+            post.interacted_users || post.recent_interactors || [];
+          const interactedUsers = rawInteracted.slice(0, 3).map((u: any) => ({
+            id: u.user_id || u.id,
+            avatar: u.profile_image || u.avatar || null,
+          }));
 
-        return {
-          id: post.post_id,
-          user: {
-            id: post.user_id,
-            name: userData.name,
-            avatar: userData.profile_image || 'https://via.placeholder.com/44',
-            time: formatTimestamp(post.timestamp),
-          },
-          event: {
-            title: post.title || 'Untitled Post',
-            description: post.description || 'No description',
-            tags: post.tags && post.tags.length > 0 ? post.tags : ['General'],
-            image: imageUrl,
-            interacted_users: interactedUsers,
-          },
-        };
-      })
-    );
+          return {
+            id: post.post_id,
+            user: {
+              id: post.user_id,
+              name: userData.name,
+              avatar:
+                userData.profile_image || "https://via.placeholder.com/44",
+              time: formatTimestamp(post.timestamp),
+            },
+            event: {
+              title: post.title || "Untitled Post",
+              description: post.description || "No description",
+              tags: post.tags && post.tags.length > 0 ? post.tags : ["General"],
+              image: imageUrl,
+              interacted_users: interactedUsers,
+            },
+          };
+        }),
+      );
 
-    return formattedEvents;
-  }, [fetchUserProfile]);
+      return formattedEvents;
+    },
+    [fetchUserProfile],
+  );
 
-  const loadFeed = useCallback(async (isRefresh = false, filterOverride?: string | null) => {
-    const currentFilter = filterOverride !== undefined ? filterOverride : activeFilter;
-    try {
-      if (isRefresh) {
-        setIsRefreshing(true);
-      } else if (filterOverride === undefined) {
-        setIsLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-      setError(null);
-
-      const filters: any = {};
-      if (currentFilter && CATEGORY_FILTERS.includes(currentFilter)) {
-        filters.category_main = currentFilter.toLowerCase();
-      }
-      const response = await apiService.getHomeFeed(user?.user_id, filters, { limit: 50, offset: 0 });
-      let data = response.data;
-
-      if (data && Array.isArray(data)) {
-        let businessPlans = data.filter((post: any) => post.type === 'business');
-        if (currentFilter && TEMPORAL_FILTERS.includes(currentFilter)) {
-          businessPlans = businessPlans.filter((p: any) => isEventDateInRange(p.date ?? p.timestamp, currentFilter));
-        }
-        businessPlans = sortPostsByTimestamp(businessPlans);
-        setBusinessPostsData(businessPlans);
-        const formatted = await formatFeedData(businessPlans);
-        setEvents(formatted);
-
-        if (user?.user_id && businessPlans.length > 0) {
-          const planIds = businessPlans.map((p: any) => p.repost_data?.original_plan_id || p.post_id);
-          const uniqueIds = Array.from(new Set(planIds));
-          const ticketMap: Record<string, boolean> = {};
-          await Promise.all(
-            uniqueIds.map(async (planId) => {
-              try {
-                const hasTicket = await apiService.hasTicketForPlan(planId, user.user_id);
-                ticketMap[planId] = hasTicket;
-              } catch {
-                ticketMap[planId] = false;
-              }
-            })
-          );
-          setPlansUserHasTicket(ticketMap);
+  const loadFeed = useCallback(
+    async (isRefresh = false, filterOverride?: string | null) => {
+      const currentFilter =
+        filterOverride !== undefined ? filterOverride : activeFilter;
+      try {
+        if (isRefresh) {
+          setIsRefreshing(true);
+        } else if (filterOverride === undefined) {
+          setIsLoading(true);
         } else {
-          setPlansUserHasTicket({});
+          setIsRefreshing(true);
         }
-      } else {
-        setBusinessPostsData([]);
-        setPlansUserHasTicket({});
+        setError(null);
+
+        const filters: any = {};
+        if (currentFilter && CATEGORY_FILTERS.includes(currentFilter)) {
+          filters.category_main = currentFilter.toLowerCase();
+        }
+        const response = await apiService.getHomeFeed(user?.user_id, filters, {
+          limit: 50,
+          offset: 0,
+        });
+        let data = response.data;
+
+        if (data && Array.isArray(data)) {
+          let businessPlans = data.filter(
+            (post: any) => post.type === "business",
+          );
+          if (currentFilter && TEMPORAL_FILTERS.includes(currentFilter)) {
+            businessPlans = businessPlans.filter((p: any) =>
+              isEventDateInRange(p.date ?? p.timestamp, currentFilter),
+            );
+          }
+          businessPlans = sortPostsByTimestamp(businessPlans);
+          setBusinessPostsData(businessPlans);
+          const formatted = await formatFeedData(businessPlans);
+          setEvents(formatted);
+
+          if (user?.user_id && businessPlans.length > 0) {
+            const planIds = businessPlans.map(
+              (p: any) => p.repost_data?.original_plan_id || p.post_id,
+            );
+            const uniqueIds = Array.from(new Set(planIds));
+            const ticketMap: Record<string, boolean> = {};
+            await Promise.all(
+              uniqueIds.map(async (planId) => {
+                try {
+                  const hasTicket = await apiService.hasTicketForPlan(
+                    planId,
+                    user.user_id,
+                  );
+                  ticketMap[planId] = hasTicket;
+                } catch {
+                  ticketMap[planId] = false;
+                }
+              }),
+            );
+            setPlansUserHasTicket(ticketMap);
+          } else {
+            setPlansUserHasTicket({});
+          }
+        } else {
+          setBusinessPostsData([]);
+          setPlansUserHasTicket({});
+          setEvents([]);
+        }
+      } catch (err: any) {
+        console.error("Error loading business feed:", err);
+        setError(err.message || "Failed to load feed");
         setEvents([]);
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-    } catch (err: any) {
-      console.error('Error loading business feed:', err);
-      setError(err.message || 'Failed to load feed');
-      setEvents([]);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [user, activeFilter, formatFeedData]);
+    },
+    [user, activeFilter, formatFeedData],
+  );
 
   const appliedInitialFilter = useRef(false);
   // Pre-populate filter when opened from home feed (e.g. "See all" with a category selected)
@@ -297,7 +379,7 @@ export default function BusinessPostsScreen() {
       <View style={styles.container}>
         {/* Full-page gradient: light gray top → green → white */}
         <LinearGradient
-          colors={['#E0E0E0', '#B8D4BE', '#FFFFFF']}
+          colors={["#E0E0E0", "#B8D4BE", "#FFFFFF"]}
           locations={[0, 0.5, 1]}
           style={styles.pageGradient}
         />
@@ -311,41 +393,66 @@ export default function BusinessPostsScreen() {
             >
               <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll} contentContainerStyle={styles.filterContent}>
-              {(activeFilter ? [activeFilter, ...FILTERS.filter(f => f !== activeFilter)] : FILTERS).map((filter) => {
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterScroll}
+              contentContainerStyle={styles.filterContent}
+            >
+              {(activeFilter
+                ? [activeFilter, ...FILTERS.filter((f) => f !== activeFilter)]
+                : FILTERS
+              ).map((filter) => {
                 const isActive = activeFilter === filter;
                 return (
                   <TouchableOpacity
                     key={filter}
-                    style={isActive ? styles.activeFilterChip : styles.filterChip}
+                    style={
+                      isActive ? styles.activeFilterChip : styles.filterChip
+                    }
                     onPress={() => {
                       setActiveFilter(isActive ? null : filter);
                       loadFeed(false, isActive ? null : filter);
                     }}
                   >
-                    <Text style={isActive ? styles.activeFilterText : styles.filterText}>{filter}</Text>
+                    <Text
+                      style={
+                        isActive ? styles.activeFilterText : styles.filterText
+                      }
+                    >
+                      {filter}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
           </View>
 
-          <ScrollView 
-            contentContainerStyle={styles.scrollContainer} 
+          <ScrollView
+            contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                tintColor="#FFF"
+              />
             }
           >
             {isLoading && events.length === 0 ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color="#4A3B69" />
-                <Text style={styles.loadingText}>Loading business plans...</Text>
+                <Text style={styles.loadingText}>
+                  Loading business plans...
+                </Text>
               </View>
             ) : error && events.length === 0 ? (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={() => loadFeed()}>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => loadFeed()}
+                >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
               </View>
@@ -354,7 +461,7 @@ export default function BusinessPostsScreen() {
                 <Text style={styles.emptyText}>No plans in your area</Text>
                 <TouchableOpacity
                   style={styles.createPlanCta}
-                  onPress={() => router.push('/(tabs)/createBusinessPost')}
+                  onPress={() => router.push("/(tabs)/createBusinessPost")}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.createPlanCtaText}>Create a plan</Text>
@@ -363,81 +470,114 @@ export default function BusinessPostsScreen() {
             ) : (
               <View style={styles.feed}>
                 {events.map((item, index) => {
-                  const rawPost = businessPostsData.find((p: any) => p.post_id === item.id);
-                  const effectivePlanId = rawPost?.repost_data?.original_plan_id || item.id;
-                  const userHasInteracted = item.event?.interacted_users?.some((u: any) => u.id === user?.user_id);
+                  const rawPost = businessPostsData.find(
+                    (p: any) => p.post_id === item.id,
+                  );
+                  const effectivePlanId =
+                    rawPost?.repost_data?.original_plan_id || item.id;
+                  const userHasInteracted = item.event?.interacted_users?.some(
+                    (u: any) => u.id === user?.user_id,
+                  );
                   return (
                     <View key={item.id} style={styles.businessCardWrapper}>
-                    <BusinessCard
-                      containerStyle={styles.businessCardInListInner}
-                      pillsAboveCard
-                      hideCardShadow
-                      compactVerticalPadding
-                      descriptionNumberOfLines={2}
-                      plan={{
-                        plan_id: effectivePlanId,
-                        title: item.event.title,
-                        description: item.event.description,
-                        media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                        category_main: rawPost?.category_main ?? '',
-                        category_sub: rawPost?.category_sub || item.event.tags || rawPost?.tags || [],
-                        temporal_tags: rawPost?.temporal_tags || [],
-                        location_text: rawPost?.location_text || '',
-                        date: rawPost?.date || rawPost?.timestamp || new Date(),
-                        time: rawPost?.time || '',
-                        passes: rawPost?.passes || [],
-                        add_details: rawPost?.add_details || [],
-                        user: { user_id: rawPost?.user_id || item.user?.id, name: item.user?.name, profile_image: item.user?.avatar },
-                      }}
-                      user={item.user}
-                      attendeesCount={rawPost?.joins_count ?? 0}
-                      interactedUsers={item.event?.interacted_users}
-                      isSwipeable={true}
-                      hideRegisterButton={false}
-                      registerButtonGreyed={rawPost?.user_id === user?.user_id || !!plansUserHasTicket[effectivePlanId] || userHasInteracted}
-                      onPress={() => {
-                        router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
-                      }}
-                      onRegisterPress={() => {
-                        if (!isAuthenticated || !user?.user_id) {
-                          router.push('/login');
-                          return;
-                        }
-                        if (rawPost?.user_id === user?.user_id) {
-                          Alert.alert('Cannot Register', "You can't register for your own event.");
-                          return;
-                        }
-                        if (rawPost?.is_women_only) {
-                          const gender = (currentUser?.gender || '').toLowerCase();
-                          if (gender !== 'female') {
-                            showSnackbar('The post is for women only');
-                            return;
-                          }
-                        }
-                        // Open plan detail first so user can select a pass, then register
-                        router.push({ pathname: '/business-plan/[planId]', params: { planId: effectivePlanId } } as any);
-                      }}
-                      onRequireAuth={() => {
-                        if (!isAuthenticated) {
-                          router.push('/login');
-                        }
-                      }}
-                      onSharePress={() => {
-                        if (!isAuthenticated) {
-                          router.push('/login');
-                          return;
-                        }
-                        setSharedBusinessPlan({
-                          planId: effectivePlanId,
+                      <BusinessCard
+                        containerStyle={styles.businessCardInListInner}
+                        pillsAboveCard
+                        hideCardShadow
+                        compactVerticalPadding
+                        descriptionNumberOfLines={2}
+                        plan={{
+                          plan_id: effectivePlanId,
                           title: item.event.title,
                           description: item.event.description,
-                          media: rawPost?.media || [{ url: item.event.image, type: 'image' }],
-                          tags: item.event.tags || rawPost?.tags,
-                          category_main: rawPost?.category_main,
-                        });
-                        setShowBusinessShareModal(true);
-                      }}
-                    />
+                          media: rawPost?.media || [
+                            { url: item.event.image, type: "image" },
+                          ],
+                          category_main: rawPost?.category_main ?? "",
+                          category_sub:
+                            rawPost?.category_sub ||
+                            item.event.tags ||
+                            rawPost?.tags ||
+                            [],
+                          temporal_tags: rawPost?.temporal_tags || [],
+                          location_text: rawPost?.location_text || "",
+                          date:
+                            rawPost?.date || rawPost?.timestamp || new Date(),
+                          time: rawPost?.time || "",
+                          passes: rawPost?.passes || [],
+                          add_details: rawPost?.add_details || [],
+                          user: {
+                            user_id: rawPost?.user_id || item.user?.id,
+                            name: item.user?.name,
+                            profile_image: item.user?.avatar,
+                          },
+                        }}
+                        user={item.user}
+                        attendeesCount={rawPost?.joins_count ?? 0}
+                        interactedUsers={item.event?.interacted_users}
+                        isSwipeable={true}
+                        hideRegisterButton={false}
+                        registerButtonGreyed={
+                          rawPost?.user_id === user?.user_id ||
+                          !!plansUserHasTicket[effectivePlanId] ||
+                          userHasInteracted
+                        }
+                        onPress={() => {
+                          router.push({
+                            pathname: "/business-plan/[planId]",
+                            params: { planId: effectivePlanId },
+                          } as any);
+                        }}
+                        onRegisterPress={() => {
+                          if (!isAuthenticated || !user?.user_id) {
+                            router.push("/login");
+                            return;
+                          }
+                          if (rawPost?.user_id === user?.user_id) {
+                            Alert.alert(
+                              "Cannot Register",
+                              "You can't register for your own event.",
+                            );
+                            return;
+                          }
+                          if (rawPost?.is_women_only) {
+                            const gender = (
+                              currentUser?.gender || ""
+                            ).toLowerCase();
+                            if (gender !== "female") {
+                              showSnackbar("The post is for women only");
+                              return;
+                            }
+                          }
+                          // Open plan detail first so user can select a pass, then register
+                          router.push({
+                            pathname: "/business-plan/[planId]",
+                            params: { planId: effectivePlanId },
+                          } as any);
+                        }}
+                        onRequireAuth={() => {
+                          if (!isAuthenticated) {
+                            router.push("/login");
+                          }
+                        }}
+                        onSharePress={() => {
+                          if (!isAuthenticated) {
+                            router.push("/login");
+                            return;
+                          }
+                          setSharedBusinessPlan({
+                            planId: effectivePlanId,
+                            title: item.event.title,
+                            description: item.event.description,
+                            media: rawPost?.media || [
+                              { url: item.event.image, type: "image" },
+                            ],
+                            tags: item.event.tags || rawPost?.tags,
+                            category_main: rawPost?.category_main,
+                          });
+                          setShowBusinessShareModal(true);
+                        }}
+                      />
                     </View>
                   );
                 })}
@@ -468,7 +608,7 @@ export default function BusinessPostsScreen() {
           postTags={sharedBusinessPlan.tags}
           postCategoryMain={sharedBusinessPlan.category_main}
           postIsBusiness={true}
-          userId={user?.user_id ?? ''}
+          userId={user?.user_id ?? ""}
           currentUserAvatar={currentUser?.profile_image ?? undefined}
         />
       )}
@@ -479,10 +619,10 @@ export default function BusinessPostsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
   },
   pageGradient: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     top: 0,
@@ -490,14 +630,14 @@ const styles = StyleSheet.create({
     zIndex: 0,
   },
   businessCardWrapper: {
-    width: Dimensions.get('window').width - 40, // full width minus container padding
+    width: Dimensions.get("window").width - 40, // full width minus container padding
     marginHorizontal: 20,
     marginBottom: 16,
-    alignSelf: 'center',
+    alignSelf: "center",
     zIndex: 10,
   },
   businessCardInListInner: {
-    width: '100%',
+    width: "100%",
   },
   businessCardInList: {
     marginBottom: 8,
@@ -505,26 +645,26 @@ const styles = StyleSheet.create({
   feed: {
     paddingTop: 12,
     paddingBottom: 12,
-    alignItems: 'center',
+    alignItems: "center",
     zIndex: 1,
   },
   safeArea: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
     zIndex: 1,
   },
   headerWithFilters: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingTop: 35,
     marginBottom: 16,
     gap: 12,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
@@ -532,15 +672,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(2, 2, 2, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(2, 2, 2, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: fontTitle,
-    color: '#000000',
+    color: "#000000",
   },
   placeholder: {
     width: 40,
@@ -551,66 +691,78 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   stickyFilterWrap: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     paddingBottom: 8,
     zIndex: 10,
   },
   filterScroll: {
-    flex: 1, marginBottom: 16 },
+    flex: 1,
+    marginBottom: 16,
+  },
   filterContent: { paddingHorizontal: 20, gap: 12 },
-  activeFilterChip: { backgroundColor: '#1C1C1E', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
-  activeFilterText: { color: '#FFF', fontWeight: '600', fontFamily: fontBody },
-  filterChip: { backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30 },
-  filterText: { color: '#1C1C1E', fontWeight: '600', fontFamily: fontBody },
+  activeFilterChip: {
+    backgroundColor: "#1C1C1E",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  activeFilterText: { color: "#FFF", fontWeight: "600", fontFamily: fontBody },
+  filterChip: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  filterText: { color: "#1C1C1E", fontWeight: "600", fontFamily: fontBody },
   loadingContainer: {
     padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
     fontFamily: fontBody,
-    color: '#666',
+    color: "#666",
   },
   errorContainer: {
     padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   errorText: {
     fontSize: 14,
     fontFamily: fontBody,
-    color: '#FF3B30',
-    textAlign: 'center',
+    color: "#FF3B30",
+    textAlign: "center",
     marginBottom: 16,
   },
   retryButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 20,
   },
   retryButtonText: {
-    color: '#FFF',
-    fontWeight: '600',
+    color: "#FFF",
+    fontWeight: "600",
     fontSize: 14,
     fontFamily: fontBody,
   },
   emptyContainer: {
     padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     fontFamily: fontBody,
-    color: '#666',
+    color: "#666",
     marginBottom: 8,
   },
   createPlanCta: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
     paddingVertical: 14,
     paddingHorizontal: 28,
     borderRadius: 24,
@@ -618,13 +770,13 @@ const styles = StyleSheet.create({
   },
   createPlanCtaText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: "700",
     fontFamily: fontTitle,
-    color: '#FFF',
+    color: "#FFF",
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    color: "#999",
+    textAlign: "center",
   },
 });

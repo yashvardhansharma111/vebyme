@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -8,9 +8,10 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { apiService } from '@/services/api';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { apiService } from "@/services/api";
 
 interface Form {
   form_id: string;
@@ -58,7 +59,7 @@ export default function FormSelector({
         setForms([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load forms');
+      setError(err instanceof Error ? err.message : "Failed to load forms");
       setForms([]);
     } finally {
       setLoadingForms(false);
@@ -67,7 +68,7 @@ export default function FormSelector({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Pressable onPress={onCancel} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>Cancel</Text>
@@ -92,7 +93,9 @@ export default function FormSelector({
           <View style={styles.emptyContainer}>
             <Ionicons name="document-outline" size={48} color="#ccc" />
             <Text style={styles.emptyTitle}>No forms yet</Text>
-            <Text style={styles.emptySubtitle}>Create your first form to get started</Text>
+            <Text style={styles.emptySubtitle}>
+              Create your first form to get started
+            </Text>
           </View>
         ) : (
           <ScrollView style={styles.formsList}>
@@ -105,11 +108,31 @@ export default function FormSelector({
                 <View style={styles.formInfo}>
                   <Text style={styles.formName}>{form.name}</Text>
                   {form.description && (
-                    <Text style={styles.formDescription}>{form.description}</Text>
+                    <Text style={styles.formDescription}>
+                      {form.description}
+                    </Text>
                   )}
-                  <Text style={styles.formFieldCount}>
-                    {form.fields?.length || 0} field{(form.fields?.length ?? 0) !== 1 ? 's' : ''}
-                  </Text>
+                  {form.fields && form.fields.length > 0 && (
+                    <View style={styles.formQuestions}>
+                      {form.fields
+                        .slice(0, 3)
+                        .map((field: any, index: number) => (
+                          <Text
+                            key={index}
+                            style={styles.formQuestion}
+                            numberOfLines={1}
+                          >
+                            {index + 1}.{" "}
+                            {field.question || field.label || "Question"}
+                          </Text>
+                        ))}
+                      {form.fields.length > 3 && (
+                        <Text style={styles.formMoreQuestions}>
+                          +{form.fields.length - 3} more questions
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
                 <Ionicons name="chevron-forward" size={24} color="#ccc" />
               </Pressable>
@@ -133,7 +156,7 @@ export default function FormSelector({
             )}
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -141,22 +164,22 @@ export default function FormSelector({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#000",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#000",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#333",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#fff",
   },
   headerButton: {
     paddingVertical: 8,
@@ -164,17 +187,17 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
   headerSpacer: {
     width: 60,
   },
   errorContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
-    backgroundColor: '#FFE5E5',
+    backgroundColor: "#330000",
     paddingHorizontal: 16,
     paddingVertical: 12,
     margin: 16,
@@ -182,33 +205,33 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#FF3B30',
+    color: "#FF3B30",
     flex: 1,
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#999',
+    color: "#ccc",
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#fff",
     marginTop: 16,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#999',
+    color: "#ccc",
     marginTop: 8,
   },
   formsList: {
@@ -217,57 +240,67 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   formItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#111",
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#333",
   },
   formInfo: {
     flex: 1,
   },
   formName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#fff",
   },
   formDescription: {
     fontSize: 13,
-    color: '#666',
+    color: "#ccc",
     marginTop: 4,
   },
-  formFieldCount: {
+  formQuestions: {
+    marginTop: 8,
+  },
+  formQuestion: {
     fontSize: 12,
-    color: '#999',
-    marginTop: 4,
+    color: "#ccc",
+    marginBottom: 2,
+  },
+  formMoreQuestions: {
+    fontSize: 11,
+    color: "#999",
+    fontStyle: "italic",
   },
   footer: {
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: "#000",
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#333",
   },
   createButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
     paddingVertical: 12,
     borderRadius: 8,
     gap: 8,
+    borderWidth: 1,
+    borderColor: "#fff",
   },
   disabledButton: {
     opacity: 0.6,
   },
   createButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Alert,
   Modal,
@@ -12,14 +12,23 @@ import {
   Switch,
   KeyboardAvoidingView,
   Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 export interface FormField {
   field_id: string;
   label: string;
-  type: 'text' | 'email' | 'phone' | 'number' | 'select' | 'textarea' | 'checkbox' | 'radio' | 'date';
+  type:
+    | "text"
+    | "email"
+    | "phone"
+    | "number"
+    | "select"
+    | "textarea"
+    | "checkbox"
+    | "radio"
+    | "date";
   placeholder?: string;
   options?: string[];
   required: boolean;
@@ -34,16 +43,16 @@ interface FormBuilderProps {
   loading?: boolean;
 }
 
-const FIELD_TYPES: FormField['type'][] = [
-  'text',
-  'email',
-  'phone',
-  'number',
-  'select',
-  'textarea',
-  'checkbox',
-  'radio',
-  'date',
+const FIELD_TYPES: FormField["type"][] = [
+  "text",
+  "email",
+  "phone",
+  "number",
+  "select",
+  "textarea",
+  "checkbox",
+  "radio",
+  "date",
 ];
 
 export default function FormBuilder({
@@ -54,7 +63,7 @@ export default function FormBuilder({
   loading = false,
 }: FormBuilderProps) {
   const [fields, setFields] = useState<FormField[]>(
-    initialFields.length > 0 ? initialFields : []
+    initialFields.length > 0 ? initialFields : [],
   );
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
 
@@ -62,8 +71,8 @@ export default function FormBuilder({
     const newField: FormField = {
       field_id: `field_${Date.now()}_${Math.random()}`,
       label: `Field ${fields.length + 1}`,
-      type: 'text',
-      placeholder: '',
+      type: "text",
+      placeholder: "",
       options: [],
       required: false,
       order: fields.length,
@@ -80,16 +89,23 @@ export default function FormBuilder({
   const addOption = (fieldIndex: number) => {
     const newFields = [...fields];
     const opts = newFields[fieldIndex].options || [];
-    newFields[fieldIndex].options = [...opts, ''];
+    newFields[fieldIndex].options = [...opts, ""];
     setFields(newFields);
   };
 
-  const updateOption = (fieldIndex: number, optionIndex: number, value: string) => {
+  const updateOption = (
+    fieldIndex: number,
+    optionIndex: number,
+    value: string,
+  ) => {
     const newFields = [...fields];
     const opts = newFields[fieldIndex].options || [];
     // if user pasted comma separated values, split into multiple options
-    if (value.includes(',')) {
-      const parts = value.split(',').map((p) => p.trim()).filter(Boolean);
+    if (value.includes(",")) {
+      const parts = value
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
       // replace current index with first part, insert remaining after
       opts[optionIndex] = parts[0];
       const rest = parts.slice(1);
@@ -118,20 +134,26 @@ export default function FormBuilder({
   const moveFieldUp = (index: number) => {
     if (index === 0) return;
     const newFields = [...fields];
-    [newFields[index - 1], newFields[index]] = [newFields[index], newFields[index - 1]];
+    [newFields[index - 1], newFields[index]] = [
+      newFields[index],
+      newFields[index - 1],
+    ];
     setFields(newFields);
   };
 
   const moveFieldDown = (index: number) => {
     if (index === fields.length - 1) return;
     const newFields = [...fields];
-    [newFields[index], newFields[index + 1]] = [newFields[index + 1], newFields[index]];
+    [newFields[index], newFields[index + 1]] = [
+      newFields[index + 1],
+      newFields[index],
+    ];
     setFields(newFields);
   };
 
   const handleSave = () => {
     if (fields.length === 0) {
-      Alert.alert('Required', 'Please add at least one field');
+      Alert.alert("Required", "Please add at least one field");
       return;
     }
     onSave(fields);
@@ -139,155 +161,194 @@ export default function FormBuilder({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={styles.flex}
         >
-          <ScrollView style={styles.content} contentContainerStyle={styles.scrollContentContainer}>
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContentContainer}
+          >
             {fields.map((field, index) => (
               <View key={field.field_id} style={styles.fieldCard}>
                 <View style={styles.fieldHeader}>
                   <Text style={styles.fieldIndex}>{index + 1}</Text>
                   <View style={styles.fieldHeaderActions}>
-                  <Pressable
-                    onPress={() => moveFieldUp(index)}
-                    disabled={index === 0}
-                    style={[styles.iconButton, index === 0 && styles.disabledButton]}
-                  >
-                    <Ionicons name="arrow-up" size={20} color={index === 0 ? '#ccc' : '#007AFF'} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => moveFieldDown(index)}
-                    disabled={index === fields.length - 1}
-                    style={[styles.iconButton, index === fields.length - 1 && styles.disabledButton]}
-                  >
-                    <Ionicons
-                      name="arrow-down"
-                      size={20}
-                      color={index === fields.length - 1 ? '#ccc' : '#007AFF'}
-                    />
-                  </Pressable>
-                  <Pressable onPress={() => deleteField(index)} style={styles.iconButton}>
-                    <Ionicons name="trash" size={20} color="#FF3B30" />
-                  </Pressable>
+                    <Pressable
+                      onPress={() => moveFieldUp(index)}
+                      disabled={index === 0}
+                      style={[
+                        styles.iconButton,
+                        index === 0 && styles.disabledButton,
+                      ]}
+                    >
+                      <Ionicons
+                        name="arrow-up"
+                        size={20}
+                        color={index === 0 ? "#ccc" : "#007AFF"}
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => moveFieldDown(index)}
+                      disabled={index === fields.length - 1}
+                      style={[
+                        styles.iconButton,
+                        index === fields.length - 1 && styles.disabledButton,
+                      ]}
+                    >
+                      <Ionicons
+                        name="arrow-down"
+                        size={20}
+                        color={index === fields.length - 1 ? "#ccc" : "#007AFF"}
+                      />
+                    </Pressable>
+                    <Pressable
+                      onPress={() => deleteField(index)}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons name="trash" size={20} color="#FF3B30" />
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Field Label *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., Full Name"
-                  value={field.label}
-                  onChangeText={(text) => updateField(index, { label: text })}
-                  placeholderTextColor="#999"
-                />
-              </View>
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Field Label *</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., Full Name"
+                    value={field.label}
+                    onChangeText={(text) => updateField(index, { label: text })}
+                    placeholderTextColor="#999"
+                  />
+                </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Field Type *</Text>
-                <View style={styles.typePickerContainer}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.typePicker}
-                  >
-                    {FIELD_TYPES.map((type) => (
-                      <Pressable
-                        key={type}
-                        onPress={() => updateField(index, { type, options: [] })}
-                        style={[
-                          styles.typeOption,
-                          field.type === type && styles.typeOptionSelected,
-                        ]}
-                      >
-                        <Text
+                <View style={styles.fieldGroup}>
+                  <Text style={styles.label}>Field Type *</Text>
+                  <View style={styles.typePickerContainer}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={styles.typePicker}
+                    >
+                      {FIELD_TYPES.map((type) => (
+                        <Pressable
+                          key={type}
+                          onPress={() =>
+                            updateField(index, { type, options: [] })
+                          }
                           style={[
-                            styles.typeOptionText,
-                            field.type === type && styles.typeOptionTextSelected,
+                            styles.typeOption,
+                            field.type === type && styles.typeOptionSelected,
                           ]}
                         >
-                          {type.charAt(0).toUpperCase() + type.slice(1)}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
+                          <Text
+                            style={[
+                              styles.typeOptionText,
+                              field.type === type &&
+                                styles.typeOptionTextSelected,
+                            ]}
+                          >
+                            {type.charAt(0).toUpperCase() + type.slice(1)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Placeholder (optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., Enter your full name"
-                  value={field.placeholder || ''}
-                  onChangeText={(text) => updateField(index, { placeholder: text })}
-                  placeholderTextColor="#999"
-                />
-              </View>
-
-              {['select', 'radio', 'checkbox'].includes(field.type) && (
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Options</Text>
-                  {(field.options || []).map((opt, oidx) => (
-                    <View key={oidx} style={styles.optionRow}>
-                      <TextInput
-                        style={[styles.input, { flex: 1 }]}
-                        placeholder={`Option ${oidx + 1}`}
-                        value={opt}
-                        onChangeText={(text) => updateOption(index, oidx, text)}
-                        placeholderTextColor="#999"
-                      />
-                      <Pressable onPress={() => removeOption(index, oidx)} style={styles.optionRemove}>
-                        <Ionicons name="trash" size={20} color="#FF3B30" />
-                      </Pressable>
-                    </View>
-                  ))}
-                  <Pressable onPress={() => addOption(index)} style={styles.addOptionButton}>
-                    <Ionicons name="add-circle" size={20} color="#007AFF" />
-                    <Text style={styles.addOptionText}>Add Option</Text>
-                  </Pressable>
-                  <Text style={{ fontSize: 12, color: '#999', marginTop: 4 }}>
-                    You can also paste comma-separated values; commas will be preserved.
-                  </Text>
+                  <Text style={styles.label}>Placeholder (optional)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="e.g., Enter your full name"
+                    value={field.placeholder || ""}
+                    onChangeText={(text) =>
+                      updateField(index, { placeholder: text })
+                    }
+                    placeholderTextColor="#999"
+                  />
                 </View>
-              )}
 
-              <View style={styles.requiredContainer}>
-                <Text style={styles.label}>Required</Text>
-                <Switch
-                  value={field.required}
-                  onValueChange={(value) => updateField(index, { required: value })}
-                  trackColor={{ false: '#ddd', true: '#81C784' }}
-                  thumbColor={'#fff'}
-                />
+                {["select", "radio", "checkbox"].includes(field.type) && (
+                  <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>Options</Text>
+                    {(field.options || []).map((opt, oidx) => (
+                      <View key={oidx} style={styles.optionRow}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          placeholder={`Option ${oidx + 1}`}
+                          value={opt}
+                          onChangeText={(text) =>
+                            updateOption(index, oidx, text)
+                          }
+                          placeholderTextColor="#999"
+                        />
+                        <Pressable
+                          onPress={() => removeOption(index, oidx)}
+                          style={styles.optionRemove}
+                        >
+                          <Ionicons name="trash" size={20} color="#FF3B30" />
+                        </Pressable>
+                      </View>
+                    ))}
+                    <Pressable
+                      onPress={() => addOption(index)}
+                      style={styles.addOptionButton}
+                    >
+                      <Ionicons name="add-circle" size={20} color="#007AFF" />
+                      <Text style={styles.addOptionText}>Add Option</Text>
+                    </Pressable>
+                    <Text style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
+                      You can also paste comma-separated values; commas will be
+                      preserved.
+                    </Text>
+                  </View>
+                )}
+
+                <View style={styles.requiredContainer}>
+                  <Text style={styles.label}>Required</Text>
+                  <Switch
+                    value={field.required}
+                    onValueChange={(value) =>
+                      updateField(index, { required: value })
+                    }
+                    trackColor={{ false: "#ddd", true: "#81C784" }}
+                    thumbColor={"#fff"}
+                  />
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
 
-          <Pressable onPress={addField} style={styles.addFieldButton}>
-            <Ionicons name="add-circle" size={24} color="#007AFF" />
-            <Text style={styles.addFieldButtonText}>Add Field</Text>
-          </Pressable>
+            <Pressable onPress={addField} style={styles.addFieldButton}>
+              <Ionicons name="add-circle" size={24} color="#007AFF" />
+              <Text style={styles.addFieldButtonText}>Add Field</Text>
+            </Pressable>
 
-          <View style={{ height: 20 }} />
-        </ScrollView>
+            <View style={{ height: 20 }} />
+          </ScrollView>
 
-        <View style={styles.footerButtonContainer}>
-          <Pressable onPress={onCancel} style={[styles.footerButton, styles.cancelButton]}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            onPress={handleSave}
-            disabled={loading}
-            style={[styles.footerButton, styles.saveButtonContainer, loading && styles.disabledButton]}
-          >
-            <Text style={[styles.saveButtonText]}>Save</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <View style={styles.footerButtonContainer}>
+            <Pressable
+              onPress={onCancel}
+              style={[styles.footerButton, styles.cancelButton]}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleSave}
+              disabled={loading}
+              style={[
+                styles.footerButton,
+                styles.saveButtonContainer,
+                loading && styles.disabledButton,
+              ]}
+            >
+              <Text style={[styles.saveButtonText]}>Save</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -295,25 +356,25 @@ export default function FormBuilder({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
   },
   flex: {
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#fff",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: "#e0e0e0",
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
   },
   headerButton: {
     paddingVertical: 8,
@@ -321,11 +382,11 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     fontSize: 16,
-    color: '#666',
+    color: "#666",
   },
   saveButton: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: "#007AFF",
+    fontWeight: "600",
   },
   disabledButton: {
     opacity: 0.5,
@@ -338,63 +399,63 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   footerButtonContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: 16,
     paddingVertical: 16,
     gap: 12,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#e0e0e0",
   },
   footerButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
   },
   cancelButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: "600",
+    color: "#666",
   },
   saveButtonContainer: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#007AFF",
   },
   saveButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: "600",
+    color: "#fff",
   },
   fieldCard: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: "#e0e0e0",
   },
   fieldHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   fieldIndex: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   fieldHeaderActions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   iconButton: {
@@ -405,19 +466,19 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: "600",
+    color: "#000",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#000',
-    backgroundColor: '#f9f9f9',
+    color: "#000",
+    backgroundColor: "#f9f9f9",
   },
   typePickerContainer: {
     marginHorizontal: -16,
@@ -431,48 +492,48 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     marginRight: 8,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: "#f9f9f9",
   },
   typeOptionSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: "#007AFF",
+    borderColor: "#007AFF",
   },
   typeOptionText: {
     fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
+    color: "#666",
+    fontWeight: "500",
   },
   typeOptionTextSelected: {
-    color: '#fff',
+    color: "#fff",
   },
   requiredContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   addFieldButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: "#007AFF",
     borderRadius: 8,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
     marginBottom: 16,
     gap: 8,
   },
   addFieldButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: "600",
+    color: "#007AFF",
   },
   optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   optionRemove: {
@@ -480,14 +541,14 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   addOptionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
   },
   addOptionText: {
     marginLeft: 4,
-    color: '#007AFF',
+    color: "#007AFF",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 });

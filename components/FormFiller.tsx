@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Alert,
   Modal,
@@ -8,13 +8,22 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+} from "react-native";
+import { Picker } from "@react-native-picker/picker";
 
 interface FormField {
   field_id: string;
   label: string;
-  type: 'text' | 'email' | 'phone' | 'number' | 'select' | 'textarea' | 'checkbox' | 'radio' | 'date';
+  type:
+    | "text"
+    | "email"
+    | "phone"
+    | "number"
+    | "select"
+    | "textarea"
+    | "checkbox"
+    | "radio"
+    | "date";
   placeholder?: string;
   options?: string[];
   required: boolean;
@@ -49,7 +58,7 @@ export default function FormFiller({
     // Validate required fields
     for (const field of fields) {
       if (field.required && !responses[field.field_id]) {
-        Alert.alert('Required Field', `${field.label} is required`);
+        Alert.alert("Required Field", `${field.label} is required`);
         return;
       }
     }
@@ -59,45 +68,45 @@ export default function FormFiller({
 
   const renderField = (field: FormField, index: number) => {
     switch (field.type) {
-      case 'text':
-      case 'email':
-      case 'phone':
-      case 'number':
+      case "text":
+      case "email":
+      case "phone":
+      case "number":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             <TextInput
               style={styles.input}
               placeholder={field.placeholder}
-              value={responses[field.field_id] || ''}
+              value={responses[field.field_id] || ""}
               onChangeText={(text) => handleFieldChange(field.field_id, text)}
               keyboardType={
-                field.type === 'number'
-                  ? 'numeric'
-                  : field.type === 'phone'
-                  ? 'phone-pad'
-                  : field.type === 'email'
-                  ? 'email-address'
-                  : 'default'
+                field.type === "number"
+                  ? "numeric"
+                  : field.type === "phone"
+                    ? "phone-pad"
+                    : field.type === "email"
+                      ? "email-address"
+                      : "default"
               }
             />
           </View>
         );
 
-      case 'textarea':
+      case "textarea":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             <TextInput
               style={[styles.input, { minHeight: 100 }]}
               placeholder={field.placeholder}
-              value={responses[field.field_id] || ''}
+              value={responses[field.field_id] || ""}
               onChangeText={(text) => handleFieldChange(field.field_id, text)}
               multiline
               numberOfLines={4}
@@ -105,17 +114,19 @@ export default function FormFiller({
           </View>
         );
 
-      case 'select':
+      case "select":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             <View style={styles.pickerContainer}>
               <Picker
-                selectedValue={responses[field.field_id] || ''}
-                onValueChange={(value) => handleFieldChange(field.field_id, value)}
+                selectedValue={responses[field.field_id] || ""}
+                onValueChange={(value) =>
+                  handleFieldChange(field.field_id, value)
+                }
               >
                 <Picker.Item label="Select an option" value="" />
                 {field.options?.map((opt) => (
@@ -126,12 +137,12 @@ export default function FormFiller({
           </View>
         );
 
-      case 'radio':
+      case "radio":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             {field.options?.map((opt) => (
               <Pressable
@@ -151,12 +162,12 @@ export default function FormFiller({
           </View>
         );
 
-      case 'checkbox':
+      case "checkbox":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             {field.options?.map((opt) => (
               <Pressable
@@ -167,7 +178,7 @@ export default function FormFiller({
                   if (current.includes(opt)) {
                     handleFieldChange(
                       field.field_id,
-                      current.filter((i: string) => i !== opt)
+                      current.filter((i: string) => i !== opt),
                     );
                   } else {
                     handleFieldChange(field.field_id, [...current, opt]);
@@ -191,17 +202,17 @@ export default function FormFiller({
           </View>
         );
 
-      case 'date':
+      case "date":
         return (
           <View key={field.field_id} style={styles.fieldContainer}>
             <Text style={styles.label}>
               {field.label}
-              {field.required && <Text style={{ color: 'red' }}>*</Text>}
+              {field.required && <Text style={{ color: "red" }}>*</Text>}
             </Text>
             <TextInput
               style={styles.input}
               placeholder="YYYY-MM-DD"
-              value={responses[field.field_id] || ''}
+              value={responses[field.field_id] || ""}
               onChangeText={(text) => handleFieldChange(field.field_id, text)}
             />
           </View>
@@ -224,7 +235,10 @@ export default function FormFiller({
         </View>
 
         {/* Form Fields */}
-        <ScrollView style={styles.formContainer} contentContainerStyle={styles.formContent}>
+        <ScrollView
+          style={styles.formContainer}
+          contentContainerStyle={styles.formContent}
+        >
           {fields.map((field, index) => renderField(field, index))}
         </ScrollView>
 
@@ -243,7 +257,7 @@ export default function FormFiller({
             style={[styles.button, styles.submitButton]}
           >
             <Text style={styles.submitButtonText}>
-              {loading ? 'Submitting...' : 'Submit'}
+              {loading ? "Submitting..." : "Submit"}
             </Text>
           </Pressable>
         </View>
@@ -255,28 +269,28 @@ export default function FormFiller({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: "#F2F2F7",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1C1C1E',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#1C1C1E",
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 12,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: "bold",
+    color: "#FFF",
   },
   closeButton: {
     padding: 8,
   },
   closeText: {
     fontSize: 24,
-    color: '#FFF',
+    color: "#FFF",
   },
   formContainer: {
     flex: 1,
@@ -290,28 +304,28 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#000',
+    color: "#000",
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: "#E5E5EA",
     borderRadius: 8,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   radioContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
   },
   radio: {
@@ -319,20 +333,20 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#666',
+    borderColor: "#666",
     marginRight: 10,
   },
   radioSelected: {
-    borderColor: '#1C1C1E',
-    backgroundColor: '#1C1C1E',
+    borderColor: "#1C1C1E",
+    backgroundColor: "#1C1C1E",
   },
   radioLabel: {
     fontSize: 14,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 10,
   },
   checkbox: {
@@ -340,60 +354,60 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#666',
+    borderColor: "#666",
     marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   checkboxSelected: {
-    borderColor: '#1C1C1E',
-    backgroundColor: '#1C1C1E',
+    borderColor: "#1C1C1E",
+    backgroundColor: "#1C1C1E",
   },
   checkMark: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   checkboxLabel: {
     fontSize: 14,
-    color: '#1C1C1E',
+    color: "#1C1C1E",
   },
   footer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFF',
+    backgroundColor: "#FFF",
     borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
+    borderTopColor: "#E5E5EA",
   },
   button: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   cancelButton: {
     borderWidth: 2,
-    borderColor: '#1C1C1E',
-    backgroundColor: '#FFF',
+    borderColor: "#1C1C1E",
+    backgroundColor: "#FFF",
   },
   cancelButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: "600",
+    color: "#1C1C1E",
   },
   submitButton: {
-    backgroundColor: '#1C1C1E',
+    backgroundColor: "#1C1C1E",
   },
   submitButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#FFF',
+    fontWeight: "600",
+    color: "#FFF",
   },
 });

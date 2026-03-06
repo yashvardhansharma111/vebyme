@@ -10,6 +10,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -177,6 +178,10 @@ export default function CreateBusinessPostScreen() {
   const [additionalDetails, setAdditionalDetails] = useState<{
     [key: string]: { title: string; description: string };
   }>({});
+  // Custom additional info fields (allow user to add multiple custom fields)
+  const [customAdditionalInfo, setCustomAdditionalInfo] = useState<
+    Array<{ id: string; heading: string; description: string }>
+  >([]);
 
   // remove strava link when category changes away from Running
   useEffect(() => {
@@ -224,6 +229,11 @@ export default function CreateBusinessPostScreen() {
   const [mostRecentFormFields, setMostRecentFormFields] = useState<FormField[]>(
     [],
   );
+  const [selectedForm, setSelectedForm] = useState<{
+    form_id: string;
+    name: string;
+    fields: FormField[];
+  } | null>(null);
 
   // Registration limit state
   const [limitRegistrationEnabled, setLimitRegistrationEnabled] =
@@ -250,6 +260,7 @@ export default function CreateBusinessPostScreen() {
     setPasses([]);
     setSelectedAdditionalSettings([]);
     setAdditionalDetails({});
+    setCustomAdditionalInfo([]);
     setWomenOnly(false);
     setHideGuestListFromViewers(false);
     setShareToAnnouncementGroup(false);
@@ -260,6 +271,7 @@ export default function CreateBusinessPostScreen() {
     setPreviewPassIndex(0);
     setFormId(null);
     setAttachFormEnabled(false);
+    setSelectedForm(null);
     setLimitRegistrationEnabled(false);
     setRegistrationLimit("");
     isEditFlowRef.current = false;
@@ -400,18 +412,46 @@ export default function CreateBusinessPostScreen() {
             const details: {
               [key: string]: { title: string; description: string };
             } = {};
+            const customInfos: Array<{
+              id: string;
+              heading: string;
+              description: string;
+            }> = [];
+
             planData.add_details.forEach((detail: any) => {
-              settings.push(detail.detail_type);
               const isAdditionalInfo = detail.detail_type === "additional_info";
-              details[detail.detail_type] = {
-                title: isAdditionalInfo
-                  ? (detail.heading ?? detail.title ?? "")
-                  : (detail.title ?? ""),
-                description: detail.description || "",
-              };
+              const isPredefinedSetting = [
+                "distance",
+                "starting_point",
+                "f&b",
+                "dress_code",
+                "music_type",
+                "strava_link",
+                "links",
+                "google_drive_link",
+              ].includes(detail.detail_type);
+
+              if (isAdditionalInfo && !isPredefinedSetting) {
+                // Custom additional info
+                customInfos.push({
+                  id: `custom_${Date.now()}_${Math.random()}`,
+                  heading: detail.heading || detail.title || "",
+                  description: detail.description || "",
+                });
+              } else {
+                // Predefined settings
+                settings.push(detail.detail_type);
+                details[detail.detail_type] = {
+                  title: isAdditionalInfo
+                    ? (detail.heading ?? detail.title ?? "")
+                    : (detail.title ?? ""),
+                  description: detail.description || "",
+                };
+              }
             });
             setSelectedAdditionalSettings(settings);
             setAdditionalDetails(details);
+            setCustomAdditionalInfo(customInfos);
           }
 
           // Handle media
@@ -446,6 +486,25 @@ export default function CreateBusinessPostScreen() {
 
     loadPlanData();
   }, []);
+
+  // Fetch selected form details when formId changes
+  useEffect(() => {
+    const fetchForm = async () => {
+      if (formId && user?.user_id) {
+        try {
+          const response = await apiService.getForm(formId);
+          if (response.success && response.data) {
+            setSelectedForm(response.data);
+          }
+        } catch (error) {
+          console.error("Error fetching form:", error);
+        }
+      } else {
+        setSelectedForm(null);
+      }
+    };
+    fetchForm();
+  }, [formId, user?.user_id]);
 
   const MAX_MEDIA = 5;
 
@@ -758,6 +817,15 @@ export default function CreateBusinessPostScreen() {
           : {}),
       };
     });
+    // Also add custom additional info fields
+    customAdditionalInfo.forEach((field) => {
+      add_details.push({
+        detail_type: "additional_info",
+        title: field.heading,
+        description: field.description,
+        heading: field.heading,
+      });
+    });
     return {
       plan_id: "preview",
       title: title || "Event Title",
@@ -967,8 +1035,16 @@ export default function CreateBusinessPostScreen() {
         planData.is_paid_plan = true;
         planData.registration_required = true;
       }
-      if (addDetails.length > 0) {
-        planData.add_details = addDetails;
+      if (addDetails.length > 0 || customAdditionalInfo.length > 0) {
+        const allAddDetails = addDetails.concat(
+          customAdditionalInfo.map((field) => ({
+            detail_type: "additional_info",
+            title: field.heading,
+            heading: field.heading,
+            description: field.description,
+          })),
+        );
+        planData.add_details = allAddDetails;
       }
       if (formId) {
         planData.form_id = formId;
@@ -1189,7 +1265,7 @@ export default function CreateBusinessPostScreen() {
             edges={["top", "bottom"]}
           >
             <View style={styles.previewScroll}>
-              <View style={styles.businessPreviewWrap}>
+              <View style={styles.businessCardWrap}>
                 <BusinessCard
                   plan={previewData}
                   user={{
@@ -1956,6 +2032,79 @@ export default function CreateBusinessPostScreen() {
                   );
                 })}
 
+                {/* Custom Additional Info – allow adding multiple fields */}
+                <View style={styles.customAdditionalInfoBlock}>
+                  <Text style={styles.sectionTitle}>
+                    Custom Additional Info
+                  </Text>
+                  {customAdditionalInfo.map((field, idx) => (
+                    <View key={field.id} style={styles.customInfoCard}>
+                      <TextInput
+                        style={styles.customInfoInput}
+                        placeholder="Field name or heading"
+                        value={field.heading}
+                        onChangeText={(text) => {
+                          const updated = [...customAdditionalInfo];
+                          updated[idx] = { ...updated[idx], heading: text };
+                          setCustomAdditionalInfo(updated);
+                        }}
+                        placeholderTextColor="#999"
+                      />
+                      <TextInput
+                        style={[
+                          styles.customInfoInput,
+                          styles.customInfoDescription,
+                        ]}
+                        placeholder="Description or details"
+                        value={field.description}
+                        onChangeText={(text) => {
+                          const updated = [...customAdditionalInfo];
+                          updated[idx] = {
+                            ...updated[idx],
+                            description: text,
+                          };
+                          setCustomAdditionalInfo(updated);
+                        }}
+                        placeholderTextColor="#999"
+                        multiline
+                        numberOfLines={2}
+                      />
+                      <TouchableOpacity
+                        style={styles.customInfoRemoveButton}
+                        onPress={() =>
+                          setCustomAdditionalInfo((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={18}
+                          color="#FF3B30"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.addCustomInfoButton}
+                    onPress={() => {
+                      setCustomAdditionalInfo((prev) => [
+                        ...prev,
+                        {
+                          id: `custom_${Date.now()}`,
+                          heading: "",
+                          description: "",
+                        },
+                      ]);
+                    }}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#000000" />
+                    <Text style={styles.addCustomInfoButtonText}>
+                      Add Info Field
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 {/* Women's Only & Allow Viewing Guest List – inside Additional Settings */}
                 <View style={styles.additionalTogglesBlock}>
                   <View style={styles.toggleRow}>
@@ -2007,7 +2156,7 @@ export default function CreateBusinessPostScreen() {
 
                   {attachFormEnabled && (
                     <View style={styles.formSection}>
-                      {formId ? (
+                      {formId && selectedForm ? (
                         <View style={styles.formSelectedContainer}>
                           <View style={styles.formSelectedContent}>
                             <Ionicons
@@ -2017,11 +2166,23 @@ export default function CreateBusinessPostScreen() {
                             />
                             <View style={styles.formSelectedInfo}>
                               <Text style={styles.formSelectedLabel}>
-                                Form Attached
+                                {selectedForm.name}
                               </Text>
-                              <Text style={styles.formSelectedId}>
-                                {formId}
-                              </Text>
+                              <ScrollView
+                                style={styles.formQuestionsList}
+                                showsVerticalScrollIndicator={false}
+                              >
+                                {selectedForm.fields.map((field, index) => (
+                                  <Text
+                                    key={index}
+                                    style={styles.formQuestionItem}
+                                    numberOfLines={2}
+                                  >
+                                    {index + 1}.{" "}
+                                    {(field as any).question || field.label}
+                                  </Text>
+                                ))}
+                              </ScrollView>
                             </View>
                           </View>
                           <TouchableOpacity
@@ -2030,6 +2191,13 @@ export default function CreateBusinessPostScreen() {
                           >
                             <Ionicons name="close" size={20} color="#FF3B30" />
                           </TouchableOpacity>
+                        </View>
+                      ) : formId ? (
+                        <View style={styles.formLoading}>
+                          <ActivityIndicator size="small" color="#8B5CF6" />
+                          <Text style={styles.formLoadingText}>
+                            Loading form...
+                          </Text>
                         </View>
                       ) : (
                         <View style={styles.formActionButtons}>
@@ -2040,7 +2208,7 @@ export default function CreateBusinessPostScreen() {
                             <Ionicons
                               name="document"
                               size={18}
-                              color="#007AFF"
+                              color="#000000"
                             />
                             <Text style={styles.formSelectButtonText}>
                               Select Existing Form
@@ -2391,72 +2559,90 @@ export default function CreateBusinessPostScreen() {
         animationType="slide"
         statusBarTranslucent
       >
-        <SafeAreaView
-          style={styles.successModalFullScreen}
-          edges={["top", "bottom"]}
-        >
-          <View style={styles.successModalScroll}>
-            <View style={styles.businessPreviewWrap}>
-              <BusinessPlanDetailPreview
-                plan={{
-                  ...formatPreviewData(),
-                  plan_id: createdPlanIdForSuccess ?? "preview",
-                }}
-                organizerName={currentUser?.name || "Organizer"}
-                organizerAvatar={currentUser?.profile_image ?? null}
-                showOrganizer={true}
-                withStickyBar={true}
-              />
-            </View>
-          </View>
-          <View
-            style={[
-              styles.previewStickyBar,
-              { paddingBottom: Math.max(insets.bottom, 16) },
-            ]}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaView
+            style={styles.successModalFullScreen}
+            edges={["top", "bottom"]}
           >
+            <View style={styles.successModalScroll}>
+              <View style={styles.businessCardWrap}>
+                <BusinessCard
+                  plan={{
+                    plan_id: createdPlanIdForSuccess ?? "preview",
+                    title: title,
+                    description: description,
+                    media: media.map((m) => ({ url: m.uri, type: m.type })),
+                    location_text: location,
+                    date: selectedDate || undefined,
+                    time: selectedDate ? formatTime(selectedDate) : undefined,
+                    category_main: selectedCategory,
+                    category_sub: selectedSubcategories,
+                    user: {
+                      user_id: currentUser?.user_id || "",
+                      name: currentUser?.name || "Organizer",
+                      profile_image: currentUser?.profile_image || undefined,
+                    },
+                  }}
+                  hideActions={true}
+                  hideRegisterButton={true}
+                  fillHeight={false}
+                  compactVerticalPadding={true}
+                  descriptionNumberOfLines={3}
+                  hideCardShadow={false}
+                />
+              </View>
+              <Text style={styles.liveStatusText}>{title} is Live</Text>
+            </View>
+            <View
+              style={[
+                styles.previewStickyBar,
+                { paddingBottom: Math.max(insets.bottom, 16) },
+              ]}
+            >
+              <TouchableOpacity
+                style={[styles.actionButton, styles.successEditButton]}
+                onPress={() => {
+                  if (!createdPlanIdForSuccess) return;
+                  setShowPostSuccessModal(false);
+                  setCreatedPlanIdForSuccess(null);
+                  resetForm();
+                  router.push({
+                    pathname: "/business-plan/[planId]",
+                    params: { planId: createdPlanIdForSuccess },
+                  } as any);
+                }}
+              >
+                <Text style={styles.successEditButtonText}>Edit Event</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.successShareButton]}
+                onPress={() => {
+                  setShowPostSuccessModal(false);
+                  setShowShareToChatModal(true);
+                  resetForm();
+                }}
+              >
+                <Ionicons name="share-social" size={20} color="#FFF" />
+                <Text style={styles.successShareButtonText}>Share</Text>
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
-              style={[styles.actionButton, styles.previewEditButton]}
+              style={styles.successModalClose}
               onPress={() => {
-                if (!createdPlanIdForSuccess) return;
                 setShowPostSuccessModal(false);
                 setCreatedPlanIdForSuccess(null);
                 resetForm();
-                router.push({
-                  pathname: "/business-plan/[planId]",
-                  params: { planId: createdPlanIdForSuccess },
-                } as any);
+                if (openedFromMyPlansRef.current) {
+                  router.replace("/profile/your-plans");
+                } else {
+                  router.replace("/(tabs)");
+                }
               }}
             >
-              <Text style={styles.previewEditButtonText}>Edit</Text>
+              <Ionicons name="close" size={24} color="#1C1C1E" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.postButton]}
-              onPress={() => {
-                setShowPostSuccessModal(false);
-                setShowShareToChatModal(true);
-                resetForm();
-              }}
-            >
-              <Text style={styles.postButtonText}>Share</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={styles.successModalClose}
-            onPress={() => {
-              setShowPostSuccessModal(false);
-              setCreatedPlanIdForSuccess(null);
-              resetForm();
-              if (openedFromMyPlansRef.current) {
-                router.replace("/profile/your-plans");
-              } else {
-                router.replace("/(tabs)");
-              }
-            }}
-          >
-            <Ionicons name="close" size={24} color="#1C1C1E" />
-          </TouchableOpacity>
-        </SafeAreaView>
+          </SafeAreaView>
+        </GestureHandlerRootView>
       </Modal>
 
       <ShareToChatModal
@@ -2782,6 +2968,52 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#000",
+  },
+  customAdditionalInfoBlock: {
+    backgroundColor: "#F9F9F9",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  customInfoCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E5E5",
+    padding: 12,
+    marginBottom: 12,
+  },
+  customInfoInput: {
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 8,
+    fontSize: 14,
+    color: "#1C1C1E",
+  },
+  customInfoDescription: {
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  customInfoRemoveButton: {
+    alignSelf: "flex-end",
+    padding: 8,
+  },
+  addCustomInfoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#000000",
+    gap: 8,
+  },
+  addCustomInfoButtonText: {
+    color: "#000000",
+    fontSize: 14,
+    fontWeight: "600",
   },
   additionalTogglesBlock: {
     marginTop: 20,
@@ -3411,18 +3643,41 @@ const styles = StyleSheet.create({
   },
   successModalScroll: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
   successModalClose: {
     position: "absolute",
-    top: 12,
-    right: 16,
+    bottom: 100,
+    right: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#E5E5EA",
+    backgroundColor: "#F0F0F0",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 10,
+  },
+  liveStatusText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1C1C1E",
+    marginTop: 20,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  businessCardWrap: {
+    width: "100%",
+    height: Dimensions.get("window").height * 0.5,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
   },
   previewFullScreen: {
     flex: 1,
@@ -3455,20 +3710,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: 16,
   },
-  businessPreviewWrap: {
-    flex: 1,
-    marginHorizontal: 4,
-    paddingTop: 70,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: "#FFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
-  },
   eventPreviewWrap: {
     flex: 1,
     paddingHorizontal: 16,
@@ -3489,9 +3730,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingBottom: 24,
-    backgroundColor: "#F2F2F7",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#E5E5E5",
+    backgroundColor: "#FFF",
+    borderTopWidth: 0,
+  },
+  successEditButton: {
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#1C1C1E",
+  },
+  successEditButtonText: {
+    color: "#1C1C1E",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  successShareButton: {
+    backgroundColor: "#1C1C1E",
+    flexDirection: "row",
+    gap: 8,
+  },
+  successShareButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
   previewEditButton: {
     backgroundColor: "#E5E5EA",
@@ -3542,6 +3802,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    padding: 12,
   },
   formSelectedContainer: {
     flexDirection: "row",
@@ -3588,13 +3851,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#007AFF",
+    borderColor: "#000000",
     backgroundColor: "#FFF",
   },
   formSelectButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#007AFF",
+    color: "#000000",
   },
   formCreateButton: {
     flexDirection: "row",
@@ -3604,12 +3867,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
-    backgroundColor: "#007AFF",
+    backgroundColor: "#000000",
   },
   formCreateButtonText: {
     fontSize: 14,
     fontWeight: "600",
     color: "#FFF",
+  },
+  formQuestionsList: {
+    maxHeight: 120,
+    marginTop: 8,
+  },
+  formQuestionItem: {
+    fontSize: 12,
+    color: "#FFF",
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  formLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 16,
+  },
+  formLoadingText: {
+    fontSize: 14,
+    color: "#FFF",
+    marginLeft: 8,
   },
   registrationLimitContainer: {
     marginTop: 10,
