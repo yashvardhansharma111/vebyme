@@ -2595,6 +2595,9 @@ export default function CreateBusinessPostScreen() {
                 hideActions={true}
                 hideRegisterButton={true}
                 isSwipeable={false}
+                fillHeight={false}
+                compactVerticalPadding={true}
+                descriptionNumberOfLines={2}
               />
             </View>
 
@@ -3911,7 +3914,7 @@ const styles = StyleSheet.create({
   successCardContainer: {
     marginTop: 60, // space for close button + notch
     paddingHorizontal: 20,
-    height: Dimensions.get("window").height * 0.3, // smaller so it doesn't overlap bottom panel
+    height: Dimensions.get("window").height * 0.2, // smaller so it doesn't overlap bottom panel
   },
 
   /* Bottom action panel */
