@@ -741,6 +741,8 @@ export default function CreateBusinessPostScreen() {
       }
       if (limitRegistrationEnabled && registrationLimit) {
         planData.registration_limit = parseInt(registrationLimit, 10);
+      } else if (editMode) {
+        planData.registration_limit = null;
       }
       if (editMode && planId) {
         planData.is_women_only = womenOnly;
