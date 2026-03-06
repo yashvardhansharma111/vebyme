@@ -23,6 +23,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   SafeAreaView,
@@ -70,6 +71,8 @@ const CATEGORY_SUBCATEGORIES: Record<string, string[]> = {
   "Fitness/Training": [],
   "Social/Community": [],
 };
+
+const MAX_MEDIA = 2;
 
 // Icons match assets/icons/*.svg replaced by React icons: Map pin → location-outline, Ticket_alt → pricetag-outline, t-shirt → shirt-outline, etc. (see constants/assetIcons.ts)
 const ADDITIONAL_SETTINGS = [
@@ -166,6 +169,13 @@ export default function CreateBusinessPostScreen() {
   const [endTimeText, setEndTimeText] = useState("");
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [showTimeWheelPicker, setShowTimeWheelPicker] = useState(false);
+  const [timeWheelTarget, setTimeWheelTarget] = useState<"start" | "end">(
+    "start",
+  );
+  const [wheelHour, setWheelHour] = useState(9);
+  const [wheelMinute, setWheelMinute] = useState(0);
+  const [wheelAmPm, setWheelAmPm] = useState<"AM" | "PM">("AM");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>(
     [],
@@ -256,592 +266,17 @@ export default function CreateBusinessPostScreen() {
     setEndTimeText("");
     setShowStartTimePicker(false);
     setShowEndTimePicker(false);
+    setShowTimeWheelPicker(false);
     setSelectedCategory("");
     setSelectedSubcategories([]);
-    setTicketsEnabled(false);
-    setPasses([]);
-    setSelectedAdditionalSettings([]);
-    setAdditionalDetails({});
-    setCustomAdditionalInfo([]);
-    setWomenOnly(false);
-    setHideGuestListFromViewers(false);
-    setShareToAnnouncementGroup(false);
-    setShowPreview(false);
-    setEditMode(false);
-    setPlanId(null);
-    setShowTicketPreview(false);
-    setPreviewPassIndex(0);
-    setFormId(null);
-    setAttachFormEnabled(false);
-    setSelectedForm(null);
-    setLimitRegistrationEnabled(false);
-    setRegistrationLimit("");
-    isEditFlowRef.current = false;
-  }, []);
+    setShowPostSuccessModal(false);
+    setCreatedPlanIdForSuccess(null);
+  }, [setSelectedSubcategories]);
 
-  // Do not reset form when screen gains focus with no saved draft – avoids clearing user input when they open Create Plan at start or return to the screen
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      AsyncStorage.getItem("planForCreation").then((planDataStr) => {
-        if (cancelled) return;
-        if (planDataStr) return;
-        if (isEditFlowRef.current) return;
-        // Previously we called resetForm() here, which cleared the form (including start time) every time the screen was focused without a draft. Removed so the plan is not cancelled/cleared when the user opens the screen.
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, []),
-  );
-
-  useEffect(() => {
-    if (user?.session_id && !currentUser) {
-      dispatch(fetchCurrentUser(user.session_id));
-    }
-  }, [user, currentUser, dispatch]);
-
-  useEffect(() => {
-    if (!isBusinessUser && currentUser) {
-      Alert.alert(
-        "Access Denied",
-        "Only business users can create business plans",
-        [{ text: "OK", onPress: () => router.back() }],
-      );
-    }
-  }, [isBusinessUser, currentUser, router]);
-
-  // Load plan data from AsyncStorage if available (for duplicate/edit)
-  useEffect(() => {
-    const loadPlanData = async () => {
-      try {
-        const planDataStr = await AsyncStorage.getItem("planForCreation");
-        if (planDataStr) {
-          openedFromMyPlansRef.current = true;
-          const planData = JSON.parse(planDataStr);
-          const isEdit = planData.mode === "edit";
-          if (isEdit) isEditFlowRef.current = true;
-          setEditMode(isEdit);
-          if (isEdit) {
-            setPlanId(planData.plan_id);
-          }
-
-          // Pre-fill form fields
-          if (planData.title) setTitle(planData.title);
-          if (planData.description) setDescription(planData.description);
-          if (planData.location_text) setLocation(planData.location_text);
-          if (planData.category_main) {
-            const raw = String(planData.category_main || "").trim();
-            const normalized = raw
-              ? raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-              : "";
-            setSelectedCategory(normalized);
-          }
-          if (planData.category_sub && Array.isArray(planData.category_sub)) {
-            setSelectedSubcategories(planData.category_sub);
-          }
-          if (planData.is_women_only) setWomenOnly(planData.is_women_only);
-          if (planData.allow_view_guest_list === false)
-            setHideGuestListFromViewers(true);
-          else if (planData.allow_view_guest_list)
-            setHideGuestListFromViewers(false);
-          if (planData.reshare_to_announcement_group)
-            setShareToAnnouncementGroup(planData.reshare_to_announcement_group);
-
-          // Handle date
-          if (planData.date) {
-            setSelectedDate(new Date(planData.date));
-          }
-
-          // Handle time
-          if (planData.time) {
-            setTimeEnabled(true);
-            setStartTimeText(planData.time);
-            const timeMatch = planData.time.match(/(\d+):(\d+)\s*(AM|PM)/i);
-            if (timeMatch) {
-              setStartAmPm(timeMatch[3].toUpperCase() as "AM" | "PM");
-              let hours = parseInt(timeMatch[1], 10);
-              const minutes = parseInt(timeMatch[2], 10);
-              if (timeMatch[3].toUpperCase() === "PM" && hours !== 12)
-                hours += 12;
-              if (timeMatch[3].toUpperCase() === "AM" && hours === 12)
-                hours = 0;
-              const timeDate = new Date();
-              timeDate.setHours(hours, minutes, 0, 0);
-              setStartTime(timeDate);
-            }
-            if (planData.end_time) {
-              setEndTimeText(planData.end_time);
-              const endMatch = planData.end_time.match(
-                /(\d+):(\d+)\s*(AM|PM)/i,
-              );
-              if (endMatch) {
-                setEndAmPm(endMatch[3].toUpperCase() as "AM" | "PM");
-                let hours = parseInt(endMatch[1], 10);
-                const minutes = parseInt(endMatch[2], 10);
-                if (endMatch[3].toUpperCase() === "PM" && hours !== 12)
-                  hours += 12;
-                if (endMatch[3].toUpperCase() === "AM" && hours === 12)
-                  hours = 0;
-                const timeDate = new Date();
-                timeDate.setHours(hours, minutes, 0, 0);
-                setEndTime(timeDate);
-              }
-            }
-          }
-
-          // Handle passes/tickets (normalize pass media to { uri, type }); mark as existing so they can't be removed/edited
-          if (planData.passes && planData.passes.length > 0) {
-            setTicketsEnabled(true);
-            setPasses(
-              planData.passes.map((p: any) => ({
-                ...p,
-                isExisting: true,
-                media:
-                  p.media && p.media.length > 0
-                    ? [
-                        {
-                          uri:
-                            typeof p.media[0] === "string"
-                              ? p.media[0]
-                              : p.media[0].url,
-                          type: "image" as const,
-                        },
-                      ]
-                    : undefined,
-              })),
-            );
-          }
-
-          // Handle additional details (additional_info may have heading + description)
-          if (planData.add_details && planData.add_details.length > 0) {
-            const settings: string[] = [];
-            const details: {
-              [key: string]: { title: string; description: string };
-            } = {};
-            const customInfos: Array<{
-              id: string;
-              heading: string;
-              description: string;
-            }> = [];
-
-            planData.add_details.forEach((detail: any) => {
-              const isAdditionalInfo = detail.detail_type === "additional_info";
-              const isPredefinedSetting = [
-                "distance",
-                "starting_point",
-                "f&b",
-                "dress_code",
-                "music_type",
-                "strava_link",
-                "links",
-                "google_drive_link",
-              ].includes(detail.detail_type);
-
-              if (isAdditionalInfo && !isPredefinedSetting) {
-                // Custom additional info
-                customInfos.push({
-                  id: `custom_${Date.now()}_${Math.random()}`,
-                  heading: detail.heading || detail.title || "",
-                  description: detail.description || "",
-                });
-              } else {
-                // Predefined settings
-                settings.push(detail.detail_type);
-                details[detail.detail_type] = {
-                  title: isAdditionalInfo
-                    ? (detail.heading ?? detail.title ?? "")
-                    : (detail.title ?? ""),
-                  description: detail.description || "",
-                };
-              }
-            });
-            setSelectedAdditionalSettings(settings);
-            setAdditionalDetails(details);
-            setCustomAdditionalInfo(customInfos);
-          }
-
-          // Handle media
-          if (planData.media && planData.media.length > 0) {
-            const mediaItems = planData.media.map((item: any) => ({
-              uri: item.url,
-              type:
-                item.type === "video" ? ("video" as const) : ("image" as const),
-            }));
-            setMedia(mediaItems);
-          }
-
-          // Handle form_id
-          if (planData.form_id) {
-            setFormId(planData.form_id);
-            setAttachFormEnabled(true);
-          }
-
-          // Handle registration limit
-          if (planData.registration_limit) {
-            setLimitRegistrationEnabled(true);
-            setRegistrationLimit(String(planData.registration_limit));
-          }
-
-          // Clear AsyncStorage after loading
-          await AsyncStorage.removeItem("planForCreation");
-        }
-      } catch (error) {
-        console.error("Error loading plan data:", error);
-      }
-    };
-
-    loadPlanData();
-  }, []);
-
-  // Fetch selected form details when formId changes
-  useEffect(() => {
-    const fetchForm = async () => {
-      if (formId && user?.user_id) {
-        try {
-          const response = await apiService.getForm(formId);
-          if (response.success && response.data) {
-            setSelectedForm(response.data);
-            if (Array.isArray(response.data?.fields)) {
-              setDraftFormFields(response.data.fields);
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching form:", error);
-        }
-      } else {
-        setSelectedForm(null);
-        setDraftFormFields([]);
-      }
-    };
-    fetchForm();
-  }, [formId, user?.user_id]);
-
-  const MAX_MEDIA = 5;
-
-  const handleAddMedia = () => {
-    if (media.length >= MAX_MEDIA) {
-      Alert.alert(
-        "Limit reached",
-        `You can add up to ${MAX_MEDIA} images per post.`,
-      );
-      return;
-    }
-    Alert.alert("Add Image", "Choose source", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Camera", onPress: () => handleAddMediaFromSource("camera") },
-      { text: "Gallery", onPress: () => handleAddMediaFromSource("gallery") },
-    ]);
-  };
-
-  const handleAddMediaFromSource = async (source: "camera" | "gallery") => {
-    try {
-      let result;
-      if (source === "camera") {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Permission needed",
-            "Please grant camera permission to take photos.",
-          );
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-      } else {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Permission needed",
-            "Please grant photo library permission.",
-          );
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsMultipleSelection: true,
-          allowsEditing: false,
-          selectionLimit: MAX_MEDIA - media.length,
-          quality: 0.8,
-        });
-      }
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const newItems = result.assets
-          .slice(0, MAX_MEDIA - media.length)
-          .map((asset) => ({
-            uri: asset.uri,
-            type: "image" as const,
-          }));
-        setMedia((prev) => [...prev, ...newItems].slice(0, MAX_MEDIA));
-      }
-    } catch (error) {
-      console.error("Error picking media:", error);
-      Alert.alert("Error", "Failed to pick media");
-    }
-  };
-
-  const handleFormEditorSave = async (fields: FormField[]) => {
-    if (!user?.user_id) {
-      Alert.alert("Error", "User ID not available");
-      return;
-    }
-
-    setSavingForm(true);
-    try {
-      const response = await apiService.createForm({
-        user_id: user.user_id,
-        name: selectedForm?.name ? `${selectedForm.name} (Edited)` : `Form ${new Date().toLocaleDateString()}`,
-        description: "Custom registration form",
-        fields,
-      });
-
-      if (response.success && response.data?.form_id) {
-        setFormId(response.data.form_id);
-        setDraftFormFields(fields);
-        setSelectedForm({
-          form_id: response.data.form_id,
-          name: selectedForm?.name ? `${selectedForm.name} (Edited)` : `Form ${new Date().toLocaleDateString()}`,
-          fields,
-        });
-        setShowFormEditor(false);
-        Alert.alert("Success", "Form updated");
-      } else {
-        Alert.alert("Error", "Failed to update form");
-      }
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        error instanceof Error ? error.message : "Failed to update form",
-      );
-    } finally {
-      setSavingForm(false);
-    }
-  };
-
-  const removeMedia = (index?: number) => {
-    if (index !== undefined) {
-      setMedia((prev) => prev.filter((_, i) => i !== index));
-    } else {
-      setMedia([]);
-    }
-  };
-
-  const handleAddPassImage = (passIndex: number) => {
-    Alert.alert("Add Image", "Choose source", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Camera",
-        onPress: () => handleAddPassImageFromSource(passIndex, "camera"),
-      },
-      {
-        text: "Gallery",
-        onPress: () => handleAddPassImageFromSource(passIndex, "gallery"),
-      },
-    ]);
-  };
-
-  const handleAddPassImageFromSource = async (
-    passIndex: number,
-    source: "camera" | "gallery",
-  ) => {
-    try {
-      let result;
-      if (source === "camera") {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Permission needed",
-            "Please grant camera permission to take photos.",
-          );
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-      } else {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(
-            "Permission needed",
-            "Please grant photo library permission.",
-          );
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsMultipleSelection: false,
-          allowsEditing: false,
-          quality: 0.8,
-        });
-      }
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const updated = [...passes];
-        updated[passIndex] = {
-          ...updated[passIndex],
-          media: [{ uri: result.assets[0].uri, type: "image" as const }],
-        };
-        setPasses(updated);
-      }
-    } catch (error) {
-      console.error("Error picking pass image:", error);
-      Alert.alert("Error", "Failed to pick image");
-    }
-  };
-
-  const removePassImage = (passIndex: number) => {
-    const updated = [...passes];
-    updated[passIndex] = { ...updated[passIndex], media: undefined };
-    setPasses(updated);
-  };
-
-  const addPass = () => {
-    const newPass: Pass = {
-      pass_id: `pass_${Date.now()}`,
-      name: "",
-      price: -1,
-      description: "",
-      capacity: 1,
-    };
-    setPasses([...passes, newPass]);
-  };
-
-  const updatePass = (index: number, field: keyof Pass, value: any) => {
-    const updated = [...passes];
-    updated[index] = { ...updated[index], [field]: value };
-    setPasses(updated);
-  };
-
-  const removePass = (index: number) => {
-    setPasses(passes.filter((_, i) => i !== index));
-  };
-
-  const toggleAdditionalSetting = (settingId: string) => {
-    if (selectedAdditionalSettings.includes(settingId)) {
-      setSelectedAdditionalSettings(
-        selectedAdditionalSettings.filter((id) => id !== settingId),
-      );
-      const updated = { ...additionalDetails };
-      delete updated[settingId];
-      setAdditionalDetails(updated);
-    } else {
-      setSelectedAdditionalSettings([...selectedAdditionalSettings, settingId]);
-      setAdditionalDetails({
-        ...additionalDetails,
-        [settingId]: { title: "", description: "" },
-      });
-    }
-  };
-
-  // Form handlers
-  const handleFormSelectorSelect = async (selectedFormId: string) => {
-    setFormId(selectedFormId);
-    setShowFormSelector(false);
-  };
-
-  const attachMostRecentForm = useCallback(async () => {
-    if (!user?.user_id) return;
-    try {
-      const res = await apiService.getUserForms(user.user_id);
-      const forms = (res as any)?.data?.forms ?? [];
-      if (!Array.isArray(forms) || forms.length === 0) return;
-
-      const sorted = [...forms].sort((a: any, b: any) => {
-        const ad = a?.created_at ? new Date(a.created_at).getTime() : 0;
-        const bd = b?.created_at ? new Date(b.created_at).getTime() : 0;
-        return bd - ad;
-      });
-
-      const mostRecent = sorted[0] ?? forms[forms.length - 1];
-      if (mostRecent?.form_id) {
-        setFormId(mostRecent.form_id);
-      }
-
-      if (Array.isArray(mostRecent?.fields) && mostRecent.fields.length > 0) {
-        setMostRecentFormFields(mostRecent.fields);
-      } else {
-        // fallback: fetch full form if fields are not included in list response
-        try {
-          if (mostRecent?.form_id) {
-            const formRes = await apiService.getForm(mostRecent.form_id);
-            const full = (formRes as any)?.data;
-            if (Array.isArray(full?.fields)) {
-              setMostRecentFormFields(full.fields);
-            }
-          }
-        } catch {
-          setMostRecentFormFields([]);
-        }
-      }
-    } catch {
-      // silent: attaching form is optional
-    }
-  }, [user?.user_id]);
-
-  const handleFormBuilderSave = async (fields: FormField[]) => {
-    if (!user?.user_id) {
-      Alert.alert("Error", "User ID not available");
-      return;
-    }
-
-    setSavingForm(true);
-    try {
-      const response = await apiService.createForm({
-        user_id: user.user_id,
-        name: `Form ${new Date().toLocaleDateString()}`,
-        description: "Custom registration form",
-        fields: fields,
-      });
-
-      if (response.success && response.data?.form_id) {
-        setFormId(response.data.form_id);
-        setShowFormBuilder(false);
-        Alert.alert("Success", "Form created successfully");
-      } else {
-        Alert.alert("Error", "Failed to create form");
-      }
-    } catch (error) {
-      Alert.alert(
-        "Error",
-        error instanceof Error ? error.message : "Failed to create form",
-      );
-    } finally {
-      setSavingForm(false);
-    }
-  };
-
-  const formatTime = (date: Date | null): string => {
-    if (!date) return "";
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? "PM" : "AM";
-    const displayHours = hours % 12 || 12;
-    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${ampm}`;
-  };
-
-  const parseTimeText = (text: string): Date | null => {
-    const timeMatch = text.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (!timeMatch) return null;
-    let hours = parseInt(timeMatch[1], 10);
-    const minutes = Math.min(59, Math.max(0, parseInt(timeMatch[2], 10)));
-    const ampm = timeMatch[3].toUpperCase();
-    if (ampm === "PM" && hours !== 12) hours += 12;
-    if (ampm === "AM" && hours === 12) hours = 0;
-    hours = Math.min(23, Math.max(0, hours));
-    const date = new Date();
-    date.setHours(hours, minutes, 0, 0);
-    return date;
-  };
-
-  const normalizeTimeInput = (raw: string): string => {
-    const cleaned = raw.replace(/[^0-9:]/g, "");
+  const normalizeTimeInput = (raw: string) => {
+    const cleaned = raw.replace(/[^\d:]/g, "");
     if (!cleaned) return "";
+
     if (cleaned.includes(":")) {
       const parts = cleaned.split(":");
       const h = parts[0] ?? "";
@@ -862,6 +297,66 @@ export default function CreateBusinessPostScreen() {
     return cleaned.slice(0, 5);
   };
 
+  const formatTime = (d: Date) => {
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const h12 = hours % 12 || 12;
+    const mm = String(minutes).padStart(2, "0");
+    return `${h12}:${mm} ${ampm}`;
+  };
+
+  const parseTimeText = (timeText: string): Date | null => {
+    if (!timeText) return null;
+    const match = timeText.match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!match) return null;
+    let hour = parseInt(match[1], 10);
+    const minute = parseInt(match[2], 10);
+    const ampm = match[3].toUpperCase();
+
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+    if (minute < 0 || minute > 59) return null;
+    if (hour < 1 || hour > 12) return null;
+
+    if (ampm === "PM" && hour !== 12) hour += 12;
+    if (ampm === "AM" && hour === 12) hour = 0;
+
+    const d = new Date();
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+
+  const openTimeWheel = (target: "start" | "end") => {
+    setTimeWheelTarget(target);
+    const currentText = target === "start" ? startTimeText : endTimeText;
+    const currentAmPm = target === "start" ? startAmPm : endAmPm;
+    const base = currentText.replace(/\s*AM|PM/i, "").trim();
+    const match = base.match(/^(\d{1,2}):(\d{2})$/);
+    const h = match ? Math.min(12, Math.max(1, Number(match[1]))) : 9;
+    const m = match ? Math.min(59, Math.max(0, Number(match[2]))) : 0;
+    setWheelHour(h);
+    setWheelMinute(m);
+    setWheelAmPm(currentAmPm);
+    setShowTimeWheelPicker(true);
+  };
+
+  const saveTimeWheel = () => {
+    const mm = String(wheelMinute).padStart(2, "0");
+    const value = `${wheelHour}:${mm} ${wheelAmPm}`;
+    const parsed = parseTimeText(value);
+
+    if (timeWheelTarget === "start") {
+      setStartAmPm(wheelAmPm);
+      setStartTimeText(value);
+      if (parsed) setStartTime(parsed);
+    } else {
+      setEndAmPm(wheelAmPm);
+      setEndTimeText(value);
+      if (parsed) setEndTime(parsed);
+    }
+    setShowTimeWheelPicker(false);
+  };
+
   // utility to validate URLs (used by the Strava field)
   const isValidUrl = (text: string) => {
     try {
@@ -869,6 +364,211 @@ export default function CreateBusinessPostScreen() {
       return true;
     } catch {
       return false;
+    }
+  };
+
+  const handleAddMediaFromSource = async (source: "camera" | "gallery") => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Permission needed",
+            "Please grant camera permission to take photos.",
+          );
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          quality: 0.8,
+        });
+      } else {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission needed", "Please grant photo permission.");
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.All,
+          allowsMultipleSelection: true,
+          allowsEditing: false,
+          quality: 0.8,
+          selectionLimit: Math.max(0, MAX_MEDIA - media.length),
+        });
+      }
+
+      if (!result.canceled && result.assets) {
+        const newMedia = result.assets
+          .slice(0, Math.max(0, MAX_MEDIA - media.length))
+          .map((asset) => ({
+            uri: asset.uri,
+            type:
+              asset.type === "video"
+                ? ("video" as const)
+                : ("image" as const),
+          }));
+        setMedia((prev) => [...prev, ...newMedia]);
+      }
+    } catch (error) {
+      console.error("Error picking media:", error);
+    }
+  };
+
+  const handleAddMedia = () => {
+    Alert.alert("Add Media", "Choose source", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Camera", onPress: () => handleAddMediaFromSource("camera") },
+      {
+        text: "Gallery",
+        onPress: () => handleAddMediaFromSource("gallery"),
+      },
+    ]);
+  };
+
+  const removeMedia = (index: number) => {
+    setMedia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addPass = () => {
+    const newPass: Pass = {
+      pass_id: `pass_${Date.now()}_${Math.random()}`,
+      name: "",
+      price: -1,
+      description: "",
+      media: [],
+    };
+    setPasses((prev) => [...prev, newPass]);
+  };
+
+  const updatePass = (index: number, key: keyof Pass, value: any) => {
+    setPasses((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  };
+
+  const removePass = (index: number) => {
+    setPasses((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddPassImage = async (passIndex: number) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission needed", "Please grant photo permission.");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        const uri = result.assets[0].uri;
+        updatePass(passIndex, "media", [{ uri, type: "image" }]);
+      }
+    } catch (e) {
+      console.error("Error picking pass image:", e);
+    }
+  };
+
+  const removePassImage = (passIndex: number) => {
+    updatePass(passIndex, "media", []);
+  };
+
+  const toggleAdditionalSetting = (settingId: string) => {
+    if (settingId === "strava_link" && selectedCategory !== "Running") {
+      return;
+    }
+    setSelectedAdditionalSettings((prev) => {
+      const exists = prev.includes(settingId);
+      const next = exists ? prev.filter((id) => id !== settingId) : [...prev, settingId];
+      return next;
+    });
+    setAdditionalDetails((prev) => {
+      if (prev[settingId]) {
+        const { [settingId]: _removed, ...rest } = prev;
+        return rest;
+      }
+      const placeholder =
+        ADDITIONAL_SETTINGS.find((s) => s.id === settingId)?.placeholder ?? "";
+      return {
+        ...prev,
+        [settingId]: { title: "", description: placeholder ? "" : "" },
+      };
+    });
+  };
+
+  const handleFormSelectorSelect = async (selectedFormId: string) => {
+    try {
+      setSavingForm(true);
+      setShowFormSelector(false);
+      setFormId(selectedFormId);
+      const resp = await apiService.getForm(selectedFormId);
+      const f = (resp as any)?.data;
+      const name = f?.name ?? "";
+      const fields = Array.isArray(f?.fields) ? (f.fields as FormField[]) : [];
+      setSelectedForm({ form_id: selectedFormId, name, fields });
+      setDraftFormFields(fields);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to load form");
+      setFormId(null);
+      setSelectedForm(null);
+      setDraftFormFields([]);
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleFormBuilderSave = async (fields: FormField[]) => {
+    try {
+      setSavingForm(true);
+      const payload = {
+        user_id: user?.user_id,
+        name: "Untitled Form",
+        fields,
+      };
+      const resp = await apiService.createForm(payload as any);
+      const createdId = (resp as any)?.data?.form_id;
+      if (createdId) {
+        setFormId(createdId);
+        setSelectedForm({ form_id: createdId, name: payload.name, fields });
+        setDraftFormFields(fields);
+      }
+      setMostRecentFormFields(fields);
+      setShowFormBuilder(false);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to save form");
+    } finally {
+      setSavingForm(false);
+    }
+  };
+
+  const handleFormEditorSave = async (fields: FormField[]) => {
+    try {
+      setSavingForm(true);
+      const baseName = selectedForm?.name || "Edited Form";
+      const payload = {
+        user_id: user?.user_id,
+        name: baseName,
+        fields,
+      };
+      const resp = await apiService.createForm(payload as any);
+      const createdId = (resp as any)?.data?.form_id;
+      if (createdId) {
+        setFormId(createdId);
+        setSelectedForm({ form_id: createdId, name: payload.name, fields });
+      }
+      setDraftFormFields(fields);
+      setShowFormEditor(false);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Failed to save form");
+    } finally {
+      setSavingForm(false);
     }
   };
 
@@ -1552,24 +1252,21 @@ export default function CreateBusinessPostScreen() {
             {timeEnabled && (
               <>
                 <View style={[styles.timeRow, styles.timeRowCompact]}>
-                  <TextInput
-                    style={[styles.input, styles.timeInput]}
-                    placeholder="8:00"
-                    value={startTimeText.replace(/\s*AM|PM/i, "").trim()}
-                    onChangeText={(text) => {
-                      const cleaned = normalizeTimeInput(text);
-                      setStartTimeText(
-                        cleaned ? `${cleaned} ${startAmPm}` : "",
-                      );
-                      const parsed = parseTimeText(
-                        cleaned ? `${cleaned} ${startAmPm}` : "",
-                      );
-                      if (parsed) setStartTime(parsed);
-                    }}
-                    placeholderTextColor="#999"
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={5}
-                  />
+                  <TouchableOpacity
+                    style={[styles.input, styles.timeInput, styles.timeWheelTap]}
+                    onPress={() => openTimeWheel("start")}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={
+                        startTimeText
+                          ? styles.inputText
+                          : styles.inputPlaceholder
+                      }
+                    >
+                      {startTimeText ? startTimeText : "Select start time"}
+                    </Text>
+                  </TouchableOpacity>
                   <View style={styles.amPmBox}>
                     <TouchableOpacity
                       style={[
@@ -1622,22 +1319,21 @@ export default function CreateBusinessPostScreen() {
                   </View>
                 </View>
                 <View style={[styles.timeRow, styles.timeRowCompact]}>
-                  <TextInput
-                    style={[styles.input, styles.timeInput]}
-                    placeholder="End time (optional)"
-                    value={endTimeText.replace(/\s*AM|PM/i, "").trim()}
-                    onChangeText={(text) => {
-                      const cleaned = normalizeTimeInput(text);
-                      setEndTimeText(cleaned ? `${cleaned} ${endAmPm}` : "");
-                      const parsed = parseTimeText(
-                        cleaned ? `${cleaned} ${endAmPm}` : "",
-                      );
-                      if (parsed) setEndTime(parsed);
-                    }}
-                    placeholderTextColor="#999"
-                    keyboardType="numbers-and-punctuation"
-                    maxLength={5}
-                  />
+                  <TouchableOpacity
+                    style={[styles.input, styles.timeInput, styles.timeWheelTap]}
+                    onPress={() => openTimeWheel("end")}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={
+                        endTimeText
+                          ? styles.inputText
+                          : styles.inputPlaceholder
+                      }
+                    >
+                      {endTimeText ? endTimeText : "Select end time (optional)"}
+                    </Text>
+                  </TouchableOpacity>
                   <View style={styles.amPmBox}>
                     <TouchableOpacity
                       style={[
@@ -1692,6 +1388,80 @@ export default function CreateBusinessPostScreen() {
               </>
             )}
           </View>
+
+          <Modal
+            visible={showTimeWheelPicker}
+            transparent
+            animationType="slide"
+            onRequestClose={() => setShowTimeWheelPicker(false)}
+          >
+            <View style={styles.timeWheelOverlay}>
+              <View style={styles.timeWheelSheet}>
+                <View style={styles.timeWheelHeader}>
+                  <TouchableOpacity
+                    onPress={() => setShowTimeWheelPicker(false)}
+                    style={styles.timeWheelHeaderButton}
+                  >
+                    <Text style={styles.timeWheelHeaderButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.timeWheelTitle}>
+                    {timeWheelTarget === "start" ? "Start Time" : "End Time"}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={saveTimeWheel}
+                    style={styles.timeWheelHeaderButton}
+                  >
+                    <Text
+                      style={[
+                        styles.timeWheelHeaderButtonText,
+                        styles.timeWheelSaveText,
+                      ]}
+                    >
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.timeWheelRow}>
+                  <View style={styles.timeWheelColumn}>
+                    <Picker
+                      selectedValue={wheelHour}
+                      onValueChange={(v) => setWheelHour(Number(v))}
+                      itemStyle={styles.timeWheelItem}
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                        <Picker.Item key={h} label={String(h)} value={h} />
+                      ))}
+                    </Picker>
+                  </View>
+
+                  <View style={styles.timeWheelColumn}>
+                    <Picker
+                      selectedValue={wheelMinute}
+                      onValueChange={(v) => setWheelMinute(Number(v))}
+                      itemStyle={styles.timeWheelItem}
+                    >
+                      {Array.from({ length: 60 }, (_, i) => i).map((m) => {
+                        const label = String(m).padStart(2, "0");
+                        return <Picker.Item key={m} label={label} value={m} />;
+                      })}
+                    </Picker>
+                  </View>
+
+                  <View style={styles.timeWheelColumn}>
+                    <Picker
+                      selectedValue={wheelAmPm}
+                      onValueChange={(v) => setWheelAmPm(v as "AM" | "PM")}
+                      itemStyle={styles.timeWheelItem}
+                    >
+                      <Picker.Item label="AM" value="AM" />
+                      <Picker.Item label="PM" value="PM" />
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* Category – icons in pills; pills white when unselected */}
           <View style={[styles.section, styles.sectionCard]}>
@@ -3011,6 +2781,9 @@ const styles = StyleSheet.create({
     flex: 1,
     marginBottom: 0,
   },
+  timeWheelTap: {
+    justifyContent: "center",
+  },
   amPmBox: {
     flexDirection: "row",
     backgroundColor: "transparent",
@@ -3022,6 +2795,55 @@ const styles = StyleSheet.create({
   amPmOption: {
     paddingVertical: 12,
     paddingHorizontal: 20,
+  },
+  timeWheelOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.35)",
+  },
+  timeWheelSheet: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 16,
+  },
+  timeWheelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#EEE",
+  },
+  timeWheelHeaderButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  timeWheelHeaderButtonText: {
+    fontSize: 16,
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+  timeWheelSaveText: {
+    color: "#8B5CF6",
+  },
+  timeWheelTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  timeWheelRow: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
+  timeWheelColumn: {
+    flex: 1,
+  },
+  timeWheelItem: {
+    fontSize: 22,
+    height: 180,
   },
   amPmOptionSelected: {
     backgroundColor: "#1C1C1E",

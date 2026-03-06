@@ -156,7 +156,7 @@ export default function SignupProfileScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.title}>Finally!</Text>
-                <Text style={styles.subtitle}>Let's hear about you</Text>
+                <Text style={styles.subtitle}>Let’s hear about you</Text>
             </View>
 
             {/* Profile Image */}

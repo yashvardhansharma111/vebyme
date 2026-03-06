@@ -15,8 +15,9 @@
 
 const fs = require('fs');
 const path = require('path');
+const { Buffer } = require('buffer');
 
-const projectRoot = path.resolve(__dirname, '..');
+const projectRoot = process.cwd();
 const credentialsPath = path.join(projectRoot, 'credentials.json');
 const outputDir = path.join(projectRoot, 'android', 'keystores');
 const defaultKeystoreFileName = 'upload-keystore.jks';

@@ -163,7 +163,7 @@ function SavedPlanCard({
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.joinButton, joinDisabled && styles.joinButtonDisabled]}
-            onPress={joinDisabled ? undefined : () => onJoinPress?.(plan)}
+            onPress={joinDisabled ? undefined : () => onJoinPress?.(plan.post_id)}
             disabled={joinDisabled}
           >
             <Text style={[styles.joinButtonText, joinDisabled && styles.joinButtonTextDisabled]}>Join</Text>
@@ -245,7 +245,7 @@ export default function SavedPlansScreen() {
         {plans.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No saved plans</Text>
-            <Text style={styles.emptySubtext}>Save plans you're interested in!</Text>
+            <Text style={styles.emptySubtext}>Save plans you’re interested in!</Text>
           </View>
         ) : (
           plans.map((plan) => {

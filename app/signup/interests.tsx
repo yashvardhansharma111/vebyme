@@ -142,7 +142,7 @@ export default function SignupInterestsScreen() {
             {isSubmitting ? (
               <ActivityIndicator color="#FFF" />
             ) : (
-              <Text style={styles.buttonText}>Let's Go</Text>
+              <Text style={styles.buttonText}>Let’s Go</Text>
             )}
           </TouchableOpacity>
         </View>

@@ -225,7 +225,7 @@ export default function MyProfileScreen() {
         {/* Blur View acts as the overlay background */}
         <BlurView intensity={25} tint="dark" style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>You're about to delete your account !</Text>
+            <Text style={styles.modalTitle}>You’re about to delete your account!</Text>
             <Text style={styles.modalDescription}>
               Deleting your account will permanently remove all your data.
             </Text>

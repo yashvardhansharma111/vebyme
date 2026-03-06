@@ -99,7 +99,7 @@ export default function PostInteractionModal({
             </View>
 
             <Text style={styles.description}>
-              Let the host know you're interested in joining this plan.
+              Let the host know you&rsquo;re interested in joining this plan.
             </Text>
 
             {/* Toggle Tabs (Visual separation) */}

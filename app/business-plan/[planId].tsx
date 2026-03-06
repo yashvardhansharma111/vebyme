@@ -683,7 +683,7 @@ export default function BusinessPlanDetailScreen() {
           {plan.allow_view_guest_list !== false && (plan.joins_count ?? 0) > 3 && (
             <TouchableOpacity style={styles.attendeesCard} onPress={() => setShowGuestListModal(true)} activeOpacity={0.9}>
               <View style={styles.attendeesTextBlock}>
-                <Text style={styles.attendeesTitle}>See who's coming</Text>
+                <Text style={styles.attendeesTitle}>See who’s coming</Text>
                 <Text style={styles.attendeesSubtitle}>Join event to view</Text>
               </View>
               <View style={styles.attendeesAvatars}>
