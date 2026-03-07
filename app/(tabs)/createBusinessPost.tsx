@@ -1428,6 +1428,7 @@ export default function CreateBusinessPostScreen() {
                     <Picker
                       selectedValue={wheelHour}
                       onValueChange={(v) => setWheelHour(Number(v))}
+                      style={styles.timeWheelPicker}
                       itemStyle={styles.timeWheelItem}
                     >
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
@@ -1440,6 +1441,7 @@ export default function CreateBusinessPostScreen() {
                     <Picker
                       selectedValue={wheelMinute}
                       onValueChange={(v) => setWheelMinute(Number(v))}
+                      style={styles.timeWheelPicker}
                       itemStyle={styles.timeWheelItem}
                     >
                       {Array.from({ length: 60 }, (_, i) => i).map((m) => {
@@ -1453,6 +1455,7 @@ export default function CreateBusinessPostScreen() {
                     <Picker
                       selectedValue={wheelAmPm}
                       onValueChange={(v) => setWheelAmPm(v as "AM" | "PM")}
+                      style={styles.timeWheelPicker}
                       itemStyle={styles.timeWheelItem}
                     >
                       <Picker.Item label="AM" value="AM" />
@@ -2781,7 +2784,9 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   timeWheelTap: {
-    justifyContent: "center",
+    // inputs for start/end time should be left aligned rather than centered
+    justifyContent: "flex-start",
+    paddingLeft: 12,
   },
   amPmBox: {
     flexDirection: "row",
@@ -2843,6 +2848,13 @@ const styles = StyleSheet.create({
   timeWheelItem: {
     fontSize: 22,
     height: 180,
+    // ensure text is visible on iOS wheels (default can be white-on-white)
+    color: "#000",
+  },
+  timeWheelPicker: {
+    // give the picker a fixed height so its wheel is visible
+    height: 180,
+    color: "#000",
   },
   amPmOptionSelected: {
     backgroundColor: "#1C1C1E",
