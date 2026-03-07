@@ -12,10 +12,10 @@ import {
   Switch,
   KeyboardAvoidingView,
   Platform,
+  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { Picker } from "@react-native-picker/picker";
 
 export interface FormField {
   field_id: string;
@@ -78,6 +78,8 @@ export default function FormBuilder({
     initialFields.length > 0 ? initialFields : [],
   );
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [showFieldTypeModal, setShowFieldTypeModal] = useState(false);
+  const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
 
   const addField = () => {
     const newField: FormField = {
@@ -171,6 +173,28 @@ export default function FormBuilder({
     onSave(fields);
   };
 
+  const openFieldTypeModal = (index: number) => {
+    setSelectedFieldIndex(index);
+    setShowFieldTypeModal(true);
+  };
+
+  const selectFieldType = (type: UiFieldType) => {
+    if (selectedFieldIndex !== null) {
+      const internal = internalTypeFromUi(type);
+      updateField(selectedFieldIndex, {
+        type: internal,
+        options:
+          internal === "radio" || internal === "checkbox"
+            ? fields[selectedFieldIndex].options && fields[selectedFieldIndex].options.length > 0
+              ? fields[selectedFieldIndex].options
+              : [""]
+            : [],
+      });
+    }
+    setShowFieldTypeModal(false);
+    setSelectedFieldIndex(null);
+  };
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -237,34 +261,15 @@ export default function FormBuilder({
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Field Type *</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={uiTypeFromInternal(field.type)}
-                      onValueChange={(value) => {
-                        const ui = value as UiFieldType;
-                        const internal = internalTypeFromUi(ui);
-                        updateField(index, {
-                          type: internal,
-                          options:
-                            internal === "radio" || internal === "checkbox"
-                              ? field.options && field.options.length > 0
-                                ? field.options
-                                : [""]
-                              : [],
-                        });
-                      }}
-                    >
-                      {(Object.keys(UI_FIELD_TYPE_LABEL) as UiFieldType[]).map(
-                        (t) => (
-                          <Picker.Item
-                            key={t}
-                            label={UI_FIELD_TYPE_LABEL[t]}
-                            value={t}
-                          />
-                        ),
-                      )}
-                    </Picker>
-                  </View>
+                  <TouchableOpacity
+                    style={styles.fieldTypeSelector}
+                    onPress={() => openFieldTypeModal(index)}
+                  >
+                    <Text style={styles.fieldTypeSelectorText}>
+                      {UI_FIELD_TYPE_LABEL[uiTypeFromInternal(field.type)]}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color="#666" />
+                  </TouchableOpacity>
                 </View>
 
                 <View style={styles.fieldGroup}>
@@ -359,6 +364,52 @@ export default function FormBuilder({
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
+      
+      {/* Field Type Modal */}
+      <Modal
+        visible={showFieldTypeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFieldTypeModal(false)}
+      >
+        <View style={styles.fieldTypeOverlay}>
+          <TouchableOpacity 
+            style={styles.fieldTypeBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowFieldTypeModal(false)}
+          />
+          <View style={styles.fieldTypeContainer}>
+            <View style={styles.fieldTypeHeader}>
+              <TouchableOpacity
+                onPress={() => setShowFieldTypeModal(false)}
+                style={styles.fieldTypeCancelButton}
+              >
+                <Text style={styles.fieldTypeCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.fieldTypeTitle}>Select Field Type</Text>
+              <View style={styles.fieldTypeSpacer} />
+            </View>
+            
+            <ScrollView style={styles.fieldTypeList}>
+              {(Object.keys(UI_FIELD_TYPE_LABEL) as UiFieldType[]).map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={styles.fieldTypeOption}
+                  onPress={() => selectFieldType(type)}
+                >
+                  <Text style={styles.fieldTypeOptionText}>
+                    {UI_FIELD_TYPE_LABEL[type]}
+                  </Text>
+                  {selectedFieldIndex !== null && 
+                   uiTypeFromInternal(fields[selectedFieldIndex].type) === type && (
+                    <Ionicons name="checkmark" size={20} color="#007AFF" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 }
@@ -567,5 +618,87 @@ const styles = StyleSheet.create({
     color: "#000000",
     fontSize: 14,
     fontWeight: "600",
+  },
+  // Field type selector styles
+  fieldTypeSelector: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#f9f9f9",
+  },
+  fieldTypeSelectorText: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "500",
+  },
+  // Field type modal styles
+  fieldTypeOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  fieldTypeBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  fieldTypeContainer: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    width: "90%",
+    maxWidth: 320,
+    maxHeight: 300,
+    overflow: "hidden",
+  },
+  fieldTypeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5EA",
+  },
+  fieldTypeCancelButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  fieldTypeCancelText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  fieldTypeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+  },
+  fieldTypeSpacer: {
+    width: 60,
+  },
+  fieldTypeList: {
+    flex: 1,
+  },
+  fieldTypeOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  fieldTypeOptionText: {
+    fontSize: 16,
+    color: "#000",
+    fontWeight: "400",
   },
 });

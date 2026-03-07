@@ -1393,71 +1393,116 @@ export default function CreateBusinessPostScreen() {
           <Modal
             visible={showTimeWheelPicker}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={() => setShowTimeWheelPicker(false)}
           >
-            <View style={styles.timeWheelOverlay}>
-              <View style={styles.timeWheelSheet}>
-                <View style={styles.timeWheelHeader}>
+            <View style={styles.iosTimeOverlay}>
+              <TouchableOpacity 
+                style={styles.iosTimeBackdrop}
+                activeOpacity={1}
+                onPress={() => setShowTimeWheelPicker(false)}
+              />
+              <View style={styles.iosTimeContainer}>
+                <View style={styles.iosTimeHeader}>
                   <TouchableOpacity
                     onPress={() => setShowTimeWheelPicker(false)}
-                    style={styles.timeWheelHeaderButton}
+                    style={styles.iosTimeCancelButton}
                   >
-                    <Text style={styles.timeWheelHeaderButtonText}>Cancel</Text>
+                    <Text style={styles.iosTimeCancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.timeWheelTitle}>
+                  <Text style={styles.iosTimeTitle}>
                     {timeWheelTarget === "start" ? "Start Time" : "End Time"}
                   </Text>
                   <TouchableOpacity
                     onPress={saveTimeWheel}
-                    style={styles.timeWheelHeaderButton}
+                    style={styles.iosTimeConfirmButton}
                   >
-                    <Text
-                      style={[
-                        styles.timeWheelHeaderButtonText,
-                        styles.timeWheelSaveText,
-                      ]}
-                    >
-                      Save
-                    </Text>
+                    <Text style={styles.iosTimeConfirmText}>Done</Text>
                   </TouchableOpacity>
                 </View>
-
-                <View style={styles.timeWheelRow}>
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelHour}
-                      onValueChange={(v) => setWheelHour(Number(v))}
-                      itemStyle={styles.timeWheelItem}
+                
+                <View style={styles.iosTimePickerContainer}>
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                        <Picker.Item key={h} label={String(h)} value={h} />
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                        <TouchableOpacity
+                          key={hour}
+                          style={[
+                            styles.iosTimeOption,
+                            wheelHour === hour && styles.iosTimeOptionSelected
+                          ]}
+                          onPress={() => setWheelHour(hour)}
+                        >
+                          <Text style={[
+                            styles.iosTimeOptionText,
+                            wheelHour === hour && styles.iosTimeOptionTextSelected
+                          ]}>
+                            {hour}
+                          </Text>
+                        </TouchableOpacity>
                       ))}
-                    </Picker>
+                    </ScrollView>
                   </View>
 
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelMinute}
-                      onValueChange={(v) => setWheelMinute(Number(v))}
-                      itemStyle={styles.timeWheelItem}
+                  <Text style={styles.iosTimeSeparator}>:</Text>
+
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      {Array.from({ length: 60 }, (_, i) => i).map((m) => {
-                        const label = String(m).padStart(2, "0");
-                        return <Picker.Item key={m} label={label} value={m} />;
+                      {Array.from({ length: 60 }, (_, i) => i).map((minute) => {
+                        const label = String(minute).padStart(2, "0");
+                        return (
+                          <TouchableOpacity
+                            key={minute}
+                            style={[
+                              styles.iosTimeOption,
+                              wheelMinute === minute && styles.iosTimeOptionSelected
+                            ]}
+                            onPress={() => setWheelMinute(minute)}
+                          >
+                            <Text style={[
+                              styles.iosTimeOptionText,
+                              wheelMinute === minute && styles.iosTimeOptionTextSelected
+                            ]}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
                       })}
-                    </Picker>
+                    </ScrollView>
                   </View>
 
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelAmPm}
-                      onValueChange={(v) => setWheelAmPm(v as "AM" | "PM")}
-                      itemStyle={styles.timeWheelItem}
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      <Picker.Item label="AM" value="AM" />
-                      <Picker.Item label="PM" value="PM" />
-                    </Picker>
+                      {["AM", "PM"].map((period) => (
+                        <TouchableOpacity
+                          key={period}
+                          style={[
+                            styles.iosTimeOption,
+                            wheelAmPm === period && styles.iosTimeOptionSelected
+                          ]}
+                          onPress={() => setWheelAmPm(period as "AM" | "PM")}
+                        >
+                          <Text style={[
+                            styles.iosTimeOptionText,
+                            wheelAmPm === period && styles.iosTimeOptionTextSelected
+                          ]}>
+                            {period}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
                 </View>
               </View>
@@ -2843,6 +2888,98 @@ const styles = StyleSheet.create({
   timeWheelItem: {
     fontSize: 22,
     height: 180,
+    color: "#000000",
+  },
+  // iOS-style time picker styles
+  iosTimeOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  iosTimeBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  iosTimeContainer: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    width: "90%",
+    maxWidth: 320,
+    overflow: "hidden",
+  },
+  iosTimeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5EA",
+  },
+  iosTimeCancelButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  iosTimeCancelText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  iosTimeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+  },
+  iosTimeConfirmButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  iosTimeConfirmText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  iosTimePickerContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  iosTimeColumn: {
+    flex: 1,
+    maxHeight: 200,
+  },
+  iosTimeScroll: {
+    flex: 1,
+  },
+  iosTimeOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  iosTimeOptionSelected: {
+    backgroundColor: "#E3F2FD",
+  },
+  iosTimeOptionText: {
+    fontSize: 18,
+    color: "#000",
+    fontWeight: "400",
+  },
+  iosTimeOptionTextSelected: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  iosTimeSeparator: {
+    fontSize: 24,
+    color: "#000",
+    fontWeight: "600",
+    marginHorizontal: 8,
   },
   amPmOptionSelected: {
     backgroundColor: "#1C1C1E",
