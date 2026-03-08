@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Picker } from "@react-native-picker/picker";
 
 export interface FormField {
   field_id: string;
@@ -84,9 +85,7 @@ export default function FormEditor({
   const [formName, setFormName] = useState(form?.name || "");
   const [formDescription, setFormDescription] = useState(form?.description || "");
   const [fields, setFields] = useState<FormField[]>(form?.fields || []);
-  const [showFieldTypeModal, setShowFieldTypeModal] = useState(false);
-  const [selectedFieldIndex, setSelectedFieldIndex] = useState<number | null>(null);
-
+  
   const addField = () => {
     const newField: FormField = {
       field_id: `field_${Date.now()}_${Math.random()}`,
@@ -189,28 +188,6 @@ export default function FormEditor({
     };
     
     onSave(updatedForm);
-  };
-
-  const openFieldTypeModal = (index: number) => {
-    setSelectedFieldIndex(index);
-    setShowFieldTypeModal(true);
-  };
-
-  const selectFieldType = (type: UiFieldType) => {
-    if (selectedFieldIndex !== null) {
-      const internal = internalTypeFromUi(type);
-      updateField(selectedFieldIndex, {
-        type: internal,
-        options:
-          internal === "radio" || internal === "checkbox"
-            ? fields[selectedFieldIndex].options && fields[selectedFieldIndex].options.length > 0
-              ? fields[selectedFieldIndex].options
-              : [""]
-            : [],
-      });
-    }
-    setShowFieldTypeModal(false);
-    setSelectedFieldIndex(null);
   };
 
   React.useEffect(() => {
@@ -317,18 +294,34 @@ export default function FormEditor({
                   />
                 </View>
 
-                <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Field Type *</Text>
-                  <TouchableOpacity
-                    style={styles.fieldTypeSelector}
-                    onPress={() => openFieldTypeModal(index)}
-                  >
-                    <Text style={styles.fieldTypeSelectorText}>
-                      {UI_FIELD_TYPE_LABEL[uiTypeFromInternal(field.type)]}
-                    </Text>
-                    <Ionicons name="chevron-down" size={16} color="#666" />
-                  </TouchableOpacity>
-                </View>
+<View style={styles.fieldGroup}>
+  <Text style={styles.label}>Field Type *</Text>
+
+  <View style={styles.pickerContainer}>
+    <Picker
+      selectedValue={uiTypeFromInternal(field.type)}
+      onValueChange={(value: UiFieldType) => {
+        const internal = internalTypeFromUi(value);
+
+        updateField(index, {
+          type: internal,
+          options:
+            internal === "radio" || internal === "checkbox"
+              ? field.options?.length
+                ? field.options
+                : [""]
+              : [],
+        });
+      }}
+      mode="dropdown"
+    >
+      <Picker.Item label="Short Answer" value="short" />
+      <Picker.Item label="Long Answer" value="long" />
+      <Picker.Item label="Single Choice" value="single" />
+      <Picker.Item label="Multiple Choice" value="multiple" />
+    </Picker>
+  </View>
+</View>
 
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Placeholder (optional)</Text>
@@ -426,7 +419,7 @@ export default function FormEditor({
       </SafeAreaView>
       
       {/* Field Type Modal */}
-      <Modal
+      {/* <Modal
         visible={showFieldTypeModal}
         transparent
         animationType="fade"
@@ -469,7 +462,7 @@ export default function FormEditor({
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </Modal> */}
     </Modal>
   );
 }
@@ -532,6 +525,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     backgroundColor: "#f9f9f9",
+    justifyContent: "center",
   },
   footerButtonContainer: {
     flexDirection: "row",
