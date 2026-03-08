@@ -85,6 +85,7 @@ export default function FormEditor({
   const [formName, setFormName] = useState(form?.name || "");
   const [formDescription, setFormDescription] = useState(form?.description || "");
   const [fields, setFields] = useState<FormField[]>(form?.fields || []);
+  const [activeFieldIndex, setActiveFieldIndex] = useState<number | null>(null);
   
   const addField = () => {
     const newField: FormField = {
@@ -297,30 +298,16 @@ export default function FormEditor({
 <View style={styles.fieldGroup}>
   <Text style={styles.label}>Field Type *</Text>
 
-  <View style={styles.pickerContainer}>
-    <Picker
-      selectedValue={uiTypeFromInternal(field.type)}
-      onValueChange={(value: UiFieldType) => {
-        const internal = internalTypeFromUi(value);
+  <Pressable
+    style={styles.fieldTypeSelector}
+    onPress={() => setActiveFieldIndex(index)}
+  >
+    <Text style={styles.fieldTypeSelectorText}>
+      {UI_FIELD_TYPE_LABEL[uiTypeFromInternal(field.type)]}
+    </Text>
 
-        updateField(index, {
-          type: internal,
-          options:
-            internal === "radio" || internal === "checkbox"
-              ? field.options?.length
-                ? field.options
-                : [""]
-              : [],
-        });
-      }}
-      mode="dropdown"
-    >
-      <Picker.Item label="Short Answer" value="short" />
-      <Picker.Item label="Long Answer" value="long" />
-      <Picker.Item label="Single Choice" value="single" />
-      <Picker.Item label="Multiple Choice" value="multiple" />
-    </Picker>
-  </View>
+    <Ionicons name="chevron-down" size={18} color="#666" />
+  </Pressable>
 </View>
 
                 <View style={styles.fieldGroup}>
@@ -418,51 +405,56 @@ export default function FormEditor({
         </KeyboardAvoidingView>
       </SafeAreaView>
       
-      {/* Field Type Modal */}
-      {/* <Modal
-        visible={showFieldTypeModal}
+      {/* Hidden Picker Modal */}
+      <Modal
+        visible={activeFieldIndex !== null}
         transparent
-        animationType="fade"
-        onRequestClose={() => setShowFieldTypeModal(false)}
+        animationType="slide"
       >
-        <View style={styles.fieldTypeOverlay}>
-          <TouchableOpacity 
-            style={styles.fieldTypeBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowFieldTypeModal(false)}
-          />
-          <View style={styles.fieldTypeContainer}>
-            <View style={styles.fieldTypeHeader}>
-              <TouchableOpacity
-                onPress={() => setShowFieldTypeModal(false)}
-                style={styles.fieldTypeCancelButton}
-              >
-                <Text style={styles.fieldTypeCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={styles.fieldTypeTitle}>Select Field Type</Text>
-              <View style={styles.fieldTypeSpacer} />
-            </View>
-            
-            <ScrollView style={styles.fieldTypeList}>
-              {(Object.keys(UI_FIELD_TYPE_LABEL) as UiFieldType[]).map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={styles.fieldTypeOption}
-                  onPress={() => selectFieldType(type)}
-                >
-                  <Text style={styles.fieldTypeOptionText}>
-                    {UI_FIELD_TYPE_LABEL[type]}
-                  </Text>
-                  {selectedFieldIndex !== null && 
-                   uiTypeFromInternal(fields[selectedFieldIndex].type) === type && (
-                    <Ionicons name="checkmark" size={20} color="#007AFF" />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+        <Pressable
+          style={styles.pickerOverlay}
+          onPress={() => setActiveFieldIndex(null)}
+        />
+
+        <View style={styles.pickerModal}>
+          <Picker
+            themeVariant="light"
+            itemStyle={{ color: "#000" }}
+            selectedValue={
+              activeFieldIndex !== null
+                ? uiTypeFromInternal(fields[activeFieldIndex].type)
+                : "short"
+            }
+            onValueChange={(value: UiFieldType) => {
+              if (activeFieldIndex !== null) {
+                const internal = internalTypeFromUi(value);
+
+                updateField(activeFieldIndex, {
+                  type: internal,
+                  options:
+                    internal === "radio" || internal === "checkbox"
+                      ? fields[activeFieldIndex].options?.length
+                        ? fields[activeFieldIndex].options
+                        : [""]
+                      : [],
+                });
+              }
+            }}
+          >
+            <Picker.Item label="Short Answer" value="short" color="#000" />
+            <Picker.Item label="Long Answer" value="long" color="#000" />
+            <Picker.Item label="Single Choice" value="single" color="#000" />
+            <Picker.Item label="Multiple Choice" value="multiple" color="#000" />
+          </Picker>
+
+          <Pressable
+            style={styles.doneButton}
+            onPress={() => setActiveFieldIndex(null)}
+          >
+            <Text style={{ fontWeight: "600", fontSize: 16 }}>Done</Text>
+          </Pressable>
         </View>
-      </Modal> */}
+      </Modal>
     </Modal>
   );
 }
@@ -717,5 +709,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#000",
     fontWeight: "400",
+  },
+  
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+
+  pickerModal: {
+    backgroundColor: "#FFF",
+    paddingBottom: 30,
+  },
+
+  doneButton: {
+    alignItems: "center",
+    paddingVertical: 14,
   },
 });

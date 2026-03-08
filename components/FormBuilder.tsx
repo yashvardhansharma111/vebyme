@@ -42,6 +42,7 @@ export default function FormBuilder({
   loading = false,
 }: FormBuilderProps) {
   const [fields, setFields] = useState<FormField[]>(initialFields);
+  const [activeFieldIndex, setActiveFieldIndex] = useState<number | null>(null);
 
   const addField = () => {
     const newField: FormField = {
@@ -139,31 +140,26 @@ export default function FormBuilder({
                   />
                 </View>
 
-                {/* Field Type Picker */}
+                {/* Field Type Selector */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Field Type *</Text>
 
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={field.type}
-                      onValueChange={(value) =>
-                        updateField(index, {
-                          type: value,
-                          options:
-                            value === "radio" || value === "checkbox"
-                              ? field.options?.length
-                                ? field.options
-                                : [""]
-                              : [],
-                        })
-                      }
-                    >
-                      <Picker.Item label="Short Answer" value="text" />
-                      <Picker.Item label="Long Answer" value="textarea" />
-                      <Picker.Item label="Single Choice" value="radio" />
-                      <Picker.Item label="Multiple Choice" value="checkbox" />
-                    </Picker>
-                  </View>
+                  <Pressable
+                    style={styles.fieldTypeRow}
+                    onPress={() => setActiveFieldIndex(index)}
+                  >
+                    <Text style={styles.fieldTypeText}>
+                      {field.type === "text"
+                        ? "Short Answer"
+                        : field.type === "textarea"
+                        ? "Long Answer"
+                        : field.type === "radio"
+                        ? "Single Choice"
+                        : "Multiple Choice"}
+                    </Text>
+
+                    <Ionicons name="chevron-down" size={18} color="#666" />
+                  </Pressable>
                 </View>
 
                 {/* Placeholder */}
@@ -241,6 +237,48 @@ export default function FormBuilder({
             </Pressable>
           </ScrollView>
 
+          {/* Hidden Picker Modal */}
+          <Modal visible={activeFieldIndex !== null} transparent animationType="slide">
+            <Pressable
+              style={styles.pickerOverlay}
+              onPress={() => setActiveFieldIndex(null)}
+            />
+
+            <View style={styles.pickerModal}>
+              <Picker
+                selectedValue={
+                  activeFieldIndex !== null
+                    ? fields[activeFieldIndex].type
+                    : "text"
+                }
+                itemStyle={{ color: "#000000" }}   // ← critical fix
+                onValueChange={(value) => {
+                  if (activeFieldIndex !== null) {
+                    updateField(activeFieldIndex, {
+                      type: value,
+                      options:
+                        value === "radio" || value === "checkbox"
+                          ? [""]
+                          : [],
+                    });
+                  }
+                }}
+              >
+                <Picker.Item label="Short Answer" value="text" color="#000000" />
+                <Picker.Item label="Long Answer" value="textarea" color="#000000" />
+                <Picker.Item label="Single Choice" value="radio" color="#000000" />
+                <Picker.Item label="Multiple Choice" value="checkbox" color="#000000" />
+              </Picker>
+
+              <Pressable
+                style={styles.doneButton}
+                onPress={() => setActiveFieldIndex(null)}
+              >
+                <Text style={{ fontWeight: "600" }}>Done</Text>
+              </Pressable>
+            </View>
+          </Modal>
+
           {/* Footer */}
           <View style={styles.footer}>
             <Pressable style={styles.cancelButton} onPress={onCancel}>
@@ -271,6 +309,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 10,
     marginBottom: 12,
+    marginTop: 30,
     borderWidth: 1,
     borderColor: "#eee",
   },
@@ -301,12 +340,37 @@ const styles = StyleSheet.create({
     backgroundColor: "#f9f9f9",
   },
 
-  pickerContainer: {
+  fieldTypeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
-    overflow: "hidden",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     backgroundColor: "#f9f9f9",
+  },
+
+  fieldTypeText: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "500",
+  },
+
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+
+  pickerModal: {
+    backgroundColor: "#fff",
+    paddingBottom: 30,
+  },
+
+  doneButton: {
+    alignItems: "center",
+    paddingVertical: 12,
   },
 
   optionRow: {
@@ -334,6 +398,7 @@ const styles = StyleSheet.create({
   },
 
   addFieldButton: {
+    marginTop: 35,
     borderWidth: 2,
     borderStyle: "dashed",
     borderColor: "#000",
