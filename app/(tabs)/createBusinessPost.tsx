@@ -1922,12 +1922,13 @@ export default function CreateBusinessPostScreen() {
                 {/* Custom Additional Info */}
                 <View style={styles.whiteCardContainer}>
                   <Text style={styles.cardHeadingAllcaps}>ADDITIONAL INFORMATION</Text>
-                  
+
                   {customAdditionalInfo.map((field, idx) => (
-                    <View key={field.id} style={styles.customInfoCard}>
-                      <View style={styles.customInfoContent}>
+                    <View key={field.id} style={styles.customFieldWrapper}>
+                      <View style={styles.customFieldInputs}>
+                        {/* Box 1: Field Name (Heading) */}
                         <TextInput
-                          style={styles.customInfoInputTop}
+                          style={styles.customInputBox}
                           placeholder={`Field Name ${idx + 1}`}
                           value={field.heading}
                           onChangeText={(text) => {
@@ -1935,10 +1936,12 @@ export default function CreateBusinessPostScreen() {
                             updated[idx] = { ...updated[idx], heading: text };
                             setCustomAdditionalInfo(updated);
                           }}
-                          placeholderTextColor="#A1A1AA"
+                          placeholderTextColor="#8E8E93"
                         />
+
+                        {/* Box 2: Field Value (Description) */}
                         <TextInput
-                          style={styles.customInfoInputBottom}
+                          style={styles.customInputBox}
                           placeholder={idx === 0 ? "e.g. Specify RSVP detail" : "e.g. Equipment needed"}
                           value={field.description}
                           onChangeText={(text) => {
@@ -1946,21 +1949,21 @@ export default function CreateBusinessPostScreen() {
                             updated[idx] = { ...updated[idx], description: text };
                             setCustomAdditionalInfo(updated);
                           }}
-                          placeholderTextColor="#71717A"
+                          placeholderTextColor="#8E8E93"
                         />
                       </View>
-                      
+
                       <TouchableOpacity
                         style={styles.customInfoRemoveIcon}
                         onPress={() =>
                           setCustomAdditionalInfo((prev) => prev.filter((_, i) => i !== idx))
                         }
                       >
-                        <Ionicons name="close" size={20} color="#000" />
+                        <Ionicons name="close" size={24} color="#000" />
                       </TouchableOpacity>
                     </View>
                   ))}
-                  
+
                   <TouchableOpacity
                     style={styles.addCustomInfoButtonOutline}
                     onPress={() => {
@@ -2972,32 +2975,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     letterSpacing: 0.5,
   },
-  customInfoCard: {
-    backgroundColor: "#EBEBED", // Light gray background matching screenshot
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  customFieldWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  customInfoContent: {
+  customFieldInputs: {
     flex: 1,
+    gap: 8, // Adds a visual gap between the field name box and the value box
   },
-  customInfoInputTop: {
-    fontSize: 13,
-    color: "#8E8E93",
-    padding: 0,
-    marginBottom: 4,
-  },
-  customInfoInputBottom: {
+  customInputBox: {
+    backgroundColor: "#EBEBED", // Light gray fill for the boxes
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
     color: "#1C1C1E",
-    padding: 0,
   },
   customInfoRemoveIcon: {
     paddingLeft: 12,
+    paddingRight: 4,
     justifyContent: "center",
+    alignItems: "center",
   },
   addCustomInfoButtonOutline: {
     alignItems: "center",
