@@ -1393,74 +1393,116 @@ export default function CreateBusinessPostScreen() {
           <Modal
             visible={showTimeWheelPicker}
             transparent
-            animationType="slide"
+            animationType="fade"
             onRequestClose={() => setShowTimeWheelPicker(false)}
           >
-            <View style={styles.timeWheelOverlay}>
-              <View style={styles.timeWheelSheet}>
-                <View style={styles.timeWheelHeader}>
+            <View style={styles.iosTimeOverlay}>
+              <TouchableOpacity 
+                style={styles.iosTimeBackdrop}
+                activeOpacity={1}
+                onPress={() => setShowTimeWheelPicker(false)}
+              />
+              <View style={styles.iosTimeContainer}>
+                <View style={styles.iosTimeHeader}>
                   <TouchableOpacity
                     onPress={() => setShowTimeWheelPicker(false)}
-                    style={styles.timeWheelHeaderButton}
+                    style={styles.iosTimeCancelButton}
                   >
-                    <Text style={styles.timeWheelHeaderButtonText}>Cancel</Text>
+                    <Text style={styles.iosTimeCancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.timeWheelTitle}>
+                  <Text style={styles.iosTimeTitle}>
                     {timeWheelTarget === "start" ? "Start Time" : "End Time"}
                   </Text>
                   <TouchableOpacity
                     onPress={saveTimeWheel}
-                    style={styles.timeWheelHeaderButton}
+                    style={styles.iosTimeConfirmButton}
                   >
-                    <Text
-                      style={[
-                        styles.timeWheelHeaderButtonText,
-                        styles.timeWheelSaveText,
-                      ]}
-                    >
-                      Save
-                    </Text>
+                    <Text style={styles.iosTimeConfirmText}>Done</Text>
                   </TouchableOpacity>
                 </View>
-
-                <View style={styles.timeWheelRow}>
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelHour}
-                      onValueChange={(v) => setWheelHour(Number(v))}
-                      style={styles.timeWheelPicker}
-                      itemStyle={styles.timeWheelItem}
+                
+                <View style={styles.iosTimePickerContainer}>
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                        <Picker.Item key={h} label={String(h)} value={h} />
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                        <TouchableOpacity
+                          key={hour}
+                          style={[
+                            styles.iosTimeOption,
+                            wheelHour === hour && styles.iosTimeOptionSelected
+                          ]}
+                          onPress={() => setWheelHour(hour)}
+                        >
+                          <Text style={[
+                            styles.iosTimeOptionText,
+                            wheelHour === hour && styles.iosTimeOptionTextSelected
+                          ]}>
+                            {hour}
+                          </Text>
+                        </TouchableOpacity>
                       ))}
-                    </Picker>
+                    </ScrollView>
                   </View>
 
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelMinute}
-                      onValueChange={(v) => setWheelMinute(Number(v))}
-                      style={styles.timeWheelPicker}
-                      itemStyle={styles.timeWheelItem}
+                  <Text style={styles.iosTimeSeparator}>:</Text>
+
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      {Array.from({ length: 60 }, (_, i) => i).map((m) => {
-                        const label = String(m).padStart(2, "0");
-                        return <Picker.Item key={m} label={label} value={m} />;
+                      {Array.from({ length: 60 }, (_, i) => i).map((minute) => {
+                        const label = String(minute).padStart(2, "0");
+                        return (
+                          <TouchableOpacity
+                            key={minute}
+                            style={[
+                              styles.iosTimeOption,
+                              wheelMinute === minute && styles.iosTimeOptionSelected
+                            ]}
+                            onPress={() => setWheelMinute(minute)}
+                          >
+                            <Text style={[
+                              styles.iosTimeOptionText,
+                              wheelMinute === minute && styles.iosTimeOptionTextSelected
+                            ]}>
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
                       })}
-                    </Picker>
+                    </ScrollView>
                   </View>
 
-                  <View style={styles.timeWheelColumn}>
-                    <Picker
-                      selectedValue={wheelAmPm}
-                      onValueChange={(v) => setWheelAmPm(v as "AM" | "PM")}
-                      style={styles.timeWheelPicker}
-                      itemStyle={styles.timeWheelItem}
+                  <View style={styles.iosTimeColumn}>
+                    <ScrollView 
+                      style={styles.iosTimeScroll}
+                      showsVerticalScrollIndicator={false}
+                      nestedScrollEnabled={true}
                     >
-                      <Picker.Item label="AM" value="AM" />
-                      <Picker.Item label="PM" value="PM" />
-                    </Picker>
+                      {["AM", "PM"].map((period) => (
+                        <TouchableOpacity
+                          key={period}
+                          style={[
+                            styles.iosTimeOption,
+                            wheelAmPm === period && styles.iosTimeOptionSelected
+                          ]}
+                          onPress={() => setWheelAmPm(period as "AM" | "PM")}
+                        >
+                          <Text style={[
+                            styles.iosTimeOptionText,
+                            wheelAmPm === period && styles.iosTimeOptionTextSelected
+                          ]}>
+                            {period}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
                 </View>
               </View>
@@ -1877,61 +1919,53 @@ export default function CreateBusinessPostScreen() {
                   );
                 })}
 
-                {/* Custom Additional Info – allow adding multiple fields */}
-                <View style={styles.customAdditionalInfoBlock}>
-                  <Text style={styles.sectionTitle}>
-                    Custom Additional Info
-                  </Text>
+                {/* Custom Additional Info */}
+                <View style={styles.whiteCardContainer}>
+                  <Text style={styles.cardHeadingAllcaps}>ADDITIONAL INFORMATION</Text>
+
                   {customAdditionalInfo.map((field, idx) => (
-                    <View key={field.id} style={styles.customInfoCard}>
-                      <TextInput
-                        style={styles.customInfoInput}
-                        placeholder="Field name or heading"
-                        value={field.heading}
-                        onChangeText={(text) => {
-                          const updated = [...customAdditionalInfo];
-                          updated[idx] = { ...updated[idx], heading: text };
-                          setCustomAdditionalInfo(updated);
-                        }}
-                        placeholderTextColor="#999"
-                      />
-                      <TextInput
-                        style={[
-                          styles.customInfoInput,
-                          styles.customInfoDescription,
-                        ]}
-                        placeholder="Description or details"
-                        value={field.description}
-                        onChangeText={(text) => {
-                          const updated = [...customAdditionalInfo];
-                          updated[idx] = {
-                            ...updated[idx],
-                            description: text,
-                          };
-                          setCustomAdditionalInfo(updated);
-                        }}
-                        placeholderTextColor="#999"
-                        multiline
-                        numberOfLines={2}
-                      />
+                    <View key={field.id} style={styles.customFieldWrapper}>
+                      <View style={styles.customFieldInputs}>
+                        {/* Box 1: Field Name (Heading) */}
+                        <TextInput
+                          style={styles.customInputBox}
+                          placeholder={`Field Name ${idx + 1}`}
+                          value={field.heading}
+                          onChangeText={(text) => {
+                            const updated = [...customAdditionalInfo];
+                            updated[idx] = { ...updated[idx], heading: text };
+                            setCustomAdditionalInfo(updated);
+                          }}
+                          placeholderTextColor="#8E8E93"
+                        />
+
+                        {/* Box 2: Field Value (Description) */}
+                        <TextInput
+                          style={styles.customInputBox}
+                          placeholder={idx === 0 ? "e.g. Specify RSVP detail" : "e.g. Equipment needed"}
+                          value={field.description}
+                          onChangeText={(text) => {
+                            const updated = [...customAdditionalInfo];
+                            updated[idx] = { ...updated[idx], description: text };
+                            setCustomAdditionalInfo(updated);
+                          }}
+                          placeholderTextColor="#8E8E93"
+                        />
+                      </View>
+
                       <TouchableOpacity
-                        style={styles.customInfoRemoveButton}
+                        style={styles.customInfoRemoveIcon}
                         onPress={() =>
-                          setCustomAdditionalInfo((prev) =>
-                            prev.filter((_, i) => i !== idx),
-                          )
+                          setCustomAdditionalInfo((prev) => prev.filter((_, i) => i !== idx))
                         }
                       >
-                        <Ionicons
-                          name="trash-outline"
-                          size={18}
-                          color="#FF3B30"
-                        />
+                        <Ionicons name="close" size={24} color="#000" />
                       </TouchableOpacity>
                     </View>
                   ))}
+
                   <TouchableOpacity
-                    style={styles.addCustomInfoButton}
+                    style={styles.addCustomInfoButtonOutline}
                     onPress={() => {
                       setCustomAdditionalInfo((prev) => [
                         ...prev,
@@ -1943,10 +1977,7 @@ export default function CreateBusinessPostScreen() {
                       ]);
                     }}
                   >
-                    <Ionicons name="add-circle" size={20} color="#000000" />
-                    <Text style={styles.addCustomInfoButtonText}>
-                      Add Info Field
-                    </Text>
+                    <Text style={styles.addCustomInfoButtonText}>+ Add a Field</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -2002,84 +2033,43 @@ export default function CreateBusinessPostScreen() {
                   </View>
 
                   {attachFormEnabled && (
-                    <View style={styles.formSection}>
+                    <View style={styles.whiteCardContainer}>
+                      <Text style={styles.cardHeadingAllcaps}>FORM ATTACHMENT</Text>
+
                       {formId && selectedForm ? (
                         <View style={styles.formSelectedContainer}>
+                          {/* Your existing selected form UI goes here */}
                           <View style={styles.formSelectedContent}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={24}
-                              color="#34C759"
-                            />
+                            <Ionicons name="checkmark-circle" size={24} color="#34C759" />
                             <View style={styles.formSelectedInfo}>
-                              <ScrollView
-                                style={styles.formQuestionsList}
-                                showsVerticalScrollIndicator={false}
-                              >
-                                {selectedForm.fields.map((field, index) => (
-                                  <Text
-                                    key={index}
-                                    style={styles.formQuestionItem}
-                                    numberOfLines={2}
-                                  >
-                                    {index + 1}.{" "}
-                                    {(field as any).question || field.label}
-                                  </Text>
-                                ))}
-                              </ScrollView>
+                               <Text style={styles.formSelectedLabel}>Form Attached</Text>
                             </View>
                           </View>
-                          <View style={styles.formSelectedActionsRow}>
-                            <TouchableOpacity
-                              onPress={() => setShowFormEditor(true)}
-                              style={styles.formEditButton}
-                              disabled={savingForm}
-                            >
-                              <Ionicons name="create-outline" size={18} color="#000" />
-                              <Text style={styles.formEditButtonText}>Edit Form</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => setFormId(null)}
-                              style={styles.formRemoveButton}
-                            >
-                              <Ionicons name="close" size={20} color="#FF3B30" />
-                            </TouchableOpacity>
-                          </View>
+                          <TouchableOpacity onPress={() => setFormId(null)}>
+                            <Ionicons name="close" size={20} color="#FF3B30" />
+                          </TouchableOpacity>
                         </View>
                       ) : formId ? (
                         <View style={styles.formLoading}>
                           <ActivityIndicator size="small" color="#8B5CF6" />
-                          <Text style={styles.formLoadingText}>
-                            Loading form...
-                          </Text>
+                          <Text style={styles.formLoadingText}>Loading form...</Text>
                         </View>
                       ) : (
-                        <View style={styles.formActionButtons}>
+                        <View style={styles.formAttachmentRow}>
                           <TouchableOpacity
-                            style={styles.formSelectButton}
+                            style={styles.formAttachmentBox}
                             onPress={() => setShowFormSelector(true)}
                           >
-                            <Ionicons
-                              name="document"
-                              size={18}
-                              color="#000000"
-                            />
-                            <Text style={styles.formSelectButtonText}>
-                              Select Existing Form
-                            </Text>
+                            <Ionicons name="list" size={22} color="#000" />
+                            <Text style={styles.formAttachmentBoxText}>Choose from{"\n"}my forms</Text>
                           </TouchableOpacity>
+
                           <TouchableOpacity
-                            style={styles.formCreateButton}
+                            style={styles.formAttachmentBox}
                             onPress={() => setShowFormBuilder(true)}
                           >
-                            <Ionicons
-                              name="add-circle"
-                              size={18}
-                              color="#FFF"
-                            />
-                            <Text style={styles.formCreateButtonText}>
-                              Create New Form
-                            </Text>
+                            <Ionicons name="duplicate-outline" size={22} color="#000" />
+                            <Text style={styles.formAttachmentBoxText}>Create a{"\n"}new form</Text>
                           </TouchableOpacity>
                         </View>
                       )}
@@ -2848,13 +2838,98 @@ const styles = StyleSheet.create({
   timeWheelItem: {
     fontSize: 22,
     height: 180,
-    // ensure text is visible on iOS wheels (default can be white-on-white)
+    color: "#000000",
+  },
+  // iOS-style time picker styles
+  iosTimeOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  iosTimeBackdrop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  iosTimeContainer: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    width: "90%",
+    maxWidth: 320,
+    overflow: "hidden",
+  },
+  iosTimeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5EA",
+  },
+  iosTimeCancelButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  iosTimeCancelText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "500",
+  },
+  iosTimeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
     color: "#000",
   },
-  timeWheelPicker: {
-    // give the picker a fixed height so its wheel is visible
-    height: 180,
+  iosTimeConfirmButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  iosTimeConfirmText: {
+    fontSize: 16,
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  iosTimePickerContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    alignItems: "center",
+  },
+  iosTimeColumn: {
+    flex: 1,
+    maxHeight: 200,
+  },
+  iosTimeScroll: {
+    flex: 1,
+  },
+  iosTimeOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    borderRadius: 8,
+    marginVertical: 2,
+  },
+  iosTimeOptionSelected: {
+    backgroundColor: "#E3F2FD",
+  },
+  iosTimeOptionText: {
+    fontSize: 18,
     color: "#000",
+    fontWeight: "400",
+  },
+  iosTimeOptionTextSelected: {
+    color: "#007AFF",
+    fontWeight: "600",
+  },
+  iosTimeSeparator: {
+    fontSize: 24,
+    color: "#000",
+    fontWeight: "600",
+    marginHorizontal: 8,
   },
   amPmOptionSelected: {
     backgroundColor: "#1C1C1E",
@@ -2883,51 +2958,81 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#000",
   },
-  customAdditionalInfoBlock: {
-    backgroundColor: "#F9F9F9",
-    borderRadius: 8,
-    padding: 12,
+  whiteCardContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardHeadingAllcaps: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#000000",
+    textTransform: "uppercase",
     marginBottom: 16,
+    letterSpacing: 0.5,
   },
-  customInfoCard: {
-    backgroundColor: "#FFF",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    padding: 12,
-    marginBottom: 12,
-  },
-  customInfoInput: {
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 8,
-    fontSize: 14,
-    color: "#1C1C1E",
-  },
-  customInfoDescription: {
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
-  customInfoRemoveButton: {
-    alignSelf: "flex-end",
-    padding: 8,
-  },
-  addCustomInfoButton: {
+  customFieldWrapper: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 16,
+  },
+  customFieldInputs: {
+    flex: 1,
+    gap: 8, // Adds a visual gap between the field name box and the value box
+  },
+  customInputBox: {
+    backgroundColor: "#EBEBED", // Light gray fill for the boxes
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: "#1C1C1E",
+  },
+  customInfoRemoveIcon: {
+    paddingLeft: 12,
+    paddingRight: 4,
     justifyContent: "center",
-    paddingVertical: 10,
-    borderRadius: 6,
+    alignItems: "center",
+  },
+  addCustomInfoButtonOutline: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#000000",
-    gap: 8,
+    marginTop: 4,
   },
   addCustomInfoButtonText: {
     color: "#000000",
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  formAttachmentRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  formAttachmentBox: {
+    flex: 1,
+    backgroundColor: "#EBEBED",
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    minHeight: 88,
+  },
+  formAttachmentBoxText: {
     fontSize: 14,
-    fontWeight: "600",
+    color: "#1C1C1E",
+    fontWeight: "500",
+    lineHeight: 20,
+    marginTop: 8,
   },
   additionalTogglesBlock: {
     marginTop: 20,

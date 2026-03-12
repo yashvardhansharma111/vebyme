@@ -8,7 +8,6 @@ import {
   Text,
   TextInput,
   View,
-  FlatList,
   Switch,
   KeyboardAvoidingView,
   Platform,
@@ -20,16 +19,7 @@ import { Picker } from "@react-native-picker/picker";
 export interface FormField {
   field_id: string;
   label: string;
-  type:
-    | "text"
-    | "email"
-    | "phone"
-    | "number"
-    | "select"
-    | "textarea"
-    | "checkbox"
-    | "radio"
-    | "date";
+  type: "text" | "textarea" | "radio" | "checkbox";
   placeholder?: string;
   options?: string[];
   required: boolean;
@@ -44,29 +34,6 @@ interface FormBuilderProps {
   loading?: boolean;
 }
 
-type UiFieldType = "short" | "long" | "single" | "multiple";
-
-const UI_FIELD_TYPE_LABEL: Record<UiFieldType, string> = {
-  short: "Short Answer",
-  long: "Long Answer",
-  single: "Single Choice",
-  multiple: "Multiple Choice",
-};
-
-const uiTypeFromInternal = (type: FormField["type"]): UiFieldType => {
-  if (type === "textarea") return "long";
-  if (type === "radio") return "single";
-  if (type === "checkbox") return "multiple";
-  return "short";
-};
-
-const internalTypeFromUi = (type: UiFieldType): FormField["type"] => {
-  if (type === "long") return "textarea";
-  if (type === "single") return "radio";
-  if (type === "multiple") return "checkbox";
-  return "text";
-};
-
 export default function FormBuilder({
   visible,
   onSave,
@@ -74,14 +41,12 @@ export default function FormBuilder({
   initialFields = [],
   loading = false,
 }: FormBuilderProps) {
-  const [fields, setFields] = useState<FormField[]>(
-    initialFields.length > 0 ? initialFields : [],
-  );
-  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+  const [fields, setFields] = useState<FormField[]>(initialFields);
+  const [activeFieldIndex, setActiveFieldIndex] = useState<number | null>(null);
 
   const addField = () => {
     const newField: FormField = {
-      field_id: `field_${Date.now()}_${Math.random()}`,
+      field_id: `field_${Date.now()}`,
       label: `Field ${fields.length + 1}`,
       type: "text",
       placeholder: "",
@@ -89,78 +54,47 @@ export default function FormBuilder({
       required: false,
       order: fields.length,
     };
+
     setFields([...fields, newField]);
   };
 
   const updateField = (index: number, updates: Partial<FormField>) => {
-    const newFields = [...fields];
-    newFields[index] = { ...newFields[index], ...updates };
-    setFields(newFields);
+    const updated = [...fields];
+    updated[index] = { ...updated[index], ...updates };
+    setFields(updated);
   };
 
   const addOption = (fieldIndex: number) => {
-    const newFields = [...fields];
-    const opts = newFields[fieldIndex].options || [];
-    newFields[fieldIndex].options = [...opts, ""];
-    setFields(newFields);
+    const updated = [...fields];
+    const opts = updated[fieldIndex].options || [];
+    updated[fieldIndex].options = [...opts, ""];
+    setFields(updated);
   };
 
   const updateOption = (
     fieldIndex: number,
     optionIndex: number,
-    value: string,
+    value: string
   ) => {
-    const newFields = [...fields];
-    const opts = newFields[fieldIndex].options || [];
-    // if user pasted comma separated values, split into multiple options
-    if (value.includes(",")) {
-      const parts = value
-        .split(",")
-        .map((p) => p.trim())
-        .filter(Boolean);
-      // replace current index with first part, insert remaining after
-      opts[optionIndex] = parts[0];
-      const rest = parts.slice(1);
-      if (rest.length > 0) {
-        opts.splice(optionIndex + 1, 0, ...rest);
-      }
-    } else {
-      opts[optionIndex] = value;
-    }
-    newFields[fieldIndex].options = opts;
-    setFields(newFields);
+    const updated = [...fields];
+    const opts = updated[fieldIndex].options || [];
+
+    opts[optionIndex] = value;
+
+    updated[fieldIndex].options = opts;
+    setFields(updated);
   };
 
   const removeOption = (fieldIndex: number, optionIndex: number) => {
-    const newFields = [...fields];
-    const opts = newFields[fieldIndex].options || [];
+    const updated = [...fields];
+    const opts = updated[fieldIndex].options || [];
     opts.splice(optionIndex, 1);
-    newFields[fieldIndex].options = opts;
-    setFields(newFields);
+    updated[fieldIndex].options = opts;
+    setFields(updated);
   };
 
   const deleteField = (index: number) => {
     setFields(fields.filter((_, i) => i !== index));
-  };
-
-  const moveFieldUp = (index: number) => {
-    if (index === 0) return;
-    const newFields = [...fields];
-    [newFields[index - 1], newFields[index]] = [
-      newFields[index],
-      newFields[index - 1],
-    ];
-    setFields(newFields);
-  };
-
-  const moveFieldDown = (index: number) => {
-    if (index === fields.length - 1) return;
-    const newFields = [...fields];
-    [newFields[index], newFields[index + 1]] = [
-      newFields[index + 1],
-      newFields[index],
-    ];
-    setFields(newFields);
   };
 
   const handleSave = () => {
@@ -168,110 +102,73 @@ export default function FormBuilder({
       Alert.alert("Required", "Please add at least one field");
       return;
     }
+
     onSave(fields);
   };
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <Modal visible={visible} animationType="slide">
+      <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.flex}
+          style={{ flex: 1 }}
         >
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.scrollContentContainer}
-          >
+          <ScrollView style={styles.content}>
             {fields.map((field, index) => (
               <View key={field.field_id} style={styles.fieldCard}>
+                {/* Header */}
                 <View style={styles.fieldHeader}>
                   <Text style={styles.fieldIndex}>{index + 1}</Text>
-                  <View style={styles.fieldHeaderActions}>
-                    <Pressable
-                      onPress={() => moveFieldUp(index)}
-                      disabled={index === 0}
-                      style={[
-                        styles.iconButton,
-                        index === 0 && styles.disabledButton,
-                      ]}
-                    >
-                      <Ionicons
-                        name="arrow-up"
-                        size={20}
-                        color={index === 0 ? "#ccc" : "#000000"}
-                      />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => moveFieldDown(index)}
-                      disabled={index === fields.length - 1}
-                      style={[
-                        styles.iconButton,
-                        index === fields.length - 1 && styles.disabledButton,
-                      ]}
-                    >
-                      <Ionicons
-                        name="arrow-down"
-                        size={20}
-                        color={index === fields.length - 1 ? "#ccc" : "#000000"}
-                      />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => deleteField(index)}
-                      style={styles.iconButton}
-                    >
-                      <Ionicons name="trash" size={20} color="#FF3B30" />
-                    </Pressable>
-                  </View>
+
+                  <Pressable onPress={() => deleteField(index)}>
+                    <Ionicons name="trash" size={20} color="#FF3B30" />
+                  </Pressable>
                 </View>
 
+                {/* Label */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Field Label *</Text>
+
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g., Full Name"
+                    placeholder="e.g. Full Name"
                     value={field.label}
-                    onChangeText={(text) => updateField(index, { label: text })}
+                    onChangeText={(text) =>
+                      updateField(index, { label: text })
+                    }
                     placeholderTextColor="#999"
                   />
                 </View>
 
+                {/* Field Type Selector */}
                 <View style={styles.fieldGroup}>
                   <Text style={styles.label}>Field Type *</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={uiTypeFromInternal(field.type)}
-                      onValueChange={(value) => {
-                        const ui = value as UiFieldType;
-                        const internal = internalTypeFromUi(ui);
-                        updateField(index, {
-                          type: internal,
-                          options:
-                            internal === "radio" || internal === "checkbox"
-                              ? field.options && field.options.length > 0
-                                ? field.options
-                                : [""]
-                              : [],
-                        });
-                      }}
-                    >
-                      {(Object.keys(UI_FIELD_TYPE_LABEL) as UiFieldType[]).map(
-                        (t) => (
-                          <Picker.Item
-                            key={t}
-                            label={UI_FIELD_TYPE_LABEL[t]}
-                            value={t}
-                          />
-                        ),
-                      )}
-                    </Picker>
-                  </View>
+
+                  <Pressable
+                    style={styles.fieldTypeRow}
+                    onPress={() => setActiveFieldIndex(index)}
+                  >
+                    <Text style={styles.fieldTypeText}>
+                      {field.type === "text"
+                        ? "Short Answer"
+                        : field.type === "textarea"
+                        ? "Long Answer"
+                        : field.type === "radio"
+                        ? "Single Choice"
+                        : "Multiple Choice"}
+                    </Text>
+
+                    <Ionicons name="chevron-down" size={18} color="#666" />
+                  </Pressable>
                 </View>
 
+                {/* Placeholder */}
                 <View style={styles.fieldGroup}>
-                  <Text style={styles.label}>Placeholder (optional)</Text>
+                  <Text style={styles.label}>Placeholder</Text>
+
                   <TextInput
                     style={styles.input}
-                    placeholder="e.g., Enter your full name"
+                    placeholder="Optional"
                     value={field.placeholder || ""}
                     onChangeText={(text) =>
                       updateField(index, { placeholder: text })
@@ -280,9 +177,11 @@ export default function FormBuilder({
                   />
                 </View>
 
-                {(field.type === "checkbox" || field.type === "radio") && (
+                {/* Options */}
+                {(field.type === "radio" || field.type === "checkbox") && (
                   <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Options</Text>
+
                     {(field.options || []).map((opt, optionIndex) => (
                       <View key={optionIndex} style={styles.optionRow}>
                         <TextInput
@@ -294,67 +193,104 @@ export default function FormBuilder({
                           }
                           placeholderTextColor="#999"
                         />
+
                         <Pressable
                           onPress={() => removeOption(index, optionIndex)}
-                          style={styles.optionRemove}
                         >
-                          <Ionicons name="trash" size={20} color="#FF3B30" />
+                          <Ionicons
+                            name="trash"
+                            size={20}
+                            color="#FF3B30"
+                          />
                         </Pressable>
                       </View>
                     ))}
+
                     <Pressable
-                      onPress={() => addOption(index)}
                       style={styles.addOptionButton}
+                      onPress={() => addOption(index)}
                     >
-                      <Ionicons name="add-circle" size={20} color="#000000" />
+                      <Ionicons name="add-circle" size={20} />
                       <Text style={styles.addOptionText}>Add Option</Text>
                     </Pressable>
-                    <Text style={{ fontSize: 12, color: "#999", marginTop: 4 }}>
-                      You can also paste comma-separated values; commas will be
-                      preserved.
-                    </Text>
                   </View>
                 )}
 
+                {/* Required */}
                 <View style={styles.requiredContainer}>
                   <Text style={styles.label}>Required</Text>
+
                   <Switch
                     value={field.required}
                     onValueChange={(value) =>
                       updateField(index, { required: value })
                     }
-                    trackColor={{ false: "#ddd", true: "#81C784" }}
-                    thumbColor={"#fff"}
                   />
                 </View>
               </View>
             ))}
 
-            <Pressable onPress={addField} style={styles.addFieldButton}>
-              <Ionicons name="add-circle" size={24} color="#000000" />
-              <Text style={styles.addFieldButtonText}>Add Field</Text>
+            {/* Add Field */}
+            <Pressable style={styles.addFieldButton} onPress={addField}>
+              <Ionicons name="add-circle" size={22} />
+              <Text style={styles.addFieldText}>Add Field</Text>
             </Pressable>
-
-            <View style={{ height: 20 }} />
           </ScrollView>
 
-          <View style={styles.footerButtonContainer}>
+          {/* Hidden Picker Modal */}
+          <Modal visible={activeFieldIndex !== null} transparent animationType="slide">
             <Pressable
-              onPress={onCancel}
-              style={[styles.footerButton, styles.cancelButton]}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              style={styles.pickerOverlay}
+              onPress={() => setActiveFieldIndex(null)}
+            />
+
+            <View style={styles.pickerModal}>
+              <Picker
+                selectedValue={
+                  activeFieldIndex !== null
+                    ? fields[activeFieldIndex].type
+                    : "text"
+                }
+                itemStyle={{ color: "#000000" }}   // ← critical fix
+                onValueChange={(value) => {
+                  if (activeFieldIndex !== null) {
+                    updateField(activeFieldIndex, {
+                      type: value,
+                      options:
+                        value === "radio" || value === "checkbox"
+                          ? [""]
+                          : [],
+                    });
+                  }
+                }}
+              >
+                <Picker.Item label="Short Answer" value="text" color="#000000" />
+                <Picker.Item label="Long Answer" value="textarea" color="#000000" />
+                <Picker.Item label="Single Choice" value="radio" color="#000000" />
+                <Picker.Item label="Multiple Choice" value="checkbox" color="#000000" />
+              </Picker>
+
+              <Pressable
+                style={styles.doneButton}
+                onPress={() => setActiveFieldIndex(null)}
+              >
+                <Text style={{ fontWeight: "600" }}>Done</Text>
+              </Pressable>
+            </View>
+          </Modal>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Pressable style={styles.cancelButton} onPress={onCancel}>
+              <Text>Cancel</Text>
             </Pressable>
+
             <Pressable
+              style={styles.saveButton}
               onPress={handleSave}
               disabled={loading}
-              style={[
-                styles.footerButton,
-                styles.saveButtonContainer,
-                loading && styles.disabledButton,
-              ]}
             >
-              <Text style={[styles.saveButtonText]}>Save</Text>
+              <Text style={{ color: "#fff" }}>Save</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -364,208 +300,142 @@ export default function FormBuilder({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  flex: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#000",
-  },
-  headerButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  headerButtonText: {
-    fontSize: 16,
-    color: "#666",
-  },
-  saveButton: {
-    color: "#000000",
-    fontWeight: "600",
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  scrollContentContainer: {
-    paddingBottom: 20,
-  },
-  footerButtonContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  footerButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#f0f0f0",
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-  },
-  saveButtonContainer: {
-    backgroundColor: "#000000",
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#fff",
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
+
+  content: { padding: 16 },
+
   fieldCard: {
     backgroundColor: "#fff",
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 10,
     marginBottom: 12,
+    marginTop: 30,
     borderWidth: 1,
-    borderColor: "#e0e0e0",
+    borderColor: "#eee",
   },
+
   fieldHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
+    marginBottom: 12,
   },
+
   fieldIndex: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#000000",
   },
-  fieldHeaderActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  iconButton: {
-    padding: 8,
-  },
-  fieldGroup: {
-    marginBottom: 16,
-  },
+
+  fieldGroup: { marginBottom: 14 },
+
   label: {
-    fontSize: 14,
     fontWeight: "600",
-    color: "#000",
-    marginBottom: 8,
+    marginBottom: 6,
   },
+
   input: {
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
-    paddingHorizontal: 12,
+    padding: 10,
+    backgroundColor: "#f9f9f9",
+  },
+
+  fieldTypeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
     paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "#f9f9f9",
+  },
+
+  fieldTypeText: {
     fontSize: 14,
     color: "#000",
-    backgroundColor: "#f9f9f9",
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#f9f9f9",
-  },
-  typePickerContainer: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
-  },
-  typePicker: {
-    flexGrow: 0,
-  },
-  typeOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginRight: 8,
-    backgroundColor: "#f9f9f9",
-  },
-  typeOptionSelected: {
-    backgroundColor: "#000000",
-    borderColor: "#000000",
-  },
-  typeOptionText: {
-    fontSize: 13,
-    color: "#666",
     fontWeight: "500",
   },
-  typeOptionTextSelected: {
-    color: "#fff",
+
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
+
+  pickerModal: {
+    backgroundColor: "#fff",
+    paddingBottom: 30,
+  },
+
+  doneButton: {
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+
+  addOptionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+
+  addOptionText: {
+    marginLeft: 6,
+    fontWeight: "600",
+  },
+
   requiredContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   addFieldButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    marginTop: 35,
     borderWidth: 2,
-    borderColor: "#000000",
-    borderRadius: 8,
     borderStyle: "dashed",
-    marginBottom: 16,
-    gap: 8,
-  },
-  addFieldButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000000",
-  },
-  optionRow: {
-    flexDirection: "row",
+    borderColor: "#000",
+    padding: 12,
     alignItems: "center",
-    marginBottom: 8,
-  },
-  optionRemove: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  addOptionButton: {
+    borderRadius: 8,
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
+    justifyContent: "center",
+    gap: 6,
   },
-  addOptionText: {
-    marginLeft: 4,
-    color: "#000000",
-    fontSize: 14,
+
+  addFieldText: {
     fontWeight: "600",
+  },
+
+  footer: {
+    flexDirection: "row",
+    padding: 16,
+    gap: 10,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+    backgroundColor: "#fff",
+  },
+
+  cancelButton: {
+    flex: 1,
+    padding: 12,
+    alignItems: "center",
+    backgroundColor: "#eee",
+    borderRadius: 8,
+  },
+
+  saveButton: {
+    flex: 1,
+    padding: 12,
+    alignItems: "center",
+    backgroundColor: "#000",
+    borderRadius: 8,
   },
 });

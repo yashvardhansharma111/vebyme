@@ -787,7 +787,7 @@ export default function OtherUserProfileScreen() {
 
               {/* Business profile: Report only */}
               {!isOwnProfile && (
-                <View style={{ gap: 10 }}>
+                <View style={styles.businessButtonsWrap}>
                   <TouchableOpacity
                     style={styles.businessReportButton}
                     onPress={handleToggleBlock}
@@ -812,7 +812,7 @@ export default function OtherUserProfileScreen() {
                     onPress={handleReport}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="flag-outline" size={22} color="#FF3B30" />
+                    <Ionicons name="person-remove-outline" size={22} color="#FF3B30" />
                     <Text style={styles.businessReportButtonText}>Report</Text>
                   </TouchableOpacity>
                 </View>
@@ -1210,7 +1210,7 @@ export default function OtherUserProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3f3f3",
+    backgroundColor: "#ffffff",
   },
   scrollView: {
     flex: 1,
@@ -1219,7 +1219,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f3f3f3",
+    backgroundColor: "#FAF9F6",
   },
   heroWrap: {
     width: "100%",
@@ -1643,23 +1643,31 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   instagramWebViewPreviewWrap: {
-    height: 400,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 14,
-    backgroundColor: "#f2f2f7",
-    ...FIGMA_CARD_SHADOW,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
+  height: 400,
+
+  borderRadius: 16,
+  overflow: "hidden",
+
+  marginBottom: 14,
+  backgroundColor: "#FFF",
+
+  // ADD BORDER (same style as social card)
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.18)",
+
+  // shadow
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  elevation: 8,
   },
   instagramWebViewPreview: {
     flex: 1,
     width: "100%",
     height: 400,
     backgroundColor: "#fff",
-    borderRadius: 16,
+
   },
   instagramWebViewPreviewLoading: {
     position: "absolute",
@@ -1712,17 +1720,20 @@ const styles = StyleSheet.create({
   },
   businessPreviousRunsCard: {
     alignSelf: "stretch",
-    backgroundColor: "#FFF",
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-    marginTop: 24,
-    ...FIGMA_CARD_SHADOW,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    elevation: 8,
+  backgroundColor: "#FFF",
+  borderRadius: 24,
+
+  paddingHorizontal: 20,
+  paddingTop: 20,
+  paddingBottom: 20,
+
+  marginTop: 24,
+
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+  elevation: 10,
   },
   businessPreviousRunsSection: {
     marginBottom: 8,
@@ -1820,22 +1831,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   businessReportButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#fff",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 14,
-    marginTop: 12,
-    alignSelf: "stretch",
-    ...FIGMA_CARD_SHADOW,
+ flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "flex-start",   // ← left align content
+  gap: 10,
+
+  width: "100%",
+  paddingVertical: 16,
+  paddingHorizontal: 18,          // ← pushes content away from edge
+
+  backgroundColor: "#FFFFFF",
+  borderRadius: 28,
+
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.18)",
+
   },
   businessReportButtonText: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#FF3B30",
+    fontSize: 16,
+  fontWeight: "700",
+  color: "#FF3B30",
+
   },
   businessOwnerShareWrap: {
     gap: 10,
@@ -1953,9 +1969,22 @@ const styles = StyleSheet.create({
     color: "#FF3B30",
   },
   socialCardFigma: {
-    marginBottom: 8,
-    minHeight: 122,
-    justifyContent: "center",
+  marginBottom: 8,
+  minHeight: 122,
+  justifyContent: "center",
+
+  backgroundColor: "#FFF",
+
+  borderWidth: 1,
+  borderColor: "rgba(0,0,0,0.18)",   // darker border
+
+  borderRadius: 28,
+
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.12,
+  shadowRadius: 12,
+  elevation: 8,
   },
   hairlineDividerFigma: {
     borderTopWidth: 2,
@@ -1985,8 +2014,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
+    paddingHorizontal: 20,
     marginTop: 8,
     marginBottom: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    width: "100%",
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.1)",
   },
   reportOnlyText: {
     fontSize: 17,
@@ -2104,4 +2140,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 20,
   },
+  businessButtonsWrap: {
+  alignSelf: "stretch",   // forces full width inside centered parent
+  width: "100%",
+  marginTop: 12,
+  gap: 10,
+},
 });
