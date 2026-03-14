@@ -141,6 +141,7 @@ export default function BusinessPlanDetailScreen() {
   // Registration limit state
   const [eventFull, setEventFull] = useState(false);
   const [registrationCount, setRegistrationCount] = useState(0);
+  const [isCancelled, setIsCancelled] = useState(false);
 
   const planMedia = useMemo(
     () => (plan?.media && plan.media.length > 0 ? plan.media.slice(0, 5) : [{ url: 'https://picsum.photos/id/1011/200/300', type: 'image' }]),
@@ -212,6 +213,10 @@ export default function BusinessPlanDetailScreen() {
       const response = await apiService.getBusinessPlan(planId);
       if (response.data) {
         setPlan(response.data);
+        
+        // Check if post is cancelled
+        const postStatus = (response.data.post_status as string) || 'published';
+        setIsCancelled(postStatus === 'deleted');
         
         // Load organizer info
         if (response.data.user_id) {
@@ -396,6 +401,11 @@ export default function BusinessPlanDetailScreen() {
 
     if (eventFull) {
       Alert.alert('Event Full', 'This event has reached its maximum capacity and registrations are now closed.');
+      return;
+    }
+
+    if (isCancelled) {
+      Alert.alert('Event Cancelled', 'This event has been cancelled and registrations are now closed.');
       return;
     }
 
@@ -755,16 +765,22 @@ export default function BusinessPlanDetailScreen() {
                 <Text style={styles.eventFullText}>This event has reached maximum capacity</Text>
               </View>
             )}
+            {isCancelled && (
+              <View style={styles.eventFullContainer}>
+                <Ionicons name="warning" size={20} color="#DD2C00" />
+                <Text style={styles.eventFullText}>This event has been cancelled</Text>
+              </View>
+            )}
             <TouchableOpacity
-              style={[styles.bottomBarButton, (registering || eventFull) && styles.registerButtonGreyed]}
+              style={[styles.bottomBarButton, (registering || eventFull || isCancelled) && styles.registerButtonGreyed]}
               onPress={handleRegister}
-              disabled={registering || eventFull}
+              disabled={registering || eventFull || isCancelled}
             >
               {registering ? (
                 <ActivityIndicator size="small" color="#FFF" />
               ) : (
-                <Text style={[styles.registerButtonText, eventFull && styles.registerButtonTextGreyed]}>
-                  {eventFull ? 'Event Full' : 'Register'}
+                <Text style={[styles.registerButtonText, (eventFull || isCancelled) && styles.registerButtonTextGreyed]}>
+                  {eventFull ? 'Event Full' : isCancelled ? 'Event Cancelled' : 'Register'}
                 </Text>
               )}
             </TouchableOpacity>
