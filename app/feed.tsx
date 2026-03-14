@@ -99,19 +99,11 @@ export default function FeedScreen() {
     return { name: 'Unknown User', profile_image: 'https://via.placeholder.com/44' };
   }, [userCache]);
 
-  const formatTimestamp = (ts: string | Date): string => {
+  /** Post created time for user pill: "Monday, 2:36pm" */
+  const formatPostCreatedDate = (ts: string | Date): string => {
     try {
       const date = typeof ts === 'string' ? new Date(ts) : ts;
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
-      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch {
       return 'Recently';
     }
@@ -150,12 +142,17 @@ export default function FeedScreen() {
             id: post.user_id,
             name: userData.name,
             avatar: userData.profile_image || 'https://via.placeholder.com/44',
-            time: formatTimestamp(post.timestamp),
+            time: formatPostCreatedDate(post.timestamp),
           },
           event: {
             title: post.title || 'Untitled Post',
             description: post.description || 'No description',
             tags: post.tags?.length > 0 ? post.tags : ['General'],
+            category_main: post.category_main ?? '',
+            category_sub: post.category_sub || [],
+            temporal_tags: post.temporal_tags || [],
+            date: post.date ?? post.timestamp,
+            time: post.time,
             image: imageUrl,
             is_repost: post.is_repost || !!(post.repost_data),
             repost_data: post.repost_data || null,

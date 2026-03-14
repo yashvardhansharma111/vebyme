@@ -504,6 +504,7 @@ export default function BusinessPostsScreen() {
                           date:
                             rawPost?.date || rawPost?.timestamp || new Date(),
                           time: rawPost?.time || "",
+                          created_at: rawPost?.timestamp || rawPost?.date,
                           passes: rawPost?.passes || [],
                           add_details: rawPost?.add_details || [],
                           user: {

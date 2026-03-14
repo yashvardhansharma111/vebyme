@@ -30,6 +30,7 @@ type TicketItem = {
     location_text?: string;
     media?: Array<{ url: string; type: string }>;
     ticket_image?: string;
+    post_status?: string | null;
   } | null;
 };
 
@@ -147,6 +148,11 @@ export default function TicketsPassesScreen() {
               onPress={() => router.push({ pathname: '/ticket/[ticketId]', params: { ticketId: t.ticket_id } } as any)}
               activeOpacity={0.8}
             >
+              {t.plan?.post_status === 'deleted' ? (
+                <View style={styles.cancelledBanner}>
+                  <Text style={styles.cancelledBannerText}>The event has been cancelled</Text>
+                </View>
+              ) : null}
               <View style={styles.cardImageWrap}>
                 {eventImage(t) ? (
                   <Image source={{ uri: eventImage(t)! }} style={styles.cardImage} resizeMode="cover" />
@@ -256,6 +262,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
+  },
+  cancelledBanner: {
+    backgroundColor: '#FFEBEE',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFCDD2',
+  },
+  cancelledBannerText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#C62828',
+    textAlign: 'center',
   },
   cardImageWrap: {
     height: 120,

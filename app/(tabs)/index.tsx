@@ -208,21 +208,11 @@ export default function HomeScreen() {
     return defaultData;
   }, [userCache]);
 
-  const formatTimestamp = (timestamp: string | Date): string => {
+  /** Post created time for pills: "Monday, 2:36pm" */
+  const formatPostCreatedDate = (timestamp: string | Date): string => {
     try {
       const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays < 7) return `${diffDays}d ago`;
-
-      return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleDateString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch {
       return 'Recently';
     }
@@ -271,7 +261,7 @@ export default function HomeScreen() {
             id: post.user_id,
             name: userData.name,
             avatar: userData.profile_image || 'https://via.placeholder.com/44',
-            time: formatTimestamp(post.timestamp),
+            time: formatPostCreatedDate(post.timestamp),
           },
           event: {
             title: post.title || 'Untitled Post',
@@ -280,6 +270,8 @@ export default function HomeScreen() {
             category_main: post.category_main ?? '',
             category_sub: post.category_sub || [],
             temporal_tags: post.temporal_tags || [],
+            date: post.date ?? post.timestamp,
+            time: post.time,
             image: imageUrl,
             is_repost: post.is_repost || !!(post.repost_data),
             repost_data: post.repost_data || null,
@@ -477,6 +469,20 @@ export default function HomeScreen() {
               <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFF" />
             }
           >
+            {/* When a filter is on and there are no posts, show only one empty state */}
+            {!!activeFilter && !isLoading && !error && businessEvents.length === 0 && events.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No plans in your area</Text>
+                <TouchableOpacity
+                  style={styles.createPlanCta}
+                  onPress={() => router.push('/(tabs)/createPost')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.createPlanCtaText}>Create a plan</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
             {/* Business plans – horizontally scrollable */}
             {businessEvents.length > 0 && (
               <View style={styles.businessHorizontalWrap}>
@@ -504,6 +510,7 @@ export default function HomeScreen() {
                             location_text: rawPost?.location_text || '',
                             date: rawPost?.date || rawPost?.timestamp || new Date(),
                             time: rawPost?.time || '',
+                            created_at: rawPost?.timestamp || rawPost?.date,
                             passes: rawPost?.passes || [],
                             add_details: rawPost?.add_details || [],
                             user: { user_id: rawPost?.user_id || item.user?.id, name: item.user?.name, profile_image: item.user?.avatar },
@@ -680,6 +687,8 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+              </>
+            )}
           </ScrollView>
         </SafeAreaView>
 

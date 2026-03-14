@@ -26,6 +26,8 @@ interface GuestListModalProps {
   visible: boolean;
   onClose: () => void;
   planId: string;
+  /** 'business' = ticket guest-list (registrations), 'regular' = joined users (approved interactions) */
+  planType?: 'business' | 'regular';
   onRegisterPress?: () => void;
 }
 
@@ -33,6 +35,7 @@ export default function GuestListModal({
   visible,
   onClose,
   planId,
+  planType = 'business',
   onRegisterPress,
 }: GuestListModalProps) {
   const router = useRouter();
@@ -50,9 +53,9 @@ export default function GuestListModal({
     if (visible && planId) {
       setError(null);
       setLoading(true);
-      apiService
-        .getGuestList(planId)
-        .then((res) => {
+      const fetchList = planType === 'regular' ? apiService.getJoinedUsers(planId) : apiService.getGuestList(planId);
+      fetchList
+        .then((res: any) => {
           const data = res?.data ?? res;
           const list = data?.guests ?? [];
           setGuests(Array.isArray(list) ? list : []);
@@ -63,7 +66,7 @@ export default function GuestListModal({
         })
         .finally(() => setLoading(false));
     }
-  }, [visible, planId]);
+  }, [visible, planId, planType]);
 
   return (
     <Modal
@@ -78,12 +81,7 @@ export default function GuestListModal({
         onPress={onClose}
       >
         <TouchableOpacity
-          style={[
-            styles.sheet,
-            {
-              paddingBottom: insets.bottom + 24,
-            },
-          ]}
+          style={styles.sheet}
           activeOpacity={1}
           onPress={(e) => e.stopPropagation()}
         >
@@ -92,9 +90,10 @@ export default function GuestListModal({
             onPress={onClose}
             activeOpacity={1}
           />
-          <Text style={styles.title}>Guest List</Text>
+          <Text style={styles.title}>{planType === 'regular' ? 'Who joined' : 'Guest List'}</Text>
           <View style={styles.separator} />
 
+          <View style={styles.contentArea}>
           {loading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator size="large" color="#1C1C1E" />
@@ -107,7 +106,8 @@ export default function GuestListModal({
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
             >
               {guests.length === 0 ? (
                 <Text style={styles.emptyText}>No one has joined yet.</Text>
@@ -139,19 +139,31 @@ export default function GuestListModal({
               )}
             </ScrollView>
           )}
+          </View>
 
-          {onRegisterPress && (
-            <TouchableOpacity
-              style={styles.registerButton}
-              onPress={() => {
-                onClose();
-                onRegisterPress();
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.registerButtonText}>Register</Text>
-            </TouchableOpacity>
-          )}
+          <View style={[styles.stickyFooterWrap, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.stickyFooter}>
+              {onRegisterPress && (
+                <TouchableOpacity
+                  style={styles.registerButton}
+                  onPress={() => {
+                    onClose();
+                    onRegisterPress();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.registerButtonText}>Register</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.closeButton, onRegisterPress && styles.closeButtonWithRegister]}
+                onPress={onClose}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
@@ -171,6 +183,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     maxHeight: '80%',
+    flexDirection: 'column',
+    overflow: 'hidden',
   },
   grabHandle: {
     width: 40,
@@ -192,6 +206,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E5E5EA',
     marginBottom: 16,
   },
+  contentArea: {
+    flex: 1,
+    minHeight: 120,
+  },
   loadingWrap: {
     paddingVertical: 40,
     alignItems: 'center',
@@ -205,10 +223,37 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   scroll: {
+    flex: 1,
     maxHeight: 360,
   },
   scrollContent: {
     paddingBottom: 16,
+  },
+  stickyFooterWrap: {
+    backgroundColor: '#FFF',
+    flexShrink: 0,
+  },
+  stickyFooter: {
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5E5EA',
+    backgroundColor: '#FFF',
+  },
+  closeButton: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 22,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  closeButtonWithRegister: {
+    marginTop: 10,
+  },
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFF',
   },
   emptyText: {
     fontSize: 15,
@@ -240,11 +285,11 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     backgroundColor: '#1C1C1E',
-    borderRadius: 14,
+    borderRadius: 22,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginBottom: 20,
   },
   registerButtonText: {
     fontSize: 16,

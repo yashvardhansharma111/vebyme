@@ -6,6 +6,7 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useAppSelector } from '@/store/hooks';
 import JoinModal, { type JoinModalPlan, type JoinModalAuthor } from './JoinModal';
 import ShareToChatModal from './ShareToChatModal';
+import GuestListModal from './GuestListModal';
 import { apiService } from '@/services/api';
 import { fontTitle, fontBody } from '@/constants/theme';
 import Avatar from './Avatar';
@@ -22,22 +23,94 @@ function getAllEventTags(event: any): string[] {
 }
 
 const DAY_TIME_TAGS = ['Today', 'Tomorrow', 'Weekend', 'Morning', 'Evening', 'Night'];
+const TIMING_SLOTS = ['Morning', 'Afternoon', 'Evening', 'Night'];
 
-// First row: category only (category_main or first category_sub, or first non–day/time tag)
-function getCategoryTags(event: any): string[] {
+// Single category for pill: category_main or first category_sub, or first non–day/time tag
+function getFirstCategory(event: any): string | null {
   const main = (event?.category_main || '').trim();
-  if (main) return [main];
+  if (main) return main.charAt(0).toUpperCase() + main.slice(1).toLowerCase();
   const sub = event?.category_sub;
-  if (Array.isArray(sub) && sub.length > 0 && sub[0]) return [String(sub[0]).trim()].filter(Boolean);
+  if (Array.isArray(sub) && sub.length > 0 && sub[0]) {
+    const s = String(sub[0]).trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : null;
+  }
   const tags = event?.tags;
   if (Array.isArray(tags)) {
     const firstNonDayTime = tags.find((t: string) => !DAY_TIME_TAGS.includes(String(t).trim()));
-    if (firstNonDayTime) return [String(firstNonDayTime).trim()];
+    if (firstNonDayTime) {
+      const s = String(firstNonDayTime).trim();
+      return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : null;
+    }
   }
-  return [];
+  return null;
 }
 
-// Second row: day and time (temporal_tags)
+// Day (weekday) from event date
+function getDayFromDate(event: any): string | null {
+  const date = event?.date ?? event?.timestamp;
+  if (!date) return null;
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  } catch {
+    return null;
+  }
+}
+
+// Timing slot from time string or temporal_tags (Morning, Afternoon, Evening, Night)
+function getTimingForEvent(event: any): string | null {
+  const timeStr = event?.time;
+  if (timeStr && String(timeStr).trim()) {
+    const s = String(timeStr).trim().toLowerCase();
+    const hourMatch = s.match(/(\d{1,2})\s*:\s*(\d{2})?\s*(am|pm)?|(\d{1,2})\s*(am|pm)/i);
+    let hour = 12;
+    if (hourMatch) {
+      const h = parseInt(hourMatch[1] || hourMatch[4] || '12', 10);
+      const pm = (hourMatch[3] || hourMatch[5] || '').toLowerCase() === 'pm';
+      hour = h === 12 ? (pm ? 12 : 0) : pm ? h + 12 : h;
+    } else {
+      if (s.includes('morning')) return 'Morning';
+      if (s.includes('afternoon')) return 'Afternoon';
+      if (s.includes('evening')) return 'Evening';
+      if (s.includes('night')) return 'Night';
+      return null;
+    }
+    if (hour >= 5 && hour < 12) return 'Morning';
+    if (hour >= 12 && hour < 17) return 'Afternoon';
+    if (hour >= 17 && hour < 20) return 'Evening';
+    return 'Night';
+  }
+  const t = event?.temporal_tags;
+  if (Array.isArray(t)) {
+    const found = t.find((x: string) => TIMING_SLOTS.includes(String(x).trim()));
+    if (found) return String(found).trim();
+  }
+  const tags = event?.tags;
+  if (Array.isArray(tags)) {
+    const found = tags.find((tag: string) => TIMING_SLOTS.includes(String(tag).trim()));
+    if (found) return String(found).trim();
+  }
+  return null;
+}
+
+// Ordered list of up to 3 tag labels: category, day, timing (for homepage normal event card)
+function getOrderedEventPillTags(event: any): { type: 'category' | 'day' | 'timing'; label: string }[] {
+  const out: { type: 'category' | 'day' | 'timing'; label: string }[] = [];
+  const cat = getFirstCategory(event);
+  if (cat) out.push({ type: 'category', label: cat });
+  const day = getDayFromDate(event);
+  if (day) out.push({ type: 'day', label: day });
+  const timing = getTimingForEvent(event);
+  if (timing) out.push({ type: 'timing', label: timing });
+  return out.slice(0, 3);
+}
+
+// Legacy: full category list (for embedded card etc.)
+function getCategoryTags(event: any): string[] {
+  const first = getFirstCategory(event);
+  return first ? [first] : [];
+}
+
 function getDayTimeTags(event: any): string[] {
   const t = event?.temporal_tags;
   if (Array.isArray(t) && t.length > 0) return t.map((x: any) => String(x).trim()).filter(Boolean);
@@ -49,6 +122,7 @@ function getDayTimeTags(event: any): string[] {
 // --- The Base Event Card ---
 function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSharePress, onImagePress, onInteractedPillPress, isRepost = false, repostData, originalAuthor, originalPostTitle, originalPostDescription, joinDisabled = false, hideFooterActions = false, hideTags = false }: any) {
   const allTags = hideTags ? [] : getAllEventTags(event);
+  const orderedPillTags = hideTags ? [] : getOrderedEventPillTags(event); // max 3: category, day, timing
   const categoryTags = hideTags ? [] : getCategoryTags(event);
   const dayTimeTags = hideTags ? [] : getDayTimeTags(event);
   const hasEventImage = event?.image && String(event.image).trim();
@@ -161,28 +235,24 @@ function EventCard({ user, event, onUserPress, onRequireAuth, onJoinPress, onSha
               <Text style={styles.title}>{event.title}</Text>
               <Text style={styles.description} numberOfLines={4}>{event.description}</Text>
               <View style={styles.middleRow}>
-                {!hideTags && (categoryTags.length > 0 || dayTimeTags.length > 0) && (
-                <View style={styles.tagsColumn}>
-                  {categoryTags.length > 0 && (
-                    <View style={styles.tagsContainer}>
-                      {categoryTags.map((tag: string, index: number) => (
-                        <View key={`cat-${index}`} style={styles.tag}>
-                          <Ionicons name={tag === 'Hitchhiking' ? 'walk' : 'pricetag'} size={14} color="#555" style={{ marginRight: 6 }} />
-                          <Text style={styles.tagText}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                  {dayTimeTags.length > 0 && (
-                    <View style={[styles.tagsContainer, styles.tagsContainerSecondRow]}>
-                      {dayTimeTags.map((tag: string, index: number) => (
-                        <View key={`dt-${index}`} style={styles.tag}>
-                          <Ionicons name="time-outline" size={14} color="#555" style={{ marginRight: 6 }} />
-                          <Text style={styles.tagText}>{tag}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                {!hideTags && orderedPillTags.length > 0 && (
+                <View style={styles.tagsColumnTwoRows}>
+                  <View style={styles.tagsRow}>
+                    {orderedPillTags.filter((t) => t.type === 'category').map((item, index) => (
+                      <View key={`cat-${index}`} style={styles.tag}>
+                        <Ionicons name={item.label === 'Hitchhiking' ? 'walk' : 'pricetag'} size={12} color="#555" style={{ marginRight: 5 }} />
+                        <Text style={styles.tagText}>{item.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.tagsRow}>
+                    {orderedPillTags.filter((t) => t.type === 'day' || t.type === 'timing').map((item, index) => (
+                      <View key={`dt-${item.type}-${index}`} style={styles.tag}>
+                        <Ionicons name={item.type === 'day' ? 'calendar-outline' : 'time-outline'} size={12} color="#555" style={{ marginRight: 5 }} />
+                        <Text style={styles.tagText}>{item.label}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
                 )}
                 {hasEventImage ? (
@@ -387,52 +457,12 @@ export default function SwipeableEventCard({ user, event, postId, onUserPress, o
           }}
         />
       )}
-      {/* Who joined modal – show list of interacted/registered users */}
-      <Modal
+      <GuestListModal
         visible={showJoinedListModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowJoinedListModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.joinedListOverlay}
-          activeOpacity={1}
-          onPress={() => setShowJoinedListModal(false)}
-        >
-          <View style={styles.joinedListSheet} pointerEvents="box-none">
-            <View style={styles.joinedListHandle} />
-            <Text style={styles.joinedListTitle}>Who joined</Text>
-            <ScrollView style={styles.joinedListScroll} contentContainerStyle={styles.joinedListContent}>
-              {(event?.interacted_users || []).map((u: any) => (
-                <TouchableOpacity
-                  key={u?.id}
-                  style={styles.joinedListRow}
-                  onPress={() => {
-                    setShowJoinedListModal(false);
-                    onUserPress?.(u?.id);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Avatar uri={u?.avatar ?? undefined} size={44} />
-                  <Text style={styles.joinedListName}>{u?.name ?? 'User'}</Text>
-                  <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
-                </TouchableOpacity>
-              ))}
-              {(event?.interaction_count ?? 0) > (event?.interacted_users?.length ?? 0) && (
-                <Text style={styles.joinedListMore}>
-                  +{(event?.interaction_count ?? 0) - (event?.interacted_users?.length ?? 0)} more
-                </Text>
-              )}
-              {(!event?.interacted_users?.length && (event?.interaction_count ?? 0) === 0) && (
-                <Text style={styles.joinedListEmpty}>No one has joined yet.</Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity style={styles.joinedListCloseBtn} onPress={() => setShowJoinedListModal(false)}>
-              <Text style={styles.joinedListCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+        onClose={() => setShowJoinedListModal(false)}
+        planId={postId}
+        planType="regular"
+      />
       {/* Full-screen image gallery (same UX as business-plan [planId]) */}
       <Modal
         visible={showImageGallery}
@@ -516,7 +546,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 22,
-    maxWidth: '48%',
+    maxWidth: '50%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -744,11 +774,13 @@ const styles = StyleSheet.create({
   description: { fontSize: 16, fontFamily: fontBody, color: '#444', lineHeight: 22, marginBottom: 16 },
   middleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   tagsColumn: { flex: 1, flexDirection: 'column', gap: 8 },
-  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tagsColumnTwoRows: { flex: 1, minWidth: 0, flexDirection: 'column', gap: 6, marginTop: 6 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center', marginTop: 6 },
+  tagsContainer: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignContent: 'flex-start', maxHeight: 60 },
   tagsContainerSecondRow: { marginTop: 0 },
-  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14 },
-  tagText: { fontSize: 16, fontWeight: '600', fontFamily: fontBody, color: '#333' },
-  eventImage: { width: 96, height: 96, borderRadius: 12, marginLeft: 12 },
+  tag: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F2F2F7', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  tagText: { fontSize: 13, fontWeight: '700', fontFamily: fontBody, color: '#333' },
+  eventImage: { width: 120, height: 120, borderRadius: 14, marginLeft: 12 },
   eventImagePlaceholder: {
     backgroundColor: '#E5E5EA',
     justifyContent: 'center',
@@ -757,7 +789,7 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 8,
     gap: 10,
     alignSelf: 'stretch',
     width: '100%',

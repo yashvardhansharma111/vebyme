@@ -231,6 +231,172 @@ export default function CreateBusinessPostScreen() {
   const openedFromMyPlansRef = useRef(false);
   const insets = useSafeAreaInsets();
 
+  // On focus: either load plan from My Events (Duplicate/Edit) or reset form so screen is always empty by default
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const loadPlanData = async () => {
+        try {
+          const planDataStr = await AsyncStorage.getItem("planForCreation");
+          if (cancelled) return;
+
+          // No stored plan (or invalid): reset form and clear any cache so screen opens empty
+          if (!planDataStr) {
+            openedFromMyPlansRef.current = false;
+            isEditFlowRef.current = false;
+            setEditMode(false);
+            setPlanId(null);
+            setTitle("");
+            setDescription("");
+            setMedia([]);
+            setLocation("Bengaluru");
+            setSelectedDate(null);
+            setShowDatePicker(false);
+            setTimeEnabled(false);
+            setStartTime(null);
+            setEndTime(null);
+            setStartTimeText("");
+            setEndTimeText("");
+            setShowStartTimePicker(false);
+            setShowEndTimePicker(false);
+            setShowTimeWheelPicker(false);
+            setSelectedCategory("");
+            setSelectedSubcategories([]);
+            setTicketsEnabled(false);
+            setPasses([]);
+            setSelectedAdditionalSettings([]);
+            setAdditionalDetails({});
+            setCustomAdditionalInfo([]);
+            setWomenOnly(false);
+            setHideGuestListFromViewers(false);
+            setShareToAnnouncementGroup(false);
+            setShowPreview(false);
+            setShowPostSuccessModal(false);
+            setCreatedPlanIdForSuccess(null);
+            setShowTicketPreview(false);
+            setFormId(null);
+            setSelectedForm(null);
+            setDraftFormFields([]);
+            setLimitRegistrationEnabled(false);
+            setRegistrationLimit("");
+            setStartAmPm("AM");
+            setEndAmPm("PM");
+            setDescriptionHeight(100);
+            await AsyncStorage.removeItem("planForCreation");
+            return;
+          }
+
+          const planData = JSON.parse(planDataStr);
+          const isEdit = planData.mode === "edit";
+          const isDuplicate = planData.mode === "duplicate";
+          if (!isEdit && !isDuplicate) {
+            await AsyncStorage.removeItem("planForCreation");
+            return;
+          }
+
+          openedFromMyPlansRef.current = true;
+          if (isEdit && planData.plan_id) {
+            setEditMode(true);
+            setPlanId(planData.plan_id);
+            isEditFlowRef.current = true;
+          } else {
+            setEditMode(false);
+            setPlanId(null);
+          }
+
+          if (planData.title) setTitle(planData.title);
+          if (planData.description) setDescription(planData.description);
+          if (planData.location_text) setLocation(planData.location_text);
+
+          if (planData.date) {
+            const d = new Date(planData.date);
+            if (!isNaN(d.getTime())) setSelectedDate(d);
+          }
+          if (planData.time) {
+            setTimeEnabled(true);
+            setStartTimeText(planData.time);
+            const parsed = parseTimeText(planData.time);
+            if (parsed) setStartTime(parsed);
+          }
+
+          if (planData.category_main) {
+            const main = (planData.category_main || "").toLowerCase().trim();
+            const displayCategory =
+              CATEGORY_TAGS.find((t) => t.toLowerCase().trim() === main) ||
+              planData.category_main;
+            setSelectedCategory(displayCategory);
+          }
+          if (planData.category_sub && Array.isArray(planData.category_sub)) {
+            setSelectedSubcategories(planData.category_sub);
+          }
+
+          if (planData.media && planData.media.length > 0) {
+            const mediaItems = planData.media.map((item: any) => ({
+              uri: typeof item === "object" && item?.url ? item.url : item,
+              type:
+                (typeof item === "object" && item?.type === "video"
+                  ? "video"
+                  : "image") as "image" | "video",
+            }));
+            setMedia(mediaItems);
+          }
+
+          if (planData.passes && planData.passes.length > 0) {
+            setTicketsEnabled(true);
+            const mappedPasses: Pass[] = planData.passes.map((p: any) => ({
+              pass_id: p.pass_id || `pass_${Date.now()}_${Math.random()}`,
+              name: p.name || "",
+              price: typeof p.price === "number" ? p.price : -1,
+              description: p.description || "",
+              capacity: p.capacity,
+              media:
+                p.media && p.media.length > 0
+                  ? [{ uri: p.media[0]?.url || p.media[0], type: "image" as const }]
+                  : [],
+              isExisting: isEdit,
+            }));
+            setPasses(mappedPasses);
+          }
+
+          if (planData.add_details && planData.add_details.length > 0) {
+            const settingIds: string[] = [];
+            const details: { [key: string]: { title: string; description: string } } = {};
+            for (const d of planData.add_details) {
+              const id = d.detail_type || d.title;
+              if (id && !settingIds.includes(id)) settingIds.push(id);
+              details[id] = {
+                title: d.title || ADDITIONAL_SETTINGS.find((s) => s.id === id)?.label || id,
+                description: d.description || "",
+              };
+            }
+            setSelectedAdditionalSettings(settingIds);
+            setAdditionalDetails(details);
+          }
+
+          if (planData.is_women_only !== undefined) setWomenOnly(!!planData.is_women_only);
+          if (planData.allow_view_guest_list !== undefined)
+            setHideGuestListFromViewers(!planData.allow_view_guest_list);
+          if (planData.reshare_to_announcement_group !== undefined)
+            setShareToAnnouncementGroup(!!planData.reshare_to_announcement_group);
+
+          if (planData.form_id) setFormId(planData.form_id);
+          if (planData.registration_limit != null && planData.registration_limit > 0) {
+            setLimitRegistrationEnabled(true);
+            setRegistrationLimit(String(planData.registration_limit - 1));
+          }
+
+          await AsyncStorage.removeItem("planForCreation");
+        } catch (error) {
+          if (!cancelled) console.error("Error loading plan data:", error);
+        }
+      };
+      loadPlanData();
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
   // Form-related state
   const [formId, setFormId] = useState<string | null>(null);
   const [showFormSelector, setShowFormSelector] = useState(false);
@@ -1100,7 +1266,7 @@ export default function CreateBusinessPostScreen() {
           <Ionicons name="arrow-back" size={24} color="#1C1C1E" />
         </TouchableOpacity>
         <Text style={styles.createPostHeaderTitle}>
-          {editMode ? "Editing post" : "Create Post"}
+          {editMode ? "Edit plan" : "Create Post"}
         </Text>
         <View style={styles.backButtonHeader} />
       </View>
@@ -2390,7 +2556,7 @@ export default function CreateBusinessPostScreen() {
               <ActivityIndicator color="#FFF" />
             ) : (
               <Text style={styles.postButtonText}>
-                {editMode ? "Update" : "Post"}
+                {editMode ? "Edit post" : "Post"}
               </Text>
             )}
           </TouchableOpacity>

@@ -41,6 +41,8 @@ interface BusinessCardProps {
     location_text?: string;
     date?: string | Date;
     time?: string;
+    /** When the post was created – used for organiser pill (e.g. "Monday, 2:36pm") */
+    created_at?: string | Date;
     category_main?: string;
     category_sub?: string[];
     temporal_tags?: string[];
@@ -48,6 +50,7 @@ interface BusinessCardProps {
       detail_type: string;
       title?: string;
       description?: string;
+      heading?: string;
     }>;
     passes?: Array<{
       pass_id: string;
@@ -159,21 +162,27 @@ function BusinessCardBase({
   const organizerName = user?.name || plan.user?.name || "Organizer";
   const organizerAvatar = user?.avatar || plan.user?.profile_image;
   const organizerUserId = plan.user?.user_id;
-  const timeText = plan.time
-    ? `${plan.time} onwards`
-    : plan.date
-      ? new Date(plan.date).toLocaleDateString()
-      : "";
+  // Organiser pill: day and time when the post was created, e.g. "Monday, 2:36pm"
+  const timeText = (() => {
+    const created = plan.created_at ?? plan.date;
+    if (created) {
+      const d = typeof created === "string" ? new Date(created) : created;
+      return d.toLocaleDateString("en-US", { weekday: "long", hour: "numeric", minute: "2-digit", hour12: true });
+    }
+    if (plan.time) return plan.time;
+    return "";
+  })();
   const passes = plan.passes || [];
   const prices = passes.filter((p) => p.price > 0).map((p) => p.price);
   const firstTicketPrice = prices.length > 0 ? Math.min(...prices) : null;
   const addDetails = plan.add_details || [];
   const detailByType = (type: string) =>
     addDetails.find((d) => d.detail_type === type);
-  const distanceLabel =
-    detailByType("distance")?.title || detailByType("distance")?.description;
-  const fbLabel =
-    detailByType("f&b")?.title || detailByType("f&b")?.description;
+  // Prefer description (user value e.g. "42km", "Post Run Coffee") over title (field label e.g. "Distance", "F&B")
+  const getDetailLabel = (d: { title?: string; description?: string; heading?: string } | undefined) =>
+    d ? (d.description || d.title || d.heading || "").trim() : "";
+  const distanceLabel = getDetailLabel(detailByType("distance"));
+  const fbLabel = getDetailLabel(detailByType("f&b"));
   const locationLabel = plan.location_text?.trim();
 
   const pauseAutoScroll = () => {
@@ -223,7 +232,31 @@ function BusinessCardBase({
       if (autoScrollTimerRef.current) clearInterval(autoScrollTimerRef.current);
     };
   }, []);
-  // Tags order: Only category
+
+  // Map time string to timing slot: Morning, Afternoon, Evening, Night
+  const getTimingFromTime = (timeStr: string | undefined): string | null => {
+    if (!timeStr || !String(timeStr).trim()) return null;
+    const s = String(timeStr).trim().toLowerCase();
+    const hourMatch = s.match(/(\d{1,2})\s*:\s*(\d{2})?\s*(am|pm)?|(\d{1,2})\s*(am|pm)/i);
+    let hour = 12;
+    if (hourMatch) {
+      const h = parseInt(hourMatch[1] || hourMatch[4] || "12", 10);
+      const pm = (hourMatch[3] || hourMatch[5] || "").toLowerCase() === "pm";
+      hour = h === 12 ? (pm ? 12 : 0) : pm ? h + 12 : h;
+    } else {
+      if (s.includes("morning")) return "Morning";
+      if (s.includes("afternoon")) return "Afternoon";
+      if (s.includes("evening")) return "Evening";
+      if (s.includes("night")) return "Night";
+      return null;
+    }
+    if (hour >= 5 && hour < 12) return "Morning";
+    if (hour >= 12 && hour < 17) return "Afternoon";
+    if (hour >= 17 && hour < 20) return "Evening";
+    return "Night";
+  };
+
+  // Business card tags: max 4, priority 1) additional (distance, f&b, dress code, music type) 2) category 3) day 4) timing
   const cardTags: {
     type:
       | "price"
@@ -232,49 +265,58 @@ function BusinessCardBase({
       | "location"
       | "category"
       | "temporal"
+      | "day"
+      | "timing"
       | "additional";
     label: string;
   }[] = [];
-  if (firstTicketPrice != null && firstTicketPrice > 0)
-    cardTags.push({ type: "price", label: `₹${firstTicketPrice}` });
-  else if (
-    firstTicketPrice === 0 ||
-    (passes.length > 0 && firstTicketPrice == null)
-  )
-    cardTags.push({ type: "price", label: "Free" });
 
-  // Helper to capitalize first letter
-  const capitalizeLabel = (label: string): string => {
-    return label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
-  };
+  const capitalizeLabel = (label: string): string =>
+    label.charAt(0).toUpperCase() + label.slice(1).toLowerCase();
 
-  // Add category_main and track it to avoid duplicates
+  // 1) Additional info in order: distance, f&b, dress code, music type (e.g. "5k", "Post Run Coffee", then category, day)
+  const additionalOrder: Array<{ type: string; getLabel: () => string }> = [
+    { type: "distance", getLabel: () => distanceLabel },
+    { type: "f&b", getLabel: () => fbLabel },
+    { type: "dress_code", getLabel: () => getDetailLabel(detailByType("dress_code")) },
+    { type: "music_type", getLabel: () => getDetailLabel(detailByType("music_type")) },
+  ];
+  for (const { getLabel } of additionalOrder) {
+    const label = getLabel?.();
+    if (label) cardTags.push({ type: "additional", label });
+  }
+
+  // 2) Category (one: category_main or first category_sub)
   const addedCategories = new Set<string>();
   if (plan.category_main) {
     const capitalizedMain = capitalizeLabel(plan.category_main);
     cardTags.push({ type: "category", label: capitalizedMain });
     addedCategories.add(capitalizedMain.toLowerCase());
   }
-
-  // Add category_sub, but skip duplicates (case-insensitive) and capitalize
-  if (plan.category_sub?.length) {
-    for (const sub of plan.category_sub) {
-      if (sub) {
-        const capitalizedSub = capitalizeLabel(sub);
-        if (!addedCategories.has(capitalizedSub.toLowerCase())) {
-          cardTags.push({ type: "category", label: capitalizedSub });
-          addedCategories.add(capitalizedSub.toLowerCase());
-        }
-      }
+  if (plan.category_sub?.length && cardTags.filter((t) => t.type === "category").length === 0) {
+    const first = plan.category_sub.find((sub) => sub && String(sub).trim());
+    if (first) {
+      const capitalizedSub = capitalizeLabel(first);
+      cardTags.push({ type: "category", label: capitalizedSub });
     }
   }
 
-  if (plan.temporal_tags?.length) {
-    for (const t of plan.temporal_tags) {
-      if (t) cardTags.push({ type: "temporal", label: t });
+  // 3) Day (weekday from event date)
+  if (plan.date) {
+    try {
+      const d = typeof plan.date === "string" ? new Date(plan.date) : plan.date;
+      const dayLabel = d.toLocaleDateString("en-US", { weekday: "long" });
+      if (dayLabel) cardTags.push({ type: "day", label: dayLabel });
+    } catch {
+      // ignore
     }
   }
-  const tagsToShow = cardTags.slice(0, 10);
+
+  // 4) Timing (Morning, Evening, Afternoon, Night) if start time mentioned
+  const timingSlot = getTimingFromTime(plan.time);
+  if (timingSlot) cardTags.push({ type: "timing", label: timingSlot });
+
+  const tagsToShow = cardTags.slice(0, 4);
   const displayUsers = interactedUsers?.slice(0, 3) || [];
 
   const handleShare = () => {
@@ -468,9 +510,16 @@ function BusinessCardBase({
                           color="#3C3C43"
                           style={styles.tagIcon}
                         />
-                      ) : item.type === "temporal" ? (
+                      ) : item.type === "temporal" || item.type === "timing" ? (
                         <Ionicons
                           name="time-outline"
+                          size={10}
+                          color="#3C3C43"
+                          style={styles.tagIcon}
+                        />
+                      ) : item.type === "day" ? (
+                        <Ionicons
+                          name="calendar-outline"
                           size={10}
                           color="#3C3C43"
                           style={styles.tagIcon}
@@ -586,8 +635,8 @@ function BusinessCardBase({
           </View>
         </TouchableOpacity>
 
-        {/* Attendees: only when joiners > 0. 1→1 circle, 2→2 circles, 3→3 circles, 4+→3 circles + overflow count */}
-        {attendeesCount > 0 &&
+        {/* Attendees / guest list: show when we have joiners or when guest list is available (so icon is always tappable) */}
+        {(attendeesCount > 0 || onGuestListPress) &&
           (() => {
             const numCircles = Math.min(3, attendeesCount);
             const pillStyle = [
@@ -597,20 +646,24 @@ function BusinessCardBase({
             ];
             const content = (
               <>
-                {Array.from({ length: numCircles }, (_, idx) => {
-                  const u = displayUsers[idx];
-                  return (
-                    <View
-                      key={u?.id ?? idx}
-                      style={[
-                        styles.interactedAvatarWrap,
-                        { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx },
-                      ]}
-                    >
-                      <Avatar uri={u?.avatar ?? undefined} size={20} />
-                    </View>
-                  );
-                })}
+                {numCircles > 0 ? (
+                  Array.from({ length: numCircles }, (_, idx) => {
+                    const u = displayUsers[idx];
+                    return (
+                      <View
+                        key={u?.id ?? idx}
+                        style={[
+                          styles.interactedAvatarWrap,
+                          { marginLeft: idx === 0 ? 0 : -10, zIndex: 3 - idx },
+                        ]}
+                      >
+                        <Avatar uri={u?.avatar ?? undefined} size={20} />
+                      </View>
+                    );
+                  })
+                ) : (
+                  <Ionicons name="people-outline" size={20} color="#1C1C1E" style={{ marginRight: 4 }} />
+                )}
                 {attendeesCount > 3 && (
                   <Text style={styles.interactedPlus}>
                     +{attendeesCount - 3}
@@ -868,6 +921,7 @@ export default function BusinessCard({
           visible={showGuestListModal}
           onClose={() => setShowGuestListModal(false)}
           planId={plan.plan_id}
+          planType="business"
           onRegisterPress={() => {
             setShowGuestListModal(false);
             onRegisterPress?.();
@@ -918,6 +972,7 @@ export default function BusinessCard({
         visible={showGuestListModal}
         onClose={() => setShowGuestListModal(false)}
         planId={plan.plan_id}
+        planType="business"
         onRegisterPress={() => {
           setShowGuestListModal(false);
           onRegisterPress?.();
@@ -1037,7 +1092,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: "#FFF",
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     borderRadius: 22,
     maxWidth: "48%",
     shadowColor: "#000",
@@ -1129,13 +1184,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     maxHeight: 36,
     flexGrow: 0,
+    width: "100%",
   },
   tagsScrollContent: {
     flexDirection: "row",
     flexWrap: "nowrap",
     alignItems: "center",
     gap: 8,
-    paddingRight: 8,
+    paddingRight: 24,
   },
   tag: {
     flexDirection: "row",

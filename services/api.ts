@@ -1207,6 +1207,14 @@ class ApiService {
     }>(`/ticket/guest-list/${plan_id}`, { method: 'GET' });
   }
 
+  /** Joined users for regular plans (approved interactions). Use for guest list modal on normal event cards. */
+  async getJoinedUsers(plan_id: string) {
+    return this.request<{
+      guests: Array<{ user_id: string; name: string; profile_image: string | null; bio?: string }>;
+      total: number;
+    }>(`/post/joined-users/${plan_id}`, { method: 'GET' });
+  }
+
   async manualCheckIn(registration_id: string, user_id: string, action: 'checkin' | 'checkout') {
     return this.request<any>('/ticket/checkin', {
       method: 'POST',
