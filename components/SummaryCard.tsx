@@ -25,7 +25,6 @@ export default function SummaryCard({
   const displayAvatars = [...avatars]
     .filter((a) => a != null && a !== '')
     .slice(0, 3);
-  const showCount = totalCount > 1 ? `+${totalCount}` : `${totalCount}`;
   const descriptionText = eventDescription?.trim().replace(/\s*vybeme!?\s*$/i, '').trim() || '';
 
   return (
@@ -55,9 +54,6 @@ export default function SummaryCard({
                   <Avatar uri={avatar} size={AVATAR_SIZE} />
                 </View>
               ))}
-              <View style={[styles.placeholderTextWrapper, styles.frameItemLayout]}>
-                <Text style={styles.placeholderText}>{showCount}</Text>
-              </View>
             </View>
           </View>
         </View>

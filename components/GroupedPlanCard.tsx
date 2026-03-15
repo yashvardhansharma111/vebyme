@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator, Modal, ScrollView, Share, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager, ActivityIndicator, Modal, ScrollView, Share, Alert, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Avatar from './Avatar';
@@ -40,6 +40,8 @@ interface GroupedPlanCardProps {
   showInteractions?: boolean;
   /** When true, hide the count badge (e.g. after user has opened/viewed this card) */
   hideCountBadge?: boolean;
+  /** Badge shows this count (new registrations only); only visible when > 0 */
+  newRegistrationCount?: number;
   /** User IDs already in the announcement group (shown as selected and disabled in Add to Community) */
   alreadyInAnnouncementGroupIds?: Set<string> | string[];
 }
@@ -63,6 +65,7 @@ export default function GroupedPlanCard({
   index = 0,
   showInteractions = false,
   hideCountBadge = false,
+  newRegistrationCount,
   alreadyInAnnouncementGroupIds,
 }: GroupedPlanCardProps) {
   const router = useRouter();
@@ -74,6 +77,8 @@ export default function GroupedPlanCard({
   const [showAddToCommunityModal, setShowAddToCommunityModal] = useState(false);
   const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
   const [interactionFilter, setInteractionFilter] = useState<'all' | 'first_timers' | 'returning'>('all');
+  const [addToCommunitySearch, setAddToCommunitySearch] = useState('');
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [planDetails, setPlanDetails] = useState<null | { passes?: any[]; add_details?: any[]; location_text?: string; category_main?: string; category_sub?: string[] }>(null);
 
   const alreadyInGroupSet = React.useMemo(() => {
@@ -200,7 +205,6 @@ export default function GroupedPlanCard({
   const avatars = avatarUsers.map((i) => 
     i.user?.profile_image || userCache[i.source_user_id]?.profile_image || null
   );
-  const remainingCount = Math.max(0, uniqueInteractions.length - 3);
 
   const postText = post?.description || post?.title || 'Post interaction';
   const postTitle = post?.title || 'Untitled Plan';
@@ -211,6 +215,12 @@ export default function GroupedPlanCard({
     if (interactionFilter === 'first_timers') return guests.filter((g) => !g.is_returning);
     return guests.filter((g) => g.is_returning);
   }, [guests, interactionFilter]);
+
+  const addToCommunitySearchLower = addToCommunitySearch.trim().toLowerCase();
+  const filteredModalGuests = React.useMemo(() => {
+    if (!addToCommunitySearchLower) return filteredGuests;
+    return filteredGuests.filter((g) => (g.name || '').toLowerCase().includes(addToCommunitySearchLower));
+  }, [filteredGuests, addToCommunitySearchLower]);
 
   // Truncate description for collapsed view
   const shortDescription = postText.length > 100 
@@ -239,7 +249,8 @@ export default function GroupedPlanCard({
   const handleAddToCommunityPress = (e: any) => {
     e?.stopPropagation?.();
     if (onAddToCommunity) {
-      setSelectedGuestIds(new Set(guests.map((g) => g.user_id)));
+      setSelectedGuestIds(new Set(selectableGuests.map((g) => g.user_id)));
+      setAddToCommunitySearch('');
       setShowAddToCommunityModal(true);
     } else if (onCreateGroup) {
       onCreateGroup();
@@ -277,20 +288,29 @@ export default function GroupedPlanCard({
     });
   };
 
-  const handleDownloadData = async (e: any) => {
-    e?.stopPropagation?.();
+  const handleDownloadData = async (format: 'csv' | 'pdf' | 'excel') => {
+    setShowDownloadModal(false);
     if (guests.length === 0) return;
     const header = 'Name,Type';
     const rows = guests.map((g) => `${(g.name || '').replace(/,/g, ' ')},${g.is_returning ? 'Returning' : 'First-timer'}`);
     const csv = [header, ...rows].join('\n');
     try {
-      await Share.share({
-        message: csv,
-        title: 'Registrations',
-      });
+      if (format === 'csv') {
+        await Share.share({ message: csv, title: 'Registrations.csv' });
+        return;
+      }
+      if (format === 'excel') {
+        const excelHeader = 'Name\tType';
+        const excelRows = guests.map((g) => `${(g.name || '').replace(/\t/g, ' ')}\t${g.is_returning ? 'Returning' : 'First-timer'}`);
+        await Share.share({ message: [excelHeader, ...excelRows].join('\n'), title: 'Registrations.xls' });
+        return;
+      }
+      if (format === 'pdf') {
+        await Share.share({ message: csv, title: 'Registrations (PDF text)' });
+      }
     } catch (err: any) {
       if (err?.message !== 'User did not share') {
-        Alert.alert('Error', err?.message || 'Failed to share data');
+        Alert.alert('Error', err?.message || 'Failed to download data');
       }
     }
   };
@@ -325,10 +345,10 @@ export default function GroupedPlanCard({
         onPress={handleToggleExpand}
         activeOpacity={0.9}
       >
-        {/* Numeric Badge - hidden after user has opened/viewed this card */}
-        {!hideCountBadge && (
+        {/* Numeric Badge - new registrations only; hidden when 0 or after viewed */}
+        {!hideCountBadge && (newRegistrationCount ?? 0) > 0 && (
           <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>{interactionCount}</Text>
+            <Text style={styles.badgeText}>{newRegistrationCount}</Text>
           </View>
         )}
 
@@ -352,30 +372,28 @@ export default function GroupedPlanCard({
           <>
             <View style={styles.analyticsRow}>
               <TouchableOpacity
-                style={[styles.analyticsItem, interactionFilter === 'all' && styles.analyticsItemActive]}
+                style={[styles.analyticsBlock, interactionFilter === 'all' && styles.analyticsBlockActive]}
                 onPress={() => setInteractionFilter('all')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.analyticsLabel}>Registrations</Text>
-                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+                <Text style={styles.analyticsBlockValue}>{loadingAnalytics ? '—' : String(analytics?.registered_count ?? 0)}</Text>
+                <Text style={[styles.analyticsBlockLabel, interactionFilter === 'all' && styles.analyticsBlockLabelActive]}>Registrations</Text>
               </TouchableOpacity>
-              <View style={styles.analyticsDivider} />
               <TouchableOpacity
-                style={[styles.analyticsItem, interactionFilter === 'first_timers' && styles.analyticsItemActive]}
+                style={[styles.analyticsBlock, interactionFilter === 'first_timers' && styles.analyticsBlockActive]}
                 onPress={() => setInteractionFilter('first_timers')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.analyticsLabel}>First-timers</Text>
-                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
+                <Text style={styles.analyticsBlockValue}>{loadingAnalytics ? '—' : String(analytics?.first_timers_count ?? 0)}</Text>
+                <Text style={[styles.analyticsBlockLabel, interactionFilter === 'first_timers' && styles.analyticsBlockLabelActive]}>First-timers</Text>
               </TouchableOpacity>
-              <View style={styles.analyticsDivider} />
               <TouchableOpacity
-                style={[styles.analyticsItem, interactionFilter === 'returning' && styles.analyticsItemActive]}
+                style={[styles.analyticsBlock, interactionFilter === 'returning' && styles.analyticsBlockActive]}
                 onPress={() => setInteractionFilter('returning')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.analyticsLabel}>Returning</Text>
-                <Text style={styles.analyticsValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+                <Text style={styles.analyticsBlockValue}>{loadingAnalytics ? '—' : String(analytics?.returning_count ?? 0)}</Text>
+                <Text style={[styles.analyticsBlockLabel, interactionFilter === 'returning' && styles.analyticsBlockLabelActive]}>Returning</Text>
               </TouchableOpacity>
             </View>
             {/* View Ticket Distribution - State 3 only (above registered list) */}
@@ -406,20 +424,6 @@ export default function GroupedPlanCard({
                 <Avatar uri={avatar} size={32} />
               </View>
             ))}
-            {remainingCount > 0 && (
-              <View
-                style={[
-                  styles.avatarWrapper,
-                  styles.avatarOverlay,
-                  { marginLeft: -12, zIndex: 0 },
-                ]}
-              >
-                <View style={styles.overlayBadge}>
-                  <Text style={styles.overlayBadgeText}>+{remainingCount}</Text>
-                </View>
-                <Avatar uri={null} size={32} />
-              </View>
-            )}
           </View>
         )}
 
@@ -436,25 +440,27 @@ export default function GroupedPlanCard({
                   {guests.length === 0 ? 'No registrations yet' : `No ${interactionFilter === 'all' ? '' : interactionFilter === 'first_timers' ? 'first-timer ' : 'returning '}registrations`}
                 </Text>
               ) : (
-                filteredGuests.map((guest) => (
-                  <TouchableOpacity
-                    key={guest.user_id}
-                    style={styles.registeredRow}
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      if (guest.user_id) {
-                        router.push({ pathname: '/profile/[userId]', params: { userId: guest.user_id } } as any);
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Avatar uri={guest.profile_image} size={36} />
-                    <Text style={styles.registeredText}>
-                      <Text style={styles.registeredName}>{guest.name}</Text>
-                      <Text style={styles.registeredAction}> registered</Text>
-                    </Text>
-                  </TouchableOpacity>
-                ))
+                <ScrollView style={styles.registeredListScroll} showsVerticalScrollIndicator>
+                  {filteredGuests.map((guest) => (
+                    <TouchableOpacity
+                      key={guest.user_id}
+                      style={styles.registeredRow}
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        if (guest.user_id) {
+                          router.push({ pathname: '/profile/[userId]', params: { userId: guest.user_id } } as any);
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Avatar uri={guest.profile_image} size={36} />
+                      <Text style={styles.registeredText}>
+                        <Text style={styles.registeredName}>{guest.name}</Text>
+                        <Text style={styles.registeredAction}> registered</Text>
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               )}
               {guests.length >= 2 && (
                 <View style={styles.registeredActionRow}>
@@ -471,7 +477,7 @@ export default function GroupedPlanCard({
                     style={styles.registeredActionButtonIcon}
                     onPress={(e) => {
                       e?.stopPropagation?.();
-                      handleDownloadData();
+                      setShowDownloadModal(true);
                     }}
                     activeOpacity={0.8}
                   >
@@ -484,7 +490,28 @@ export default function GroupedPlanCard({
         )}
       </TouchableOpacity>
 
-      {/* Add to Community Modal: show guest list, confirm adds them to announcement group */}
+      {/* Download Data Modal */}
+      <Modal visible={showDownloadModal} transparent animationType="fade" onRequestClose={() => setShowDownloadModal(false)}>
+        <TouchableOpacity style={styles.addToCommunityOverlay} activeOpacity={1} onPress={() => setShowDownloadModal(false)}>
+          <TouchableOpacity style={styles.downloadModalContent} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.downloadModalTitle}>Download User Data</Text>
+            <TouchableOpacity style={styles.downloadOptionRow} onPress={() => handleDownloadData('pdf')} activeOpacity={0.7}>
+              <Text style={styles.downloadOptionText}>PDF</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.downloadOptionRow} onPress={() => handleDownloadData('csv')} activeOpacity={0.7}>
+              <Text style={styles.downloadOptionText}>CSV</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.downloadOptionRow} onPress={() => handleDownloadData('excel')} activeOpacity={0.7}>
+              <Text style={styles.downloadOptionText}>EXCEL</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.downloadModalCancel} onPress={() => setShowDownloadModal(false)}>
+              <Text style={styles.downloadModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Add to Community Modal: no title, sticky Select All, search */}
       <Modal
         visible={showAddToCommunityModal}
         transparent
@@ -498,62 +525,66 @@ export default function GroupedPlanCard({
         >
           <TouchableOpacity style={styles.addToCommunityModal} activeOpacity={1} onPress={(e) => e.stopPropagation()}>
             <View style={styles.addToCommunityModalHeader}>
-              <Text style={styles.addToCommunityModalTitle}>Add to Community</Text>
               <TouchableOpacity onPress={() => setShowAddToCommunityModal(false)}>
                 <Ionicons name="close" size={24} color="#1C1C1E" />
               </TouchableOpacity>
             </View>
-            <ScrollView style={styles.addToCommunityGuestList} showsVerticalScrollIndicator={false}>
-              {filteredGuests.length === 0 ? (
+            <TextInput
+              style={styles.addToCommunitySearchInput}
+              placeholder="Search by name"
+              placeholderTextColor="#8E8E93"
+              value={addToCommunitySearch}
+              onChangeText={setAddToCommunitySearch}
+            />
+            <TouchableOpacity
+              style={styles.addToCommunitySelectAllRowSticky}
+              onPress={toggleSelectAll}
+              activeOpacity={0.7}
+              disabled={selectableGuests.length === 0}
+            >
+              <Text style={styles.addToCommunitySelectAllText}>Select All</Text>
+              <View
+                style={[
+                  styles.addToCommunityCheckbox,
+                  selectableGuests.length > 0 &&
+                    selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) &&
+                    styles.addToCommunityCheckboxSelected,
+                ]}
+              >
+                {selectableGuests.length > 0 &&
+                  selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) && (
+                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                  )}
+              </View>
+            </TouchableOpacity>
+            <ScrollView style={styles.addToCommunityGuestList} showsVerticalScrollIndicator>
+              {filteredModalGuests.length === 0 ? (
                 <Text style={styles.registeredEmpty}>
-                  {guests.length === 0 ? 'No registered users to add' : `No ${interactionFilter === 'first_timers' ? 'first-timer' : interactionFilter === 'returning' ? 'returning' : ''} users to show`}
+                  {guests.length === 0 ? 'No registered users to add' : addToCommunitySearchLower ? 'No matches' : `No ${interactionFilter === 'first_timers' ? 'first-timer' : interactionFilter === 'returning' ? 'returning' : ''} users to show`}
                 </Text>
               ) : (
-                <>
-                  {filteredGuests.map((guest) => {
-                    const isDisabled = alreadyInGroupSet.has(guest.user_id) || !!guest.is_returning;
-                    const isSelected = isDisabled || selectedGuestIds.has(guest.user_id);
-                    return (
-                      <TouchableOpacity
-                        key={guest.user_id}
-                        style={[styles.addToCommunityGuestRow, isDisabled && styles.addToCommunityGuestRowDisabled]}
-                        onPress={() => !isDisabled && toggleGuestSelection(guest.user_id)}
-                        activeOpacity={isDisabled ? 1 : 0.7}
-                        disabled={isDisabled}
-                      >
-                        <Avatar uri={guest.profile_image} size={44} />
-                        <Text style={[styles.addToCommunityGuestName, isDisabled && styles.addToCommunityGuestNameDisabled]} numberOfLines={1}>
-                          {guest.name}
-                          {guest.is_returning ? ' (returning)' : alreadyInGroupSet.has(guest.user_id) ? ' (in group)' : ''}
-                        </Text>
-                        <View style={[styles.addToCommunityCheckbox, isSelected && styles.addToCommunityCheckboxSelected]}>
-                          {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  <TouchableOpacity
-                    style={styles.addToCommunitySelectAllRow}
-                    onPress={toggleSelectAll}
-                    activeOpacity={0.7}
-                    disabled={selectableGuests.length === 0}
-                  >
-                    <Text style={styles.addToCommunitySelectAllText}>Select All</Text>
-                    <View
-                      style={[
-                        styles.addToCommunityCheckbox,
-                        selectableGuests.length > 0 &&
-                          selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) &&
-                          styles.addToCommunityCheckboxSelected,
-                      ]}
+                filteredModalGuests.map((guest) => {
+                  const isDisabled = alreadyInGroupSet.has(guest.user_id) || !!guest.is_returning;
+                  const isSelected = isDisabled || selectedGuestIds.has(guest.user_id);
+                  return (
+                    <TouchableOpacity
+                      key={guest.user_id}
+                      style={[styles.addToCommunityGuestRow, isDisabled && styles.addToCommunityGuestRowDisabled]}
+                      onPress={() => !isDisabled && toggleGuestSelection(guest.user_id)}
+                      activeOpacity={isDisabled ? 1 : 0.7}
+                      disabled={isDisabled}
                     >
-                      {selectableGuests.length > 0 &&
-                        selectableGuests.every((g) => selectedGuestIds.has(g.user_id)) && (
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                        )}
-                    </View>
-                  </TouchableOpacity>
-                </>
+                      <Avatar uri={guest.profile_image} size={44} />
+                      <Text style={[styles.addToCommunityGuestName, isDisabled && styles.addToCommunityGuestNameDisabled]} numberOfLines={1}>
+                        {guest.name}
+                        {guest.is_returning ? ' (returning)' : alreadyInGroupSet.has(guest.user_id) ? ' (in group)' : ''}
+                      </Text>
+                      <View style={[styles.addToCommunityCheckbox, isSelected && styles.addToCommunityCheckboxSelected]}>
+                        {isSelected && <Ionicons name="checkmark" size={16} color="#FFFFFF" />}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </ScrollView>
             {(() => {
@@ -650,38 +681,36 @@ const styles = StyleSheet.create({
   },
   analyticsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'space-between',
-    backgroundColor: '#F2F2F7',
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    gap: 8,
     marginBottom: 12,
   },
-  analyticsItem: {
+  analyticsBlock: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
-  analyticsLabel: {
+  analyticsBlockActive: {
+    backgroundColor: '#1C1C1E',
+  },
+  analyticsBlockValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1C1C1E',
+  },
+  analyticsBlockLabel: {
     fontSize: 11,
     color: '#8E8E93',
-    fontWeight: '600',
-  },
-  analyticsValue: {
+    fontStyle: 'italic',
     marginTop: 4,
-    fontSize: 14,
-    color: '#1C1C1E',
-    fontWeight: '800',
   },
-  analyticsDivider: {
-    width: 1,
-    height: 26,
-    backgroundColor: '#E5E5EA',
-  },
-  analyticsItemActive: {
-    backgroundColor: '#E5E5EA',
-    borderRadius: 8,
-    paddingVertical: 4,
+  analyticsBlockLabelActive: {
+    color: '#FFFFFF',
   },
   avatarsContainerTopRight: {
     position: 'absolute',
@@ -729,6 +758,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#F2F2F7',
+  },
+  registeredListScroll: {
+    maxHeight: 200,
+    marginBottom: 8,
   },
   registeredActionRow: {
     flexDirection: 'row',
@@ -806,14 +839,66 @@ const styles = StyleSheet.create({
   },
   addToCommunityModalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     marginBottom: 8,
+  },
+  addToCommunitySearchInput: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: '#1C1C1E',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  addToCommunitySelectAllRowSticky: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    marginBottom: 8,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
   },
   addToCommunityModalTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1C1C1E',
+  },
+  downloadModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    width: '100%',
+    maxWidth: 320,
+  },
+  downloadModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  downloadOptionRow: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  downloadOptionText: {
+    fontSize: 16,
+    color: '#1C1C1E',
+  },
+  downloadModalCancel: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  downloadModalCancelText: {
+    fontSize: 16,
+    color: '#8E8E93',
   },
   addToCommunityModalSubtitle: {
     fontSize: 13,

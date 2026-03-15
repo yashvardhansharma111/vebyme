@@ -57,26 +57,33 @@ export default function ChatScreen() {
   const [groups, setGroups] = useState<ChatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadedAt, setLastLoadedAt] = useState<number>(0);
+  const CACHE_TTL_MS = 60 * 1000; // 1 minute: use cache when returning to screen within this window
 
   useEffect(() => {
     if (isAuthenticated && user?.user_id) {
-      loadChats();
+      loadChats(true);
     }
   }, [isAuthenticated, user]);
 
   useFocusEffect(
     React.useCallback(() => {
-      if (isAuthenticated && user?.user_id) {
-        loadChats();
+      if (!isAuthenticated || !user?.user_id) return;
+      const now = Date.now();
+      const useCache = lastLoadedAt > 0 && now - lastLoadedAt < CACHE_TTL_MS;
+      if (useCache) {
+        setLoading(false);
+        return;
       }
-    }, [isAuthenticated, user?.user_id])
+      loadChats(false);
+    }, [isAuthenticated, user?.user_id, lastLoadedAt])
   );
 
-  const loadChats = async () => {
+  const loadChats = async (isInitialOrRefresh: boolean) => {
     if (!user?.user_id) return;
 
     try {
-      setLoading(true);
+      if (isInitialOrRefresh) setLoading(true);
       const response = await apiService.getChatLists(user.user_id);
 
       const groupsList = response?.data?.groups || [];
@@ -139,6 +146,7 @@ export default function ChatScreen() {
         const unreadChatsCount = allItems.filter((item) => (item?.unread_count ?? 0) > 0).length;
         dispatch(setChatUnreadCount(unreadChatsCount));
       }
+      setLastLoadedAt(Date.now());
     } catch (error: any) {
       console.error('[Chat] Error loading chats:', error);
     } finally {
@@ -149,7 +157,7 @@ export default function ChatScreen() {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadChats();
+    loadChats(true);
   };
 
   const getCurrentData = () => {

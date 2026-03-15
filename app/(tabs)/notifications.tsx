@@ -82,6 +82,7 @@ export default function NotificationsScreen() {
   const [viewMode, setViewMode] = useState<'summary' | 'eventsList' | 'eventDetail'>('summary');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [viewedCardIds, setViewedCardIds] = useState<Set<string>>(new Set());
+  const [addToCommunitySearch, setAddToCommunitySearch] = useState('');
   const announcementMembersLoadedRef = useRef(false);
   const userNotFoundIdsRef = useRef<Set<string>>(new Set());
   const router = useRouter();
@@ -290,7 +291,6 @@ export default function NotificationsScreen() {
 
   const openGroupModal = async (postId: string) => {
     setCurrentPostId(postId);
-    setSelectedUsers(new Set());
     setShowGroupModal(true);
     setLoadingAnnouncementMembers(true);
     try {
@@ -309,12 +309,19 @@ export default function NotificationsScreen() {
           });
         }
         setAnnouncementMemberIds(ids);
+        const group = notifications.find((n) => n.post_id === postId);
+        const available = group ? [...new Set(group.interactions.map((i) => i.source_user_id))].filter((id) => id && !ids.has(String(id))) : [];
+        setSelectedUsers(new Set(available));
       } else {
         setAnnouncementMemberIds(new Set());
+        const group = notifications.find((n) => n.post_id === postId);
+        const available = group ? [...new Set(group.interactions.map((i) => i.source_user_id))].filter(Boolean) : [];
+        setSelectedUsers(new Set(available));
       }
     } catch {
       setAnnouncementGroupId(null);
       setAnnouncementMemberIds(new Set());
+      setSelectedUsers(new Set());
     } finally {
       setLoadingAnnouncementMembers(false);
     }
@@ -324,6 +331,7 @@ export default function NotificationsScreen() {
     setShowGroupModal(false);
     setCurrentPostId(null);
     setSelectedUsers(new Set());
+    setAddToCommunitySearch('');
   };
 
   const toggleUserSelection = (userId: string) => {
@@ -421,12 +429,17 @@ export default function NotificationsScreen() {
   const currentGroup = currentPostId ? notifications.find((n) => n.post_id === currentPostId) : null;
   const uniqueUserIds = currentGroup ? [...new Set(currentGroup.interactions.map((i) => i.source_user_id))] : [];
   const availableUserIds = uniqueUserIds.filter((id) => id && !announcementMemberIds.has(id));
+  const searchLower = addToCommunitySearch.trim().toLowerCase();
+  const filteredAvailableUserIds = searchLower
+    ? availableUserIds.filter((id) => (userCache[id]?.name ?? '').toLowerCase().includes(searchLower))
+    : availableUserIds;
   const allSelected = availableUserIds.length > 0 && selectedUsers.size === availableUserIds.length;
 
   const CARD_INTERACTION_TYPES = ['comment', 'reaction', 'join', 'repost'];
   const BUSINESS_PLAN_NOTIFICATION_TYPES = ['event_ended', 'event_ended_registered', 'event_ended_attended', 'post_live', 'free_event_cancelled', 'paid_event_cancelled'];
-  // Grouped plan cards: social-only for regular users; for business users also include plans with event_ended* etc. so recent plans appear in the stack
-  const groupedPlanCards = notifications
+  // One card per event: merge all groups with same plan_id into a single card
+  const groupedByPlanId = new Map<string, NotificationGroup>();
+  notifications
     .filter((n) => {
       if (!n.post || !n.post.plan_id || n.interactions.length === 0) return false;
       if (isBusinessUser) {
@@ -436,11 +449,23 @@ export default function NotificationsScreen() {
       }
       return n.interactions.every((i) => CARD_INTERACTION_TYPES.includes(i.type));
     })
-    .sort((a, b) => {
-      const aLatest = Math.max(...a.interactions.map((i) => new Date(i.created_at).getTime()));
-      const bLatest = Math.max(...b.interactions.map((i) => new Date(i.created_at).getTime()));
-      return bLatest - aLatest;
+    .forEach((n) => {
+      const planId = n.post!.plan_id;
+      if (!groupedByPlanId.has(planId)) {
+        groupedByPlanId.set(planId, { ...n, interactions: [...n.interactions] });
+      } else {
+        const existing = groupedByPlanId.get(planId)!;
+        existing.interactions.push(...n.interactions);
+        const existingLatest = Math.max(...existing.interactions.map((i) => new Date(i.created_at).getTime()));
+        const thisLatest = Math.max(...n.interactions.map((i) => new Date(i.created_at).getTime()));
+        if (thisLatest > existingLatest) existing.created_at = n.created_at;
+      }
     });
+  const groupedPlanCards = Array.from(groupedByPlanId.values()).sort((a, b) => {
+    const aLatest = Math.max(...a.interactions.map((i) => new Date(i.created_at).getTime()));
+    const bLatest = Math.max(...b.interactions.map((i) => new Date(i.created_at).getTime()));
+    return bLatest - aLatest;
+  });
 
   // All interactions as flat list for individual notifications below the cards
   // General Notifications: Business User (6) | Regular User (5) — see spec tables
@@ -897,6 +922,9 @@ export default function NotificationsScreen() {
                       {groupedPlanCards.map((group, index) => {
                         const isExpanded = viewMode === 'eventDetail' && selectedEventId === group.post_id;
                         const shouldShowInteractions = viewMode === 'eventDetail' && selectedEventId === group.post_id;
+                        const newRegistrationCount = (group.interactions as any[]).filter(
+                          (i: any) => (i.type === 'join' || i.type === 'registration_successful') && !i.is_read
+                        ).length;
                         return (
                           <GroupedPlanCard
                             key={group.post_id}
@@ -912,6 +940,7 @@ export default function NotificationsScreen() {
                             index={index}
                             showInteractions={shouldShowInteractions}
                             hideCountBadge={viewedCardIds.has(group.post_id)}
+                            newRegistrationCount={newRegistrationCount}
                             alreadyInAnnouncementGroupIds={announcementMemberIds}
                           />
                         );
@@ -924,6 +953,7 @@ export default function NotificationsScreen() {
                 timeGroupedNotifications.yesterday.length > 0 ||
                 timeGroupedNotifications.earlierSections.length > 0) && (
                 <View style={styles.listContainer}>
+                  <ScrollView style={styles.listContainerScroll} showsVerticalScrollIndicator>
                   {timeGroupedNotifications.today.length > 0 && (
                     <>
                       <View style={styles.sectionHeader}>
@@ -998,6 +1028,7 @@ export default function NotificationsScreen() {
                       })}
                     </React.Fragment>
                   ))}
+                  </ScrollView>
                 </View>
               )}
             </>
@@ -1035,23 +1066,38 @@ export default function NotificationsScreen() {
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <View style={styles.modalHeaderLeft}>
-                <Ionicons name="bicycle-outline" size={24} color="#1C1C1E" />
-                <Text style={styles.modalHeaderText}>Announcement Group</Text>
-              </View>
-              <TouchableOpacity onPress={closeGroupModal}>
+              <TouchableOpacity onPress={closeGroupModal} style={styles.modalCloseOnly}>
                 <Ionicons name="close" size={24} color="#1C1C1E" />
               </TouchableOpacity>
             </View>
-
-            {/* User List */}
-            <ScrollView 
-              style={styles.userList}
-              showsVerticalScrollIndicator={false}
+            <TextInput
+              style={styles.addToCommunitySearchInput}
+              placeholder="Search by name"
+              placeholderTextColor="#8E8E93"
+              value={addToCommunitySearch}
+              onChangeText={setAddToCommunitySearch}
+            />
+            {/* Sticky Select All */}
+            <TouchableOpacity
+              style={styles.selectAllItemSticky}
+              onPress={toggleSelectAll}
+              activeOpacity={0.7}
+              disabled={availableUserIds.length === 0}
             >
-              {currentGroup && uniqueUserIds.map((userId) => {
+              <Text style={styles.selectAllText}>Select All</Text>
+              <View style={[styles.checkbox, allSelected && styles.checkboxSelected]}>
+                {allSelected && (
+                  <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                )}
+              </View>
+            </TouchableOpacity>
+            {/* User List - scrollable inside container */}
+            <ScrollView 
+              style={styles.userListScroll}
+              showsVerticalScrollIndicator={true}
+            >
+              {currentGroup && filteredAvailableUserIds.map((userId) => {
                 const interaction = currentGroup.interactions.find((i) => i.source_user_id === userId);
                 const cachedUser = userCache[userId];
                 const user = cachedUser || interaction?.user;
@@ -1079,20 +1125,6 @@ export default function NotificationsScreen() {
                   </TouchableOpacity>
                 );
               })}
-              
-              {/* Select All */}
-              <TouchableOpacity
-                style={styles.selectAllItem}
-                onPress={toggleSelectAll}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.selectAllText}>Select All</Text>
-                <View style={[styles.checkbox, allSelected && styles.checkboxSelected]}>
-                  {allSelected && (
-                    <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-                  )}
-                </View>
-              </TouchableOpacity>
             </ScrollView>
 
             {/* Action Button */}
@@ -1202,6 +1234,10 @@ const styles = StyleSheet.create({
   listContainer: {
     backgroundColor: '#F2F2F7',
     paddingTop: 8,
+    maxHeight: 400,
+  },
+  listContainerScroll: {
+    flexGrow: 0,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -1274,12 +1310,36 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    marginBottom: 12,
+  },
+  modalCloseOnly: {
+    padding: 4,
+  },
+  addToCommunitySearchInput: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: '#1C1C1E',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  selectAllItemSticky: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+    backgroundColor: '#F2F2F7',
+    borderRadius: 12,
+  },
+  userListScroll: {
+    maxHeight: 240,
+    marginBottom: 16,
   },
   modalHeaderLeft: {
     flexDirection: 'row',

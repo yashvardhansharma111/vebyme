@@ -154,26 +154,28 @@ export default function EventAnalyticsScreen() {
         {ticketDist.length > 0 && (
           <View style={[styles.card, styles.cardGray]}>
             <Text style={styles.cardHeading}>Ticket Distribution</Text>
-            <View style={styles.ticketDistributionRow}>
-              {ticketDist.map((item, index) => {
-                const totalPct = ticketDist.reduce((s, i) => s + i.percent, 0) || 1;
-                const flex = item.percent / totalPct;
-                return (
-                  <View
-                    key={item.pass_id}
-                    style={[
-                      styles.ticketBlock,
-                      {
-                        backgroundColor: TICKET_COLORS[index % TICKET_COLORS.length],
-                        flex,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.ticketBlockName} numberOfLines={1}>{item.name}</Text>
-                    <Text style={styles.ticketBlockPercent}>{item.percent.toFixed(0)} %</Text>
-                  </View>
-                );
-              })}
+            <View style={styles.ticketDistributionContent}>
+              <View style={styles.ticketDistributionRow}>
+                {ticketDist.map((item, index) => {
+                  const totalPct = ticketDist.reduce((s, i) => s + i.percent, 0) || 1;
+                  const flex = item.percent / totalPct;
+                  return (
+                    <View
+                      key={item.pass_id}
+                      style={[
+                        styles.ticketBlock,
+                        {
+                          backgroundColor: TICKET_COLORS[index % TICKET_COLORS.length],
+                          flex,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.ticketBlockName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.ticketBlockPercent}>{item.percent.toFixed(0)} %</Text>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           </View>
         )}
@@ -181,28 +183,30 @@ export default function EventAnalyticsScreen() {
         {/* Gender Distribution */}
         <View style={styles.card}>
           <Text style={styles.cardHeading}>Gender Distribution</Text>
-          <View style={styles.genderBarWrap}>
-            {g.male > 0 && (
-              <View style={[styles.genderSegment, { backgroundColor: '#22C55E', width: `${g.male}%` }]}>
-                <Text style={styles.genderLabel}>Men</Text>
-                <Text style={styles.genderPercent}>{g.male.toFixed(0)} %</Text>
-              </View>
-            )}
-            {g.female > 0 && (
-              <View style={[styles.genderSegment, { backgroundColor: '#14B8A6', width: `${g.female}%` }]}>
-                <Text style={styles.genderLabel}>Women</Text>
-                <Text style={styles.genderPercent}>{g.female.toFixed(0)} %</Text>
-              </View>
-            )}
-            {g.other > 0 && (
-              <View style={[styles.genderSegment, { backgroundColor: '#3B82F6', width: `${g.other}%` }]}>
-                <Text style={styles.genderLabel}>Others</Text>
-                <Text style={styles.genderPercent}>{g.other.toFixed(0)} %</Text>
-              </View>
-            )}
-            {g.male === 0 && g.female === 0 && g.other === 0 && (
-              <Text style={styles.noDataText}>No gender data</Text>
-            )}
+          <View style={styles.genderDistributionContent}>
+            <View style={styles.genderBarWrap}>
+              {g.male > 0 && (
+                <View style={[styles.genderSegment, { backgroundColor: '#22C55E', width: `${g.male}%` }]}>
+                  <Text style={styles.genderLabel}>Men</Text>
+                  <Text style={styles.genderPercent}>{g.male.toFixed(0)} %</Text>
+                </View>
+              )}
+              {g.female > 0 && (
+                <View style={[styles.genderSegment, { backgroundColor: '#14B8A6', width: `${g.female}%` }]}>
+                  <Text style={styles.genderLabel}>Women</Text>
+                  <Text style={styles.genderPercent}>{g.female.toFixed(0)} %</Text>
+                </View>
+              )}
+              {g.other > 0 && (
+                <View style={[styles.genderSegment, { backgroundColor: '#3B82F6', width: `${g.other}%` }]}>
+                  <Text style={styles.genderLabel}>Others</Text>
+                  <Text style={styles.genderPercent}>{g.other.toFixed(0)} %</Text>
+                </View>
+              )}
+              {g.male === 0 && g.female === 0 && g.other === 0 && (
+                <Text style={styles.noDataText}>No gender data</Text>
+              )}
+            </View>
           </View>
         </View>
 
@@ -242,13 +246,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   cardGray: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#F2F2F7',
   },
   cardHeading: {
     fontSize: 15,
     fontWeight: '600',
     color: '#3A3A3C',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  ticketDistributionContent: {
+    paddingTop: 4,
+  },
+  genderDistributionContent: {
+    paddingTop: 4,
   },
   revenueBox: {
     backgroundColor: '#1C1C1E',
@@ -316,12 +326,13 @@ const styles = StyleSheet.create({
   },
   ticketDistributionRow: {
     flexDirection: 'row',
-    gap: 4,
-    height: 72,
+    gap: 8,
+    height: 80,
   },
   ticketBlock: {
     borderRadius: 12,
-    padding: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
     justifyContent: 'flex-end',
   },
   ticketBlockName: {
@@ -333,18 +344,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#FFF',
-    marginTop: 4,
+    marginTop: 6,
   },
   genderBarWrap: {
     flexDirection: 'row',
-    height: 44,
-    borderRadius: 10,
+    height: 52,
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#E5E5EA',
   },
   genderSegment: {
     justifyContent: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     minWidth: 2,
   },
   genderLabel: {
@@ -355,13 +366,13 @@ const styles = StyleSheet.create({
   genderPercent: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.9)',
-    marginTop: 2,
+    marginTop: 4,
   },
   noDataText: {
     fontSize: 14,
     color: '#8E8E93',
     alignSelf: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   feedbackTagline: {
     fontSize: 15,

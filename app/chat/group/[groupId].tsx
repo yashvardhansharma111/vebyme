@@ -29,7 +29,7 @@ import SharedPlanCard from '@/components/SharedPlanCard';
 interface Message {
   message_id: string;
   user_id: string;
-  type: 'text' | 'image' | 'poll' | 'plan';
+  type: 'text' | 'image' | 'poll' | 'plan' | 'system';
   content: any;
   timestamp: Date | string;
   reactions: Array<{
@@ -74,8 +74,11 @@ interface GroupDetails {
   plan: {
     plan_id: string;
     title: string;
-    description: string;
+    description?: string;
     media: any[];
+    date?: string | null;
+    time?: string | null;
+    joins_count?: number;
   } | null;
   members: Array<{
     user_id: string;
@@ -516,28 +519,31 @@ export default function GroupChatScreen() {
   const renderPlanCard = () => {
     if (!groupDetails?.plan) return null;
     const { plan } = groupDetails;
-    const memberCount = groupDetails.members?.length || 0;
-    const otherMembersCount = memberCount > 1 ? memberCount - 1 : 0;
+    const attendeesCount = plan.joins_count ?? groupDetails.members?.length ?? 0;
+    const eventMedia = plan.media?.[0];
+    const eventImageUrl = eventMedia ? (typeof eventMedia === 'string' ? eventMedia : eventMedia?.url) : null;
 
     return (
       <View style={styles.planContainer}>
         <View style={styles.planCard}>
-          <View style={styles.planBadgeRow}>
-            <View style={styles.planBadgeDark}>
-              <Text style={styles.planBadgeTextDark}>You Interacted</Text>
-            </View>
-            {otherMembersCount > 0 && (
-              <View style={styles.planBadgeLight}>
-                <Text style={styles.planBadgeTextLight}>+{otherMembersCount} {otherMembersCount === 1 ? 'Other' : 'Others'}</Text>
+          {eventImageUrl ? (
+            <Image source={{ uri: eventImageUrl }} style={styles.planCardImage} resizeMode="cover" />
+          ) : null}
+          <Text style={styles.planTitle}>{plan.title || 'Event'}</Text>
+          <View style={styles.planMetaRow}>
+            {(plan.date || plan.time) && (
+              <Text style={styles.planDateTime}>
+                {plan.date ? new Date(plan.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                {plan.date && plan.time ? ' · ' : ''}
+                {plan.time || ''}
+              </Text>
+            )}
+            {attendeesCount > 0 && (
+              <View style={styles.attendeesPill}>
+                <Text style={styles.attendeesPillText}>{attendeesCount} attendees</Text>
               </View>
             )}
           </View>
-          
-          <Text style={styles.planTitle}>{plan.title || 'Trip Plan'}</Text>
-          <Text style={styles.planDescription}>
-            {plan.description} 
-            <Text style={{fontWeight: '700'}}> vybeme!</Text>
-          </Text>
         </View>
       </View>
     );
@@ -605,6 +611,29 @@ export default function GroupChatScreen() {
       (new Date(item.timestamp).getTime() - new Date(previousMessage.timestamp).getTime() > 3600000);
     const showAvatar = !isMe && (!previousMessage || previousMessage.user_id !== item.user_id);
     const showName = !isMe;
+
+    if (item.type === 'system') {
+      const content = item.content;
+      const systemText = typeof content === 'object' && content?.text
+        ? content.text
+        : typeof content === 'string'
+          ? content
+          : 'System message';
+      const addedImage = typeof content === 'object' && content?.added_user_profile_image ? content.added_user_profile_image : null;
+      return (
+        <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+          {showTimeHeader && (
+            <View style={styles.timeHeaderContainer}>
+              <Text style={styles.timeHeaderText}>{formatTimeHeader(item.timestamp)}</Text>
+            </View>
+          )}
+          <View style={styles.systemMessageRow}>
+            {addedImage != null && <Avatar uri={addedImage} size={24} />}
+            <Text style={styles.systemMessageText}>{systemText}</Text>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <View style={{ paddingHorizontal: 16 }}>
@@ -1034,6 +1063,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 24,
     padding: 16,
+    overflow: 'hidden',
+  },
+  planCardImage: {
+    width: '100%',
+    height: 140,
+    borderRadius: 16,
+    marginBottom: 12,
+    backgroundColor: '#E5E7EB',
+  },
+  planMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 4,
+  },
+  planDateTime: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  attendeesPill: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  attendeesPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
   },
   planBadgeRow: {
     flexDirection: 'row',
@@ -1073,6 +1132,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4B5563',
     lineHeight: 20,
+  },
+  systemMessageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  systemMessageText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    fontStyle: 'italic',
   },
 
   // --- Poll Styles ---

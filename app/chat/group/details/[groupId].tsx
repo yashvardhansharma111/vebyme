@@ -24,8 +24,11 @@ interface GroupDetails {
   plan: {
     plan_id: string;
     title: string;
-    description: string;
+    description?: string;
     media: any[];
+    date?: string | null;
+    time?: string | null;
+    joins_count?: number;
   } | null;
   members: Array<{
     user_id: string;
@@ -72,24 +75,10 @@ export default function GroupDetailsScreen() {
     try {
       await apiService.closeGroup(groupId, user.user_id);
       setShowCloseDialog(false);
-      await loadGroupDetails();
-      Alert.alert('Success', 'Group chat has been closed');
+      router.replace('/(tabs)/chat' as any);
     } catch (error: any) {
       Alert.alert('Error', 'Failed to close group');
       console.error('Error closing group:', error);
-    }
-  };
-
-  const handleReopenGroup = async () => {
-    if (!groupId || !user?.user_id) return;
-
-    try {
-      await apiService.reopenGroup(groupId, user.user_id);
-      await loadGroupDetails();
-      Alert.alert('Success', 'Group chat has been reopened');
-    } catch (error: any) {
-      Alert.alert('Error', 'Failed to reopen group');
-      console.error('Error reopening group:', error);
     }
   };
 
@@ -139,36 +128,59 @@ export default function GroupDetailsScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Active Plan Card */}
+        {/* Active Plan Card: image, title, date|time, attendees pill only */}
         {groupDetails.plan && (
           <View style={styles.planCard}>
             <View style={styles.planBadge}>
               <Text style={styles.planBadgeText}>Active Plan</Text>
             </View>
             <View style={styles.planContent}>
-              <Text style={styles.planTitle}>{groupDetails.plan.title}</Text>
-              <Text style={styles.planDescription} numberOfLines={3}>
-                {groupDetails.plan.description}
-              </Text>
               {groupDetails.plan.media && groupDetails.plan.media.length > 0 && (
                 <Image
-                  source={{ uri: groupDetails.plan.media[0].url }}
+                  source={{ uri: typeof groupDetails.plan.media[0] === 'string' ? groupDetails.plan.media[0] : groupDetails.plan.media[0].url }}
                   style={styles.planImage}
                   resizeMode="cover"
                 />
               )}
+              <Text style={styles.planTitle}>{groupDetails.plan.title}</Text>
+              <View style={styles.planMetaRow}>
+                {(groupDetails.plan.date || groupDetails.plan.time) && (
+                  <Text style={styles.planDateTime}>
+                    {groupDetails.plan.date ? new Date(groupDetails.plan.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                    {groupDetails.plan.date && groupDetails.plan.time ? ' · ' : ''}
+                    {groupDetails.plan.time || ''}
+                  </Text>
+                )}
+                {(groupDetails.plan.joins_count ?? groupDetails.members.length) > 0 && (
+                  <View style={styles.attendeesPill}>
+                    <Text style={styles.attendeesPillText}>
+                      {groupDetails.plan.joins_count ?? groupDetails.members.length} attendees
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
         )}
 
-        {/* All Members */}
+        {/* All Members - tap avatar/row to open profile */}
         <View style={styles.membersCard}>
           <View style={styles.membersBadge}>
             <Text style={styles.membersBadgeText}>All Members</Text>
           </View>
           <View style={styles.membersList}>
             {groupDetails.members.map((member) => (
-              <View key={member.user_id} style={styles.memberRow}>
+              <TouchableOpacity
+                key={member.user_id}
+                style={styles.memberRow}
+                onPress={() => {
+                  if (member.user_id !== user?.user_id) {
+                    router.push({ pathname: '/profile/[userId]', params: { userId: member.user_id } } as any);
+                  }
+                }}
+                activeOpacity={member.user_id === user?.user_id ? 1 : 0.7}
+                disabled={member.user_id === user?.user_id}
+              >
                 <Image
                   source={{ uri: member.profile_image || 'https://via.placeholder.com/50' }}
                   style={styles.memberAvatar}
@@ -176,28 +188,20 @@ export default function GroupDetailsScreen() {
                 <Text style={styles.memberName} numberOfLines={1}>
                   {member.user_id === user?.user_id ? 'You' : member.name}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* Close Group Button */}
-      {isCreator && (
+      {/* Close Group Button - no reopen; once closed, group is closed permanently */}
+      {isCreator && !groupDetails.is_closed && (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={() => {
-              if (groupDetails.is_closed) {
-                handleReopenGroup();
-              } else {
-                setShowCloseDialog(true);
-              }
-            }}
+            onPress={() => setShowCloseDialog(true)}
           >
-            <Text style={styles.closeButtonText}>
-              {groupDetails.is_closed ? 'Reopen Group' : 'Close Group'}
-            </Text>
+            <Text style={styles.closeButtonText}>Close Group</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -213,8 +217,7 @@ export default function GroupDetailsScreen() {
           <View style={styles.dialog}>
             <Text style={styles.dialogTitle}>Close group chat?</Text>
             <Text style={styles.dialogText}>
-              New messages will be disabled for everyone. Existing messages stay visible. You can
-              re-open the chat anytime in Settings.
+              This will permanently close the group. New messages will be disabled for everyone.
             </Text>
             <View style={styles.dialogButtons}>
               <TouchableOpacity
@@ -367,13 +370,35 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginBottom: 8,
+    marginRight: 12,
   },
   memberName: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '600',
     color: '#1C1C1E',
-    textAlign: 'center',
+  },
+  planMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  planDateTime: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  attendeesPill: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+  },
+  attendeesPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
   },
   footer: {
     padding: 16,
